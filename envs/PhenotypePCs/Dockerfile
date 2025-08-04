@@ -13,6 +13,6 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     bioconda::bioconductor-pcatools \
     conda-forge::r-rnomni
 
-COPY calculate_PCs.R . 
+COPY scripts/calculate_PCs.R . 
 ## Default command to run when the container starts
 CMD ["bash"]
