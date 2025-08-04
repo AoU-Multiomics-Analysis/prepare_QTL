@@ -4,3 +4,5 @@ workflows:
     primaryDescriptorPath: /workflows/prepare_eQTL.wdl
   - subclass: WDL 
     primaryDescriptorPath: /workflows/prepare_pQTL.wdl
+  - subclass: WDL 
+    primaryDescriptorPath: /workflows/prepare_sQTL.wdl
