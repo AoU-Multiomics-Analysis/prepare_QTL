@@ -28,7 +28,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/PhenotypePCs
+          images: ghcr.io/${{ github.repository }}
 
       - name: Build and push docker containers
         uses: docker/build-push-action@v6
