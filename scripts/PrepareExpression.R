@@ -1,13 +1,10 @@
 library(tidyverse)
 library(data.table)
 library(patchwork)
-library(OlinkAnalyze)
 library(magrittr)
-library(WGCNA)
 library(biomaRt)
 library(optparse)
 library(data.table)
-library(arrow)
 library(rtracklayer)
 library(RNOmni)
 library(edgeR)
@@ -63,7 +60,7 @@ PositionTSS <- extract_TSS_pos(opt$AnnotationGTF)
 
 
 OutputFile <- paste0(OutputPrefix,'.expression.bed.gz')
-message('Writing to file:')
+message(paste0('Writing to file: ',OutputFile ))
 ############# PROCESS DATA ###########
 # transpose read count data such that 
 # genes are column and rows are samples 

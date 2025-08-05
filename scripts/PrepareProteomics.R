@@ -11,6 +11,7 @@ library(arrow)
 library(rtracklayer)
 library(RNOmni)
 
+
 #########  FUNCTIONS ##########
 
 # helper functions that converts ensembl IDs 
@@ -130,10 +131,10 @@ ProteomicsBed <- ProteomicsDataWide %>%
     dplyr::rename_with(~str_remove(.,'X')) %>% 
     rownames_to_column('UniProt') %>%
     left_join(UniProtTSSLocations,by = 'UniProt') %>% 
-    dplyr::select(seqnames,start,end,UniProt,gene_id,everything()) %>% 
+    dplyr::select(seqnames,start, end, UniProt, gene_id, everything()) %>% 
     filter(!is.na(seqnames)) %>% 
     dplyr::rename_with(~str_remove(.,'X')) %>% 
-    mutate(gene_id = paste0(UniProt,'_',gene_id)) %>% 
+    mutate(gene_id = paste0(UniProt, '_', gene_id)) %>% 
     dplyr::select(-UniProt) %>% 
     arrange(seqnames,start) %>% 
     dplyr::rename('#chr'='seqnames')
