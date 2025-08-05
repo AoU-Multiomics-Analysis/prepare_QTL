@@ -24,7 +24,7 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 
 
 OutputFile <- paste0(opt$OutputPrefix,'.splicing.bed.gz')
-message(paste0('Writing to output file: ',OutputFile)
+message(paste0('Writing to output file: ',OutputFile))
 
 ############### LOAD DATA ###################
 
