@@ -63,14 +63,16 @@ message(paste0('Writing to file: ',OutputFile ))
 ############# PROCESS DATA ###########
 # transpose read count data such that 
 # genes are column and rows are samples 
+message('Transposing data')
 CountDataTransposed <- CountData %>%
-    select(-Description) %>% 
+    dplyr::select(-Description) %>% 
     column_to_rownames('Name') %>% 
     t() %>% 
     data.frame()
 
 # filter to genes where the count is greater than 6
 # in atleast 20% of samples
+message('Filtering expression by counts')
 CountDataFiltered <- CountDataTransposed %>%
         dplyr::select(where(~ mean(.x > 6) >= 0.2)) %>% 
         t() %>% 
@@ -100,7 +102,7 @@ message(paste0('Number of genes found: ',LengthNormalziedCPMS))
 message('Merging with quantifications with TSS locations')
 BedNormalizedCPMs <- PositionTSS %>% 
             inner_join(NormalizedCPMs,by = 'gene_id') %>% 
-            select(seqnames,start,end,gene_id,everything()) %>% 
+            dplyr::select(seqnames,start,end,gene_id,everything()) %>% 
             dplyr::rename('#chr' = 'seqnames')
 
 
