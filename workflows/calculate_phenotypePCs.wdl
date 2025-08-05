@@ -1,12 +1,12 @@
 version 1.0 
 workflow PhenotypePCs {
-
-    File BedFile 
-    String OutputPrefix
-    Int memory 
-    Int disk_space 
-    Int num_threads
-
+    input {
+        File BedFile 
+        String OutputPrefix
+        Int memory 
+        Int disk_space 
+        Int num_threads
+    }
     call ComputePCs{
         input:
             BedFile = BedFile,
