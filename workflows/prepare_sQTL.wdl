@@ -51,7 +51,7 @@ workflow sQTLPrepareData  {
             OutputPrefix = OutputPrefix
     }
 
-    call ComputePCs.ComputePCs {
+    call ComputePCs.PhenotypePCs {
         input:
             BedFile = PrepareSpliceData.SplicingBed,
             OutputPrefix = OutputPrefix,
@@ -61,7 +61,7 @@ workflow sQTLPrepareData  {
     }
     output {
         File BedFile = PrepareSpliceData.SplicingBed 
-        File PhenotypePCs = ComputePCs.OutPhenotypePCs 
+        File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs 
     }
 
 }
