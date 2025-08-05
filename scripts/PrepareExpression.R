@@ -58,7 +58,7 @@ CountData <-  fread(opt$CountGCT,skip  =2 ,header = TRUE)
 PositionTSS <- extract_TSS_pos(opt$AnnotationGTF)
 
 
-OutputFile <- paste0(OutputPrefix,'.expression.bed.gz')
+OutputFile <- paste0(opt$OutputPrefix,'.expression.bed.gz')
 message(paste0('Writing to file: ',OutputFile ))
 ############# PROCESS DATA ###########
 # transpose read count data such that 
