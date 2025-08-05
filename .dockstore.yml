@@ -6,3 +6,5 @@ workflows:
     primaryDescriptorPath: /workflows/prepare_pQTL.wdl
   - subclass: WDL 
     primaryDescriptorPath: /workflows/prepare_sQTL.wdl
+  - subclass: WDL 
+    primaryDescriptorPath: /workflows/calculate_phenotypePCs.wdl

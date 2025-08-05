@@ -34,7 +34,7 @@ task ComputePCs{
 
     >>>
     runtime {
-        docker: "evinpadhi/prepare_qtl:latest"
+        docker: "AoU-Multiomics-Analysis/prepare_QTL:main"
         memory: "${memory}GB"
         disks: "local-disk ${disk_space} HDD"
         cpu: "${num_threads}"

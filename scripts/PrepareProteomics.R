@@ -98,7 +98,7 @@ TSS_position <- extract_TSS_pos(opt$AnnotationGTF)
 message('Merging Uniprot conversion table and TSS locations')
 UniProtTSSLocations <- UniProtConversion %>% left_join(TSS_position,by = 'UniProt')
 
-OutputFile <- paste0(opt$OutputPrefix,'.bed.gz')
+OutputFile <- paste0(opt$OutputPrefix,'.protein.bed.gz')
 message(paste0('Writing bed file to ',OutputFile))
 ############ BEGIN SCRIPT ##########
 

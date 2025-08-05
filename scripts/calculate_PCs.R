@@ -9,9 +9,9 @@ option_list <- list(
     optparse::make_option(c("--bed_file"), type="character", default=NULL,
                         help="Sample to be used in processing expression marix", metavar = "type"),
     optparse::make_option(c("--output_prefix"), type="character", default=NULL,
-                        help="Sample to be used in processing expression marix", metavar = "type"),
-    optparse::make_option(c("--genetic_covariates"), type="character", default=NULL,
                         help="Sample to be used in processing expression marix", metavar = "type")
+  #  optparse::make_option(c("--genetic_covariates"), type="character", default=NULL,
+                        #help="Sample to be used in processing expression marix", metavar = "type")
 
     )
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
@@ -23,7 +23,7 @@ bed_file <- opt$bed_file
 prefix <- opt$output_prefix
 
 phenotype_pcs_out <- paste0(prefix,'_phenotype_PCs.tsv')
-QTL_covariates <- paste0(prefix,'_QTL_covariates.tsv')
+#QTL_covariates <- paste0(prefix,'_QTL_covariates.tsv')
 
 ######## FUNCTIONS ########
 compute_pcs <- function(expression_df){
@@ -48,24 +48,24 @@ pca_out
 
 bed_df <- fread(bed_file)
 PCA_data <- compute_pcs(bed_df)
-genetic_PCs <- fread(genetic_PCs) %>% dplyr::rename( 'ID'= 'sample_id')
+#genetic_PCs <- fread(genetic_PCs) %>% dplyr::rename( 'ID'= 'sample_id')
 
 # writes phenotype PC to output
 PCA_data %>% write_tsv(phenotype_pcs_out)
 
 # merges genetic PCs and phenotype PCs
-merged_data <- genetic_PCs %>% 
-    inner_join(PCA_data,by = 'ID') %>% 
-    dplyr::select(ID,everything()) %>% 
-    distinct() 
+#merged_data <- genetic_PCs %>% 
+    #inner_join(PCA_data,by = 'ID') %>% 
+    #dplyr::select(ID,everything()) %>% 
+    #distinct() 
 
-# formats covariates data for tensorQTL
-output_data <- merged_data %>% 
-    arrange(ID) %>% 
-    t() %>% 
-    data.frame()
-    janitor::row_to_names(row_number = 1) %>% 
-    rownames_to_column('ID')
+## formats covariates data for tensorQTL
+#output_data <- merged_data %>% 
+    #arrange(ID) %>% 
+    #t() %>% 
+    #data.frame()
+    #janitor::row_to_names(row_number = 1) %>% 
+    #rownames_to_column('ID')
 
-output_data %>% write_tsv(QTL_covariates)
+#output_data %>% write_tsv(QTL_covariates)
 
