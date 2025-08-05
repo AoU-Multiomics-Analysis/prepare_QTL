@@ -102,8 +102,7 @@ message(paste0('Number of genes found: ',LengthNormalziedCPMS))
 message('Merging with quantifications with TSS locations')
 BedNormalizedCPMs <- PositionTSS %>% 
             inner_join(NormalizedCPMs,by = 'gene_id') %>% 
-            dplyr::select(seqnames,start,end,gene_id,everything()) %>% 
-            dplyr::rename('#chr' = 'seqnames')
+            dplyr::select(seqnames,start,end,gene_id,everything()) 
 
 
 LengthBedCPMs <- BedNormalizedCPMs %>% nrow
@@ -117,7 +116,7 @@ message('Please check GENCODE version since genes are lost in merging process')
 
 }
 
-BedNormalizedCPMs %>% arrange(seqnames,start) %>% fwrite(OutputFile) 
+BedNormalizedCPMs %>% arrange(seqnames,start) %>%  dplyr::rename('#chr' = 'seqnames') %>% fwrite(OutputFile) 
 
 
 
