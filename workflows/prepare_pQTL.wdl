@@ -1,5 +1,5 @@
 version 1.0
-import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs 
+import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs
 
 
 
@@ -44,9 +44,9 @@ workflow pQTLPrepareData {
         Int memory 
         Int disk_space 
         Int num_threads 
-        
         File AnnotationGTF 
         File SampleList 
+        File ProteomicData
         String OutputPrefix 
     } 
     call PrepareProteomicData {
@@ -56,10 +56,12 @@ workflow pQTLPrepareData {
             num_threads = num_threads,
             AnnotationGTF = AnnotationGTF,
             SampleList = SampleList,
-            OutputPrefix = OutputPrefix
+            OutputPrefix = OutputPrefix,
+            ProteomicData = ProteomicData
+
     }
 
-    call ComputePCs.ComputePCs {
+    call ComputePCs.PhenotypePCs {
         input:
             BedFile = PrepareProteomicData.ProteomicBed,
             OutputPrefix = OutputPrefix,
@@ -69,6 +71,6 @@ workflow pQTLPrepareData {
     }
     output {
         File BedFile = PrepareProteomicData.ProteomicBed 
-        File PhenotypePCs = ComputePCs.OutPhenotypePCs 
+        File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs 
     }
 }

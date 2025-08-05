@@ -1,6 +1,7 @@
 version 1.0
 
-import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as calculate_phenotypePCs
+import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs
+
 
 
 task eqtl_prepare_expression {
@@ -59,7 +60,6 @@ workflow eQTLPrepareData {
         Int memory 
         Int disk_space 
         Int num_threads 
-        File genotype_covariates
         
 
         File tpm_gct
@@ -93,7 +93,7 @@ workflow eQTLPrepareData {
             flags = flags
     }
 
-    call calculate_phenotypePCs.ComputePCs {
+    call ComputePCs.PhenotypePCs {
         input:
             BedFile = eqtl_prepare_expression.ExpressionBed,
             OutputPrefix = OutputPrefix,
@@ -104,6 +104,6 @@ workflow eQTLPrepareData {
 
     output {
         File BedFile = eqtl_prepare_expression.ExpressionBed 
-        File PhenotypePCs = ComputePCs.OutPhenotypePCs 
+        File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs 
     }
 }
