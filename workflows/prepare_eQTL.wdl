@@ -27,7 +27,7 @@ task eqtl_prepare_expression {
         }
 
     runtime {
-        docker: "quay.io/jonnguye/modified_gtex_eqtl:1.1"
+        docker: "ghcr.io/AoU-Multiomics-Analysis/prepare_QTL:main"
         memory: "${memory}GB"
         disks: "local-disk ${disk_space} HDD"
         cpu: "${num_threads}"
