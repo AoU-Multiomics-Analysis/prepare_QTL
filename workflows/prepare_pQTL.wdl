@@ -67,4 +67,8 @@ workflow pQTLPrepareData {
             disk_space = disk_space,
             num_threads = num_threads
     }
+    output {
+        File BedFile = PrepareProteomicData.ProteomicBed 
+        File PhenotypePCs = ComputePCs.OutPhenotypePCs 
+    }
 }

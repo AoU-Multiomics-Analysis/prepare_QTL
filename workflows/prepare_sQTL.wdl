@@ -59,4 +59,9 @@ workflow sQTLPrepareData  {
             disk_space = disk_space,
             num_threads = num_threads
     }
+    output {
+        File BedFile = PrepareSpliceData.SplicingBed 
+        File PhenotypePCs = ComputePCs.OutPhenotypePCs 
+    }
+
 }

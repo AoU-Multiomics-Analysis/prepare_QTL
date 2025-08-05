@@ -101,4 +101,9 @@ workflow eQTLPrepareData {
             disk_space = disk_space,
             num_threads = num_threads
     }
+
+    output {
+        File BedFile = eqtl_prepare_expression.ExpressionBed 
+        File PhenotypePCs = ComputePCs.OutPhenotypePCs 
+    }
 }
