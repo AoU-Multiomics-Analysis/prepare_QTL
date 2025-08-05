@@ -5,6 +5,7 @@ import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/re
 
 
 task PrepareProteomicData {
+    input {
         File AnnotationGTF
         File SampleList 
         File ProteomicData 
@@ -12,7 +13,8 @@ task PrepareProteomicData {
         
         Int memory 
         Int disk_space 
-        Int num_threads 
+        Int num_threads
+    }
     command {
         Rscript /tmp/PrepareProteomics.R \
             --ProteomicData ${ProteomicData} \

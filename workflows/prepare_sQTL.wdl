@@ -3,13 +3,15 @@ import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/re
 
 
 task PrepareSpliceData {
+    input {
         File SampleList 
         File SpliceData 
         String OutputPrefix 
         
         Int memory 
         Int disk_space 
-        Int num_threads 
+        Int num_threads
+    }
     command {
         Rscript /tmp/PrepareSpliceData.R \
             --SpliceData ${SpliceData} \
