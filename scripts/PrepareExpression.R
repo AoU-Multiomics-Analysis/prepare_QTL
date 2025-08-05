@@ -116,7 +116,7 @@ message('Please check GENCODE version since genes are lost in merging process')
 
 }
 
-BedNormalizedCPMs %>% fwrite(OutputFile) 
+BedNormalizedCPMs %>% arrange(seqnames,start) %>% fwrite(OutputFile) 
 
 
 
