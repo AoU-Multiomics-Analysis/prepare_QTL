@@ -51,7 +51,7 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 ########### LOAD DATA #####################
 
 message('Loading count data')
-CountData <-  readr::read_tsv(opt$countGCT,skip  =2 ,col_names = TRUE)
+CountData <-  fread(opt$CountGCT,skip  =2 ,col_names = TRUE)
 
 #TPMData <- fread(opt$TPMGCT,skip  =2 ,header = TRUE)
 

@@ -70,7 +70,7 @@ option_list <- list(
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 
-
+filepath <- opt$ProteomicsData
 ############### LOAD DATA ###################
 # load in proteomics data based on type of file 
 if (grepl("\\.tsv(\\.gz)?$", filepath)) {
