@@ -32,6 +32,7 @@ task PrepareSpliceData {
  }
 
 workflow sQTLPrepareData  {
+    input { 
         File SampleList 
         File SpliceData
         String OutputPrefix
@@ -39,7 +40,7 @@ workflow sQTLPrepareData  {
         Int memory 
         Int disk_space 
         Int num_threads 
-    
+    } 
     call PrepareSpliceData {
         input:
             memory = memory,

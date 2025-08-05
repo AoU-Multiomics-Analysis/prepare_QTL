@@ -40,6 +40,7 @@ task PrepareProteomicData {
 }
 
 workflow pQTLPrepareData {
+    input {
         Int memory 
         Int disk_space 
         Int num_threads 
@@ -47,7 +48,7 @@ workflow pQTLPrepareData {
         File AnnotationGTF 
         File SampleList 
         String OutputPrefix 
-    
+    } 
     call PrepareProteomicData {
         input:
             memory = memory,

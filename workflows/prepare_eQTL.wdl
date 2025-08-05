@@ -54,6 +54,7 @@ task eqtl_prepare_expression {
 }
 
 workflow eQTLPrepareData {
+    input {
         String OutputPrefix 
         Int memory 
         Int disk_space 
@@ -72,7 +73,7 @@ workflow eQTLPrepareData {
         Float? sample_frac_threshold
         String? normalization_method
         String? flags
-    
+    } 
     call eqtl_prepare_expression {
         input:
             OutputPrefix = OutputPrefix,
