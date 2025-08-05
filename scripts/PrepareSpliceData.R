@@ -30,12 +30,12 @@ message(paste0('Writing to output file: ',OutputFile))
 
 message('Loading sample list')
 # load sample list data
-SampleList <- fread(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% pull(ID)
+SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% pull(ID)
 message(paste0('Number of samples in SampleList:',SampleList %>% length()))
 
 
 message('Loading splice data')
-SpliceData <- fread(opt$SpliceData) %>% 
+SpliceData <-  readr::read_tsv(opt$SpliceData) %>% 
     select(1,2,3,4,any_of(SampleList))
 NumSampleSpliceData <- SpliceData %>% ncol - 4
 message(paste0('Number of samples found in SpliceData matching SampleList:', NumSampleSpliceData ))

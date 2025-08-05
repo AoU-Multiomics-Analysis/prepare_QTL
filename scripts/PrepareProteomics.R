@@ -75,7 +75,7 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 # load in proteomics data based on type of file 
 if (grepl("\\.tsv(\\.gz)?$", filepath)) {
     message("Reading as TSV using fread")
-    ProteomicsData <- fread(filepath)
+    ProteomicsData <-  readr::read_tsv(filepath)
   } else if (grepl("\\.parquet$", filepath)) {
     message("Reading as Parquet using arrow")
     ProteomicsData <- arrow::read_parquet(filepath)
@@ -86,7 +86,7 @@ if (grepl("\\.tsv(\\.gz)?$", filepath)) {
 
 message('Loading sample list')
 # load sample list data
-SampleList <- fread(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% pull(ID)
+SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% pull(ID)
 
 message('Creating UniProt ensembl id conversion')
 # create table containing UniProt and ensembl id conversions 

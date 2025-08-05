@@ -46,7 +46,7 @@ pca_out
 
 ####### ANALYSIS BEGIN ########
 
-bed_df <- fread(bed_file)
+bed_df <-  readr::read_tsv(bed_file)
 PCA_data <- compute_pcs(bed_df)
 #genetic_PCs <- fread(genetic_PCs) %>% dplyr::rename( 'ID'= 'sample_id')
 
