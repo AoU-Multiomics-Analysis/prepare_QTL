@@ -14,11 +14,12 @@ workflow PhenotypePCs {
             memory = memory, 
             disk_space = disk_space, 
             num_threads = num_threads
+    } 
+
     output {
         File OutPhenotypePCs="${OutputPrefix}_phenotype_PCs.tsv"
+    }
 
-        }
-    } 
 }
 
 task ComputePCs{
