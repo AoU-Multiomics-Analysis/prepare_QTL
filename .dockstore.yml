@@ -1,10 +1,10 @@
 version: 1.2
 workflows:
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/prepare_eQTL.wdl
+    primaryDescriptorPath: workflows/prepare_eQTL.wdl
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/prepare_pQTL.wdl
+    primaryDescriptorPath: workflows/prepare_pQTL.wdl
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/prepare_sQTL.wdl
+    primaryDescriptorPath: workflows/prepare_sQTL.wdl
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/calculate_phenotypePCs.wdl
+    primaryDescriptorPath: workflows/calculate_phenotypePCs.wdl
