@@ -15,7 +15,7 @@ task ComputePCs{
         --output_prefix ${OutputPrefix}
     >>>
     runtime {
-        docker: "AoU-Multiomics-Analysis/prepare_QTL:main"
+        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
         memory: "${memory}GB"
         disks: "local-disk ${disk_space} HDD"
         cpu: "${num_threads}"
