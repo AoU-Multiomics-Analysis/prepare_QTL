@@ -11,7 +11,9 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::r-optparse \
     conda-forge::r-janitor \
     bioconda::bioconductor-pcatools \
-    conda-forge::r-rnomni
+    conda-forge::r-rnomni \ 
+    bioconda::bioconductor-edger
+
 
 COPY scripts/*  . 
 ## Default command to run when the container starts
