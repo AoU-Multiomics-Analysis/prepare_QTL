@@ -1,6 +1,6 @@
 version 1.0
 
-import https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl as calculate_phenotypePCs
+import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as calculate_phenotypePCs
 
 
 task eqtl_prepare_expression {
@@ -10,7 +10,7 @@ task eqtl_prepare_expression {
         File sample_participant_ids
         File vcf_chr_list
         File sample_list
-        String prefix
+        String OutputPrefix 
         
 
         Int memory 
@@ -25,7 +25,7 @@ task eqtl_prepare_expression {
     command {
         set -euo pipefail
         /src/eqtl_prepare_expression.py ${tpm_gct} ${counts_gct} \
-        ${annotation_gtf} ${sample_participant_ids} ${vcf_chr_list} ${prefix} \
+        ${annotation_gtf} ${sample_participant_ids} ${vcf_chr_list} ${OutputPrefix} \
         ${"--tpm_threshold " + tpm_threshold} \
         ${"--sample_ids " + sample_list} \
         ${"--count_threshold " + count_threshold} \
@@ -42,8 +42,8 @@ task eqtl_prepare_expression {
     }
 
     output {
-        File expression_bed="${prefix}.expression.bed.gz"
-        File expression_bed_index="${prefix}.expression.bed.gz.tbi"
+        File ExpressionBed="${OutputPrefix}.expression.bed.gz"
+        File ExpressionBedIndex="${OutputPrefix}.expression.bed.gz.tbi"
     }
 
     meta {
@@ -51,42 +51,8 @@ task eqtl_prepare_expression {
     }
 }
 
-task compute_PCs{
-    
-        File expression_bed 
-        File genotype_covariates 
-        String prefix
-
-        Int memory
-        Int disk_space
-        Int num_threads   
-    command {
-
-    Rscript /tmp/compute_PCS.R \
-        --expression_bed ${expression_bed} \
-        --genotype_covariates ${genotype_covariates} \
-        --output_prefix ${prefix}
-
-    }
-    runtime {
-        docker: "evinpadhi/prepare_qtl:latest"
-        memory: "${memory}GB"
-        disks: "local-disk ${disk_space} HDD"
-        cpu: "${num_threads}"
-    }
-
-    output {
-        File phenotype_pcs="${prefix}_phenotype_PCs.tsv"
-        File QTL_covariates="${prefix}_QTL_covariates.tsv"
-    }
-
-    meta {
-        author: "Evin Padhi"
-    }
-} 
-
-workflow prepare_QTL_data {
-        String prefix
+workflow eQTLPrepareData {
+        String OutputPrefix 
         Int memory 
         Int disk_space 
         Int num_threads 
@@ -104,9 +70,10 @@ workflow prepare_QTL_data {
         Float? sample_frac_threshold
         String? normalization_method
         String? flags
+    
     call eqtl_prepare_expression {
         input:
-            prefix = prefix,
+            OutputPrefix = OutputPrefix,
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
@@ -123,13 +90,12 @@ workflow prepare_QTL_data {
             flags = flags
     }
 
-    call compute_PCs {
+    call calculate_phenotypePCs.ComputePCs {
         input:
-            expression_bed = eqtl_prepare_expression.expression_bed,
-            prefix = prefix,
+            BedFile = eqtl_prepare_expression.ExpressionBed,
+            OutputPrefix = OutputPrefix,
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads,
-            genotype_covariates = genotype_covariates
+            num_threads = num_threads
     }
 }

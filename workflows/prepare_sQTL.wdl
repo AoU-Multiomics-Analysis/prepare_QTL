@@ -1,5 +1,5 @@
 version 1.0
-import https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl as ComputePCs 
+import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs 
 
 
 task PrepareSpliceData {
@@ -12,7 +12,7 @@ task PrepareSpliceData {
         Int num_threads 
     command {
         Rscript /tmp/PrepareSpliceData.R \
-            --SpliceData ${ProteomicData} \
+            --SpliceData ${SpliceData} \
             --SampleList ${SampleList} \
             --OutputPrefix ${OutputPrefix}
         }
@@ -25,7 +25,7 @@ task PrepareSpliceData {
     }
 
     output {
-        File SplicingBed="${prefix}.splicing.bed.gz"
+        File SplicingBed="${OutputPrefix}.splicing.bed.gz"
     }
  }
 
@@ -48,9 +48,9 @@ workflow sQTLPrepareData  {
             OutputPrefix = OutputPrefix
     }
 
-    call ComputePCs.PhenotypePCs {
+    call ComputePCs.ComputePCs {
         input:
-            BedFile = sQTLPrepareData.SplicingBed,
+            BedFile = PrepareSpliceData.SplicingBed,
             OutputPrefix = OutputPrefix,
             memory = memory,
             disk_space = disk_space,

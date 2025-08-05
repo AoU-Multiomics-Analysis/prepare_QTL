@@ -1,5 +1,5 @@
 version 1.0
-import https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl as calculate_phenotypePCs
+import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs 
 
 
 
@@ -29,7 +29,7 @@ task PrepareProteomicData {
     }
 
     output {
-        File ProteomicBed="${prefix}.protein.bed.gz"
+        File ProteomicBed="${OutputPrefix}.protein.bed.gz"
     }
 
     meta {
@@ -56,7 +56,7 @@ workflow pQTLPrepareData {
             OutputPrefix = OutputPrefix
     }
 
-    call ComputePCs.PhenotypePCs {
+    call ComputePCs.ComputePCs {
         input:
             BedFile = PrepareProteomicData.ProteomicBed,
             OutputPrefix = OutputPrefix,
