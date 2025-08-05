@@ -1,6 +1,5 @@
 library(tidyverse)
 library(data.table)
-library(patchwork)
 library(magrittr)
 library(biomaRt)
 library(optparse)
