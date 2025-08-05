@@ -17,7 +17,7 @@ option_list <- list(
     optparse::make_option(c("--OutputPrefix"), type="character", default=NULL,
                         help="Prefix for output data", metavar = "type"),
     optparse::make_option(c("--SampleList"), type="character", default=NULL,
-                        help="File containing list of samples to run processing on", metavar = "type"),
+                        help="File containing list of samples to run processing on", metavar = "type")
 )
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
