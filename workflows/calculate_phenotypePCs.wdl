@@ -11,8 +11,8 @@ task ComputePCs{
     command <<<
 
     Rscript /tmp/calculate_PCs.R \
-        --bed_file ${BedFile} \
-        --output_prefix ${OutputPrefix}
+        --bed_file ~{BedFile} \
+        --output_prefix ~{OutputPrefix}
     >>>
     runtime {
         docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
