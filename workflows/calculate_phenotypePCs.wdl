@@ -10,7 +10,7 @@ task ComputePCs{
     }
     command <<<
 
-    Rscript /tmp/compute_PCs.R \
+    Rscript /tmp/calculate_PCs.R \
         --expression_bed ${BedFile} \
         --output_prefix ${OutputPrefix}
     >>>
