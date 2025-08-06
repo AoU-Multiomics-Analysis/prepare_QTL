@@ -57,5 +57,5 @@ SpliceDataNorm <- SpliceData %>%
     dplyr::rename_with(~str_remove(.,'X')) 
 
 SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>% arrange(seqnames,start)
-SpliceDataBed %>% fwrite(OutputFile)
+SpliceDataBed %>% fwrite(OutputFile,sep ='t')
 

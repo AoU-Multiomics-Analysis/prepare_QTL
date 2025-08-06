@@ -116,7 +116,7 @@ message('Please check GENCODE version since genes are lost in merging process')
 
 }
 
-BedNormalizedCPMs %>% arrange(seqnames,start) %>%  dplyr::rename('#chr' = 'seqnames') %>% fwrite(OutputFile) 
+BedNormalizedCPMs %>% arrange(seqnames,start) %>%  dplyr::rename('#chr' = 'seqnames') %>% fwrite(OutputFile,sep='\t') 
 
 
 

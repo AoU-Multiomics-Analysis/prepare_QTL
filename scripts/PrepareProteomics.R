@@ -144,6 +144,6 @@ message('Writing data to output')
 message(paste0(nproteins, ' found'))
 
 # write data to output
-ProteomicsBed %>% fwrite(OutputFile)
+ProteomicsBed %>% fwrite(OutputFile,sep ='\t')
 
 
