@@ -24,7 +24,7 @@ prefix <- opt$output_prefix
 
 phenotype_pcs_out <- paste0(prefix,'_phenotype_PCs.tsv')
 #QTL_covariates <- paste0(prefix,'_QTL_covariates.tsv')
-message(paste0('Writing to: ' phenotype_pcs_out))
+message(paste0('Writing to: ' ,phenotype_pcs_out))
 
 ######## FUNCTIONS ########
 compute_pcs <- function(expression_df){
