@@ -16,13 +16,13 @@ task ComputePCs{
     >>>
     runtime {
         docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        memory: "${memory}GB"
-        disks: "local-disk ${disk_space} HDD"
-        cpu: "${num_threads}"
+        memory: "~{memory}GB"
+        disks: "local-disk ~{disk_space} HDD"
+        cpu: "~{num_threads}"
     }
 
     output {
-        File PhenotypePCsTSV="${OutputPrefix}_phenotype_PCs.tsv"
+        File PhenotypePCsTSV="~{OutputPrefix}_phenotype_PCs.tsv"
     }
 }
 
