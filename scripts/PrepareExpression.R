@@ -57,6 +57,10 @@ CountData <-  fread(opt$CountGCT,skip  =2 ,header = TRUE)
 
 PositionTSS <- extract_TSS_pos(opt$AnnotationGTF)
 
+SampleList <- fread(opt$SampleList,header = FALSE) %>% dplyr::rename('ID' = 1) %>% pull(ID)
+nSamples <- SampleList %>% length()
+message(paste0('Number of sample in sample list:',nSamples))
+
 
 OutputFile <- paste0(opt$OutputPrefix,'.expression.bed.gz')
 message(paste0('Writing to file: ',OutputFile ))
@@ -66,7 +70,8 @@ message(paste0('Writing to file: ',OutputFile ))
 message('Transposing data')
 CountDataTransposed <- CountData %>%
     dplyr::select(-Description) %>% 
-    column_to_rownames('Name') %>% 
+    column_to_rownames('Name') %>%
+    select(any_of(SampleList)) %>% 
     t() %>% 
     data.frame()
 
