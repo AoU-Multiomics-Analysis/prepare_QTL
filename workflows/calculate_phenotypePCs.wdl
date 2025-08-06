@@ -11,7 +11,7 @@ task ComputePCs{
     command <<<
 
     Rscript /tmp/calculate_PCs.R \
-        --expression_bed ${BedFile} \
+        --bed_file ${BedFile} \
         --output_prefix ${OutputPrefix}
     >>>
     runtime {
