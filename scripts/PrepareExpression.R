@@ -71,7 +71,7 @@ message('Transposing data')
 CountDataTransposed <- CountData %>%
     dplyr::select(-Description) %>% 
     column_to_rownames('Name') %>%
-    select(any_of(SampleList)) %>% 
+    dplyr::select(any_of(SampleList)) %>% 
     t() %>% 
     data.frame()
 
