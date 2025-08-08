@@ -42,6 +42,14 @@ workflow PrepareGenotypes{
             output_prefix = OutputPrefix,
             genotype_rscript = genotype_rscript
     }
+
+    output {
+        File VCF =  FilterMTAndExportToVCF.PathVCF
+        File GenotypePCs =  ComputeGenotypePCs.output_tsv
+        File pgen = plink2.pgen 
+        File psam = plink2.psam 
+        File pvar = plink2.pvar
+    } 
 }
 
 
@@ -74,7 +82,10 @@ task plink2 {
     }
 
     output {
-        Array[File] plink_outputs = glob("plink_output/*")
+        File pgen  = "~{output_prefix}.pgen"
+        File pvar  = "~{output_prefix}.pvar"
+        File psam  = "~{output_prefix}.psam"
+
     }
 }
 
