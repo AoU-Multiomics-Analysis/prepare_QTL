@@ -1,94 +1,49 @@
 version 1.0
 
 
+import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/MTtoVCF/refs/heads/develop/main.wdl" as ProcessMT
+
 workflow PrepareGenotypes{
     input {
-        File InputVCF 
+        String UriMatrixTable 
         File SampleList
         Int AlleleCountThreshold
         Int max_allele_len 
         String OutputPrefix
+        String OutpathVCF
+        String OutpathMT
+        String CloudTmpdir
+
+        File genotype_rscript
 
     }
-    call SubsetVCF {
+       call ProcessMT.FilterMTAndExportToVCF {
         input: 
-            InputVCF = InputVCF,
-            SampleList = SampleList, 
-            OutputPrefix = OutputPrefix
+            UriMatrixTable =  UriMatrixTable,
+            OutputBucketVCF = OutpathVCF ,
+            OutputPrefix = OutputPrefix ,
+            AlleleCountThreshold = AlleleCountThreshold,
+            OutputBucketCheckpointMT = OutpathMT,
+            CloudTmpdir = CloudTmpdir,
+            SampleList = SampleList
 
     }
-    
-    call FilterVCF {
-        input:
-            VCF = SubsetVCF.OutSubsetVCF
-            AlleleCountThreshold = AlleleCountThreshold,
-            OutputPrefix = OutputPrefix
-    }
-    
+
     call plink2 {
         input:
-            vcf_file = FilterVCF.FilteredVCF,
+            vcf_file = FilterMTAndExportToVCF.PathVCF,
             output_prefix = OutputPrefix,
             new_id_max_allele_len = max_allele_len,
     }
     
     call ComputeGenotypePCs {
-        vcf_file = ,
-        output_prefix = OutputPrefix, 
-        
-
+        input:
+            vcf_file = FilterMTAndExportToVCF.PathVCF,
+            output_prefix = OutputPrefix,
+            genotype_rscript = genotype_rscript
     }
 }
 
-
-task SubsetVCF {
-    input {
-        File  InputVCF
-        File SampleList
-        String OutputPrefix
-    }
-    command <<< 
-    bcftools view \
-        -S ~{SampleList } \
-        ~{InputVCF} \
-        --Oz -output  ~{OutputPrefix}.vcf.gz 
-    >>> 
-    
-    output {
-        File OutSubsetVCF = "~{OutputPrefix}.vcf.bgz"
-    }
-    
-    runtime {
-        docker: ""
-        memory: "${memory}GB"
-        disks: "local-disk ${disk_space} HDD"
-        cpu: "${num_threads}"
-    }
-}
-
-task FilterVCF {
-    input {
-        File VCF
-        Int AlleleCountThreshold
-        String OutputPrefix
-    }
-    command <<<
-    bcftools +fill-tags ~{VCF}  -- -t AC,AN,MAF,F_MISSING \
-        | bcftools filter -i 'INFO/AC >= ~{AlleleCountThreshold}' \
-        --Oz --output ~{OutputPrefix}.AC~{AlleleCountThreshold}.biallelic.vcf.gz 
-
-    >>>
-    output {
-    File FilteredVCF = "~{OutputPrefix}.AC~{AlleleCountThreshold}.biallelic.vcf.gz"
-    }
-
-    runtime {
-        docker: ""
-        memory: "${memory}GB"
-        disks: "local-disk ${disk_space} HDD"
-        cpu: "${num_threads}"
-    }
-} 
 
 task plink2 {
     input {
@@ -125,7 +80,7 @@ task plink2 {
 
 
 
-task ComputeGenotypePCS {
+task ComputeGenotypePCs {
     input {
         File vcf_file
         String output_prefix
