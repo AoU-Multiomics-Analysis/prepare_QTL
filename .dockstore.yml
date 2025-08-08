@@ -13,3 +13,6 @@ workflows:
   - subclass: WDL 
     primaryDescriptorPath: /workflows/calculate_phenotypePCs.wdl
     name: calculate_phenotypePCs
+  - subclass: WDL 
+    primaryDescriptorPath: /workflows/prepare_VCF.wdl
+    name: prepare_VCF
