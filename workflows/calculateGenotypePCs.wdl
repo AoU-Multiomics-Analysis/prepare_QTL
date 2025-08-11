@@ -41,7 +41,7 @@ task RComputeGenotypePCs {
             docker: "quay.io/jonnguye/genotype_pcs:micromamba"
             memory: "96G"
             cpu: 2
-            disks: "local-disk 100 SSD"
+            disks: "local-disk 300 SSD"
         }
     
         output {
