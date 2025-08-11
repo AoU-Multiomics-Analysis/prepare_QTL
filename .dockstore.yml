@@ -16,3 +16,6 @@ workflows:
   - subclass: WDL 
     primaryDescriptorPath: /workflows/prepare_VCF.wdl
     name: prepare_VCF
+  - subclass: WDL 
+    primaryDescriptorPath: /workflows/calculateGenotypePCs.wdl
+    name: calculateGenotypePCs
