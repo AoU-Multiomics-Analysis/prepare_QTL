@@ -21,4 +21,7 @@ workflows:
     name: calculateGenotypePCs
   - subclass: WDL 
     primaryDescriptorPath: /workflows/convertVCF2Plink.wdl    
-    name: convertVCF2plink 
+    name: convertVCF2plink
+  - subclass: WDL 
+    primaryDescriptorPath: /workflows/MergeCovariates.wdl    
+    name: MergeCovariates 
