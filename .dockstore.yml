@@ -19,3 +19,6 @@ workflows:
   - subclass: WDL 
     primaryDescriptorPath: /workflows/calculateGenotypePCs.wdl
     name: calculateGenotypePCs
+  - subclass: WDL 
+    primaryDescriptorPath: /workflows/convertVCF2Plink.wdl    
+    name: convertVCF2plink 
