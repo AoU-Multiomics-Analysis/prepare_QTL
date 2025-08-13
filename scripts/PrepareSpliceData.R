@@ -35,7 +35,7 @@ message(paste0('Number of samples in SampleList:',SampleList %>% length()))
 
 
 message('Loading splice data')
-SpliceData <-  readr::read_tsv(opt$SpliceData) %>% 
+SpliceData <-  fread(opt$SpliceData) %>% 
     dplyr::select(1,2,3,4,any_of(SampleList))
 NumSampleSpliceData <- SpliceData %>% ncol - 4
 message(paste0('Number of samples found in SpliceData matching SampleList:', NumSampleSpliceData ))
