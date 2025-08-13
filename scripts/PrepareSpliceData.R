@@ -36,7 +36,7 @@ message(paste0('Number of samples in SampleList:',SampleList %>% length()))
 
 message('Loading splice data')
 SpliceData <-  readr::read_tsv(opt$SpliceData) %>% 
-    select(1,2,3,4,any_of(SampleList))
+    dplyr::select(1,2,3,4,any_of(SampleList))
 NumSampleSpliceData <- SpliceData %>% ncol - 4
 message(paste0('Number of samples found in SpliceData matching SampleList:', NumSampleSpliceData ))
 
@@ -48,7 +48,7 @@ SpliceDataTSS <- SpliceData %>% select(1,2,3,4)
 # drops splice interval information and 
 # performs RankNorm transformation
 SpliceDataNorm <- SpliceData %>% 
-    select(-1,-2,-3,-4) %>% 
+    dplyr::select(-1,-2,-3,-4) %>% 
     t() %>% 
     data.frame() %>% 
     mutate(across(everything(),~RankNorm(.))) %>% 
