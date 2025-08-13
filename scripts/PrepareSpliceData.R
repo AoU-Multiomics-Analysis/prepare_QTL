@@ -29,7 +29,7 @@ message(paste0('Writing to output file: ',OutputFile))
 
 message('Loading sample list')
 # load sample list data
-SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% pull(ID)
+SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% mutate(ID = as.character(ID))  %>% pull(ID)
 message(paste0('Number of samples in SampleList:',SampleList %>% length()))
 
 
