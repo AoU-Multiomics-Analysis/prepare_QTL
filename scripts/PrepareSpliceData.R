@@ -1,7 +1,6 @@
 library(tidyverse)
 library(data.table)
 library(magrittr)
-library(biomaRt)
 library(optparse)
 library(data.table)
 library(rtracklayer)
