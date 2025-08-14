@@ -60,6 +60,8 @@ task plink2 {
         Int new_id_max_allele_len
     }
 
+    Int disk_size = ceil(size(vcf_file, "GB") * 2)
+
     command <<<
         set -e
 
@@ -78,7 +80,7 @@ task plink2 {
         docker: "quay.io/biocontainers/plink2:2.0.0a.6.9--h9948957_0"
         memory: "16G"
         cpu: 4
-        disks: "local-disk 100 SSD"
+        disks: "local-disk ~{disk_size} SSD"
     }
 
     output {
@@ -98,6 +100,8 @@ task ComputeGenotypePCs {
         File genotype_rscript
     }
 
+    Int disk_size = ceil(size(vcf_file, "GB") * 2)
+
     command <<<
         set -e
 
@@ -110,7 +114,7 @@ task ComputeGenotypePCs {
             docker: "quay.io/jonnguye/genotype_pcs:micromamba"
             memory: "96G"
             cpu: 2
-            disks: "local-disk 100 SSD"
+            disks: "local-disk ~{disk_size} SSD"
         }
     
         output {
