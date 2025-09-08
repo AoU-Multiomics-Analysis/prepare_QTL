@@ -27,4 +27,7 @@ workflows:
     name: MergeCovariates 
   - subclass: WDL 
     primaryDescriptorPath: /workflows/calculateGenotypeDosage.wdl    
-    name: calculateGenotypeDosage 
+    name: calculateGenotypeDosage
+  - subclass: WDL 
+    primaryDescriptorPath: /workflows/calculateAF.wdl    
+    name: calculateAF 
