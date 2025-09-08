@@ -25,6 +25,10 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 OutputFile <- paste0(opt$OutputPrefix,'.splicing.bed.gz')
 message(paste0('Writing to output file: ',OutputFile))
 
+OutputFileGroups <- paste0(opt$OutputPrefix,'.phenotype_groups.tsv')
+message(paste0('Writing to groups file: ',OutputFileGroups))
+
+
 ############### LOAD DATA ###################
 
 message('Loading sample list')
@@ -55,6 +59,14 @@ SpliceDataNorm <- SpliceData %>%
     data.frame() %>%
     dplyr::rename_with(~str_remove(.,'X')) 
 
-SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>% arrange(`#chr`,start)
+SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>%
+    arrange(`#chr`,start) %>%
+    dplyr::rename('phenotype_id' = 'ID') 
+PhenotypeGroups <- SpliceDataBed %>% 
+        select(phenotype_id) %>% 
+        mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)")  %>% 
+        select(phenotype_id,group_id)
+
 SpliceDataBed %>% fwrite(OutputFile,sep ='\t')
+PhenotypeGroups %>% fwrite(OutputFileGroups,sep ='\t',col.names = FALSE)
 
