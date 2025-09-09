@@ -61,6 +61,20 @@ SpliceDataNorm <- SpliceData %>%
     data.frame() %>%
     dplyr::rename_with(~str_remove(.,'X')) 
 
+# Create group_id column
+SpliceDataNorm <- SpliceDataNorm %>%
+  rownames_to_column('phenotype_id') %>%
+  mutate(group_id = str_remove(phenotype_id, ".*(?=ENSG)"))
+
+# Reindex and sort the dataframe
+ordered_index <- SpliceDataNorm %>%
+  arrange(group_id, phenotype_id) %>%
+  pull(phenotype_id)
+
+SpliceDataNorm <- SpliceDataNorm %>%
+  filter(phenotype_id %in% ordered_index) %>%
+  arrange(factor(phenotype_id, levels = ordered_index))
+
 message('Merging normalized splice data and TSS info')
 SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>%
     #arrange(`#chr`,start) %>%
