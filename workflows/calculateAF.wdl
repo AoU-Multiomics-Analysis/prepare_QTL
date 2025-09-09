@@ -37,11 +37,13 @@ workflow CaclulateAF {
         }
 
         command <<<
-        ls "~{pvar}"
-        ls "~{pgen}"
-        ls "~{psam}"
 
-        plink2 --pfile "~{prefix}" --freq --out "~{prefix}" 
+
+        plink2 \
+            --pvar "~{pvar}" \
+            --psam "~{psam}" \
+            --pgen "~{pgen}" \
+            --freq --out "~{prefix}" 
         >>> 
         
         runtime {
