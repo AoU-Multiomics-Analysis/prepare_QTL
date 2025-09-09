@@ -64,18 +64,18 @@ SpliceDataNorm <- SpliceData %>%
 message('Merging normalized splice data and TSS info')
 SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>%
     #arrange(`#chr`,start) %>%
-    arrange(group_id, `#chr`, start, end, phenotype_id) %>% 
-    dplyr::rename('phenotype_id' = 'ID')
+    mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)"))  %>%
+    dplyr::rename('phenotype_id' = 'ID') %>% 
+    arrange(group_id, `#chr`, start, end, phenotype_id) 
 
 message('Extracting phenotype groups')
-PhenotypeGroups <- SpliceDataBed %>% 
-        select(phenotype_id) %>% 
-        mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)"))  %>% 
-        select(phenotype_id,group_id)
+#PhenotypeGroups <- SpliceDataBed %>% 
+        #select(phenotype_id) %>% 
+        #select(phenotype_id,group_id)
 
 message('Writing bedfile')
-SpliceDataBed %>% fwrite(OutputFile,sep ='\t')
+SpliceDataBed %>% select(-group_id)%>% fwrite(OutputFile,sep ='\t')
 
 message('Writing phenotype groups')
-PhenotypeGroups %>% fwrite(OutputFileGroups,sep ='\t',col.names = FALSE)
+SpliceDataBed %>% select(phenotype_id,group_id)%>% fwrite(OutputFileGroups,sep ='\t',col.names = FALSE)
 
