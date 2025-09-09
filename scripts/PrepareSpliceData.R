@@ -44,10 +44,12 @@ NumSampleSpliceData <- SpliceData %>% ncol - 4
 message(paste0('Number of samples found in SpliceData matching SampleList:', NumSampleSpliceData ))
 
 
+message('Extracting interval information')
 # extracts interval information for splice junctions
 SpliceDataTSS <- SpliceData %>% select(1,2,3,4)
 
 
+message('Performing normalization')
 # drops splice interval information and 
 # performs RankNorm transformation
 SpliceDataNorm <- SpliceData %>% 
@@ -59,14 +61,20 @@ SpliceDataNorm <- SpliceData %>%
     data.frame() %>%
     dplyr::rename_with(~str_remove(.,'X')) 
 
+message('Merging normalized splice data and TSS info')
 SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>%
     arrange(`#chr`,start) %>%
-    dplyr::rename('phenotype_id' = 'ID') 
+    dplyr::rename('phenotype_id' = 'ID')
+
+message('Extracting phenotype groups')
 PhenotypeGroups <- SpliceDataBed %>% 
         select(phenotype_id) %>% 
-        mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)")  %>% 
+        mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)"))  %>% 
         select(phenotype_id,group_id)
 
+message('Writing bedfile')
 SpliceDataBed %>% fwrite(OutputFile,sep ='\t')
+
+message('Writing phenotype groups')
 PhenotypeGroups %>% fwrite(OutputFileGroups,sep ='\t',col.names = FALSE)
 
