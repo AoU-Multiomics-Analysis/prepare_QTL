@@ -37,7 +37,7 @@ workflow CaclulateAF {
         }
 
         command <<< 
-        plink2 --pfile ~{prefix} --freq --out ~{prefix}         
+        plink2 --pfile "~{prefix}" --freq --out "~{prefix}" 
         >>> 
         
         runtime {
