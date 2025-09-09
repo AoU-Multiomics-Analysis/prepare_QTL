@@ -27,7 +27,7 @@ task PrepareSpliceData {
 
     output {
         File SplicingBed="${OutputPrefix}.splicing.bed.gz"
-        File PhenotypeGroups = "${OutputPrefix}.phenotype_groups.tsv"
+        #File PhenotypeGroups = "${OutputPrefix}.phenotype_groups.tsv"
     }
  }
 
@@ -62,7 +62,7 @@ workflow sQTLPrepareData  {
     output {
         File BedFile = PrepareSpliceData.SplicingBed 
         File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs
-        File PhenotypeGroups = PrepareSpliceData.PhenotypeGroups
+        #File PhenotypeGroups = PrepareSpliceData.PhenotypeGroups
     }
 
 }
