@@ -63,7 +63,8 @@ SpliceDataNorm <- SpliceData %>%
 
 message('Merging normalized splice data and TSS info')
 SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>%
-    arrange(`#chr`,start) %>%
+    #arrange(`#chr`,start) %>%
+    arrange(group_id, `#chr`, start, end, phenotype_id) %>% 
     dplyr::rename('phenotype_id' = 'ID')
 
 message('Extracting phenotype groups')
