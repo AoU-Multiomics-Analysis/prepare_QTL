@@ -36,7 +36,11 @@ workflow CaclulateAF {
             Int num_threads
         }
 
-        command <<< 
+        command <<<
+        ls "~{pvar}"
+        ls "~{pgen}"
+        ls "~{psam}"
+
         plink2 --pfile "~{prefix}" --freq --out "~{prefix}" 
         >>> 
         
