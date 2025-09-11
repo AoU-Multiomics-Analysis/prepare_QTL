@@ -76,11 +76,11 @@ SpliceDataNorm <- SpliceDataNorm %>%
   arrange(factor(phenotype_id, levels = ordered_index))
 
 message('Merging normalized splice data and TSS info')
-SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>%
-    #arrange(`#chr`,start) %>%
-    dplyr::rename('phenotype_id' = 'ID') 
-#    mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)"))  %>%
-    #arrange(group_id, `#chr`, start, end, phenotype_id) 
+SpliceDataTSS <- SpliceDataTSS %>%
+  dplyr::rename('interval_id' = 'ID')
+
+SpliceDataBed <- bind_cols(SpliceDataTSS, SpliceDataNorm %>% select(-group_id)) %>%
+  dplyr::rename('phenotype_id' = 'interval_id')
 
 message('Extracting phenotype groups')
 #PhenotypeGroups <- SpliceDataBed %>% 
