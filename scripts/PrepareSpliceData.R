@@ -32,34 +32,30 @@ message(paste0('Writing to groups file: ',OutputFileGroups))
 ############### LOAD DATA ###################
 
 message('Loading sample list')
-# load sample list data
-SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% mutate(ID = as.character(ID))  %>% pull(ID)
-message(paste0('Number of samples in SampleList:',SampleList %>% length()))
-
+SampleList <- readr::read_tsv(opt$SampleList) %>%
+  dplyr::rename('ID' = 1) %>%
+  mutate(ID = as.character(ID)) %>%
+  pull(ID)
+message(paste0('Number of samples in SampleList:', SampleList %>% length()))
 
 message('Loading splice data')
-SpliceData <-  fread(opt$SpliceData) %>% 
-    dplyr::select(1,2,3,4,any_of(SampleList))
+SpliceData <- fread(opt$SpliceData) %>%
+  dplyr::select(1, 2, 3, 4, any_of(SampleList))
 NumSampleSpliceData <- SpliceData %>% ncol - 4
-message(paste0('Number of samples found in SpliceData matching SampleList:', NumSampleSpliceData ))
-
+message(paste0('Number of samples found in SpliceData matching SampleList:', NumSampleSpliceData))
 
 message('Extracting interval information')
-# extracts interval information for splice junctions
-SpliceDataTSS <- SpliceData %>% select(1,2,3,4)
-
+SpliceDataTSS <- SpliceData %>% select(1, 2, 3, 4)
 
 message('Performing normalization')
-# drops splice interval information and 
-# performs RankNorm transformation
-SpliceDataNorm <- SpliceData %>% 
-    dplyr::select(-1,-2,-3,-4) %>% 
-    t() %>% 
-    data.frame() %>% 
-    mutate(across(everything(),~RankNorm(.))) %>% 
-    t() %>% 
-    data.frame() %>%
-    dplyr::rename_with(~str_remove(.,'X')) 
+SpliceDataNorm <- SpliceData %>%
+  dplyr::select(-1, -2, -3, -4) %>%
+  t() %>%
+  data.frame() %>%
+  mutate(across(everything(), ~RankNorm(.))) %>%
+  t() %>%
+  data.frame() %>%
+  dplyr::rename_with(~str_remove(., 'X'))
 
 # Create group_id column
 SpliceDataNorm <- SpliceDataNorm %>%
@@ -79,17 +75,15 @@ message('Merging normalized splice data and TSS info')
 SpliceDataTSS <- SpliceDataTSS %>%
   dplyr::rename('interval_id' = 'ID')
 
+# Ensure unique column names before binding
+SpliceDataNorm <- SpliceDataNorm %>%
+  dplyr::rename('norm_phenotype_id' = 'phenotype_id')
+
 SpliceDataBed <- bind_cols(SpliceDataTSS, SpliceDataNorm %>% select(-group_id)) %>%
   dplyr::rename('phenotype_id' = 'interval_id')
 
 message('Extracting phenotype groups')
-#PhenotypeGroups <- SpliceDataBed %>% 
-        #select(phenotype_id) %>% 
-        #select(phenotype_id,group_id)
 
 message('Writing bedfile')
-SpliceDataBed %>%  fwrite(OutputFile,sep ='\t')
-
-#message('Writing phenotype groups')
-#SpliceDataBed %>% select(phenotype_id,group_id)%>% fwrite(OutputFileGroups,sep ='\t',col.names = FALSE)
+SpliceDataBed %>% fwrite(OutputFile, sep = '\t')
 
