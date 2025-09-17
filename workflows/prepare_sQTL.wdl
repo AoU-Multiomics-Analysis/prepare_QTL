@@ -12,9 +12,7 @@ task PrepareSpliceData {
         Int num_threads
     }
     command {
-        curl -o PrepareSpliceData.R https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/sort_by_CHR_ENSG/scripts/PrepareSpliceData.R
-        #Rscript /tmp/PrepareSpliceData.R \
-        Rscript PrepareSpliceData.R \
+        Rscript /tmp/PrepareSpliceData.R \
             --SpliceData ${SpliceData} \
             --SampleList ${SampleList} \
             --OutputPrefix ${OutputPrefix}
