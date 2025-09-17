@@ -77,7 +77,7 @@ message('Extracting phenotype groups')
 SpliceDataBed <- SpliceDataBed %>%
   mutate(ENSG_id = str_extract(phenotype_id, "ENSG[0-9]+"))
 SpliceDataBed <- SpliceDataBed %>%
-  arrange(#chr, start, end, ENSG_id) %>%
+  arrange(`#chr`, start, end, ENSG_id) %>%
   select(-ENSG_id)
 
 message('Writing bedfile')
