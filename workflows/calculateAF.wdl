@@ -5,6 +5,7 @@ workflow CaclulateAF {
         File pvar
         File psam
         File pgen
+        File sample_list
         String prefix
         Int memory 
         Int disk_space 
@@ -16,6 +17,7 @@ workflow CaclulateAF {
             psam = psam,
             pgen = pgen,
             prefix = prefix,
+            sample_list = sample_list,
             memory = memory, 
             disk_space = disk_space, 
             num_threads = num_threads
@@ -30,6 +32,7 @@ workflow CaclulateAF {
             File pvar 
             File pgen 
             File psam
+            File sample_list
             String prefix
             Int memory 
             Int disk_space 
@@ -37,12 +40,18 @@ workflow CaclulateAF {
         }
 
         command <<<
-
+        first=$(head -n1 ~{sample_list})
+        if [[ "$first" =~ [a-zA-Z] ]]; then
+          tail -n +2 ~{sample_list} | awk '{print $1}' > keep_plink.txt
+        else
+          awk '{print $1}' ~{sample_list} > keep_plink.txt
+        fi
 
         plink2 \
             --pvar "~{pvar}" \
             --psam "~{psam}" \
             --pgen "~{pgen}" \
+            --keep keep_plink.txt \
             --freq --out "~{prefix}" 
         >>> 
         
