@@ -36,6 +36,8 @@ task PrepareProteomicData {
         File IntProteomicBed="${OutputPrefix}.protein.INT.bed.gz"
         File ScaledProteomicBed="${OutputPrefix}.protein.scaled.bed.gz"
         File RawProteomicBed="${OutputPrefix}.protein.raw.bed.gz"
+        File IntConnectivityOutliers="${OutputPrefix}.protein.INT.connectivity_outliers.tsv"
+        File ScaledConnectivityOutliers="${OutputPrefix}.protein.scaled.connectivity_outliers.tsv"
     }
 
     meta {
@@ -130,6 +132,8 @@ workflow pQTLPrepareData {
         File IntBedFile = PrepareProteomicData.IntProteomicBed
         File ScaledBedFile = PrepareProteomicData.ScaledProteomicBed
         File RawBedFile = PrepareProteomicData.RawProteomicBed
+        File IntConnectivityOutliers = PrepareProteomicData.IntConnectivityOutliers
+        File ScaledConnectivityOutliers = PrepareProteomicData.ScaledConnectivityOutliers
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates

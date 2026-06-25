@@ -31,6 +31,8 @@ task PrepareSpliceData {
         File IntSplicingBed="${OutputPrefix}.splicing.INT.bed.gz"
         File ScaledSplicingBed="${OutputPrefix}.splicing.scaled.bed.gz"
         File RawSplicingBed="${OutputPrefix}.splicing.raw.bed.gz"
+        File IntConnectivityOutliers="${OutputPrefix}.splicing.INT.connectivity_outliers.tsv"
+        File ScaledConnectivityOutliers="${OutputPrefix}.splicing.scaled.connectivity_outliers.tsv"
         #File PhenotypeGroups = "${OutputPrefix}.phenotype_groups.tsv"
     }
  }
@@ -120,6 +122,8 @@ workflow sQTLPrepareData  {
         File IntBedFile = PrepareSpliceData.IntSplicingBed
         File ScaledBedFile = PrepareSpliceData.ScaledSplicingBed
         File RawBedFile = PrepareSpliceData.RawSplicingBed
+        File IntConnectivityOutliers = PrepareSpliceData.IntConnectivityOutliers
+        File ScaledConnectivityOutliers = PrepareSpliceData.ScaledConnectivityOutliers
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates

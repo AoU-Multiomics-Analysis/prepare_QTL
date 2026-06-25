@@ -34,6 +34,7 @@ The prepare scripts and workflows for eQTL, pQTL, and sQTL share this output pat
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
 - `.scaled`: Centered and scaled molecular phenotypes.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting. Raw BEDs are emitted as workflow outputs but are not used for phenotype PCs or covariate merging.
+- Connectivity outliers: `.INT` and `.scaled` BEDs have WGCNA sample connectivity outliers removed, with removed samples written to `*.connectivity_outliers.tsv`. Raw BEDs keep all samples after the initial sample-list filter.
 - `AdditionalCovariates`: Optional WDL input for eQTL, pQTL, and sQTL prepare workflows. When provided, the workflow runs `MergeCovariates.wdl` for both `.INT` and `.scaled` phenotype PCs.
 - `ResidualizeNormalizedInputs`: Optional WDL toggle for eQTL, pQTL, and sQTL prepare workflows. When `true`, the workflow writes residualized BEDs for `.INT` and `.scaled` inputs; raw BEDs are not residualized.
 
