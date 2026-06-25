@@ -3,18 +3,20 @@ version 1.0
 
 workflow MergeCovariates {
     input {
-        File GenotypePCs 
-        String OutputPrefix 
-        File MolecularPCs 
+        File GenotypePCs
+        String OutputPrefix
+        String OutputSuffix = ""
+        File MolecularPCs
     }
-    
+
     call MergeCovariatesR {
         input:
             GenotypePCs = GenotypePCs,
             OutputPrefix = OutputPrefix,
+            OutputSuffix = OutputSuffix,
             MolecularPCs = MolecularPCs
     }
-    
+
     output {
         File QtlCovariates = MergeCovariatesR.QtlCovariates
 
@@ -24,27 +26,29 @@ workflow MergeCovariates {
 
 task MergeCovariatesR {
     input {
-        File GenotypePCs 
-        String OutputPrefix 
-        File MolecularPCs 
+        File GenotypePCs
+        String OutputPrefix
+        String OutputSuffix = ""
+        File MolecularPCs
     }
 
     command <<<
         Rscript /tmp/MergeCovariates.R \
             --GenotypePCs ~{GenotypePCs} \
             --MolecularPCs ~{MolecularPCs} \
-            --OutputPrefix ~{OutputPrefix}
+            --OutputPrefix ~{OutputPrefix} \
+            --OutputSuffix ~{OutputSuffix}
         >>>
-    
+
         runtime {
             docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
             memory: "96G"
             cpu: 1
             disks: "local-disk 100 SSD"
         }
-    
+
         output {
-            File QtlCovariates = "~{OutputPrefix}_QTL_covariates.tsv"
+            File QtlCovariates = "~{OutputPrefix}_QTL_covariates~{OutputSuffix}.tsv"
         }
 
 
