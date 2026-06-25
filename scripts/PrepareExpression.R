@@ -28,6 +28,24 @@ TSS_locations <- gencode_GTF  %>%
 TSS_locations
 }
 
+parse_bool <- function(x){
+    x <- tolower(as.character(x))
+    if (x %in% c("true", "t", "1", "yes", "y")) {
+        return(TRUE)
+    }
+    if (x %in% c("false", "f", "0", "no", "n")) {
+        return(FALSE)
+    }
+    stop("RankNormalize must be true or false")
+}
+
+transform_phenotype <- function(x, rank_normalize){
+    if (rank_normalize) {
+        return(RankNorm(x))
+    }
+    as.numeric(scale(x, center = TRUE, scale = TRUE))
+}
+
 
 
 ######## COMMAND LINE ARGUMENTS ############
@@ -42,10 +60,13 @@ option_list <- list(
     optparse::make_option(c("--AnnotationGTF"), type="character", default=NULL,
                         help="GTF file used to TSS locations for each gene", metavar = "type"),
     optparse::make_option(c("--SampleList"), type="character", default=NULL,
-                        help="File containing list of samples to run processing on", metavar = "type")
+                        help="File containing list of samples to run processing on", metavar = "type"),
+    optparse::make_option(c("--RankNormalize"), type="character", default="true",
+                        help="Apply rank-based inverse normal transformation before writing BED output", metavar = "type")
 )
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
+RankNormalize <- parse_bool(opt$RankNormalize)
 
 
 ########### LOAD DATA #####################
@@ -91,11 +112,15 @@ DataEdgeR <- edgeR::calcNormFactors(DataEdgeR)
 message('Computing CPMs')
 DataCPM <- edgeR::cpm(DataEdgeR, log=FALSE) %>% data.frame() 
 
-message('Normalizing CPMs')
+if (RankNormalize) {
+    message('Applying rank-based inverse normal transformation to CPMs')
+} else {
+    message('Centering and scaling CPMs')
+}
 NormalizedCPMs <- DataCPM %>% 
                 t() %>% 
                 data.frame() %>% 
-                mutate(across(everything(),~RankNorm(.))) %>% 
+                mutate(across(everything(),~transform_phenotype(., RankNormalize))) %>%
                 t() %>% 
                 data.frame() %>% 
                 dplyr::rename_with(~str_remove(.,'^X')) %>% 
@@ -122,7 +147,5 @@ message('Please check GENCODE version since genes are lost in merging process')
 }
 
 BedNormalizedCPMs %>% arrange(seqnames,start) %>%  dplyr::rename('#chr' = 'seqnames') %>% fwrite(OutputFile,sep='\t') 
-
-
 
 

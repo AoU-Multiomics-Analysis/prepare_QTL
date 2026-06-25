@@ -29,7 +29,7 @@ Prepares RNA-seq gene expression data for eQTL analysis.
 3. Filters to a specified list of samples.
 4. Filters genes by expression count (retains genes with counts > 6 in at least 20% of samples).
 5. Normalizes counts using edgeR TMM normalization followed by CPM transformation.
-6. Applies rank-based inverse normal (RankNorm) transformation to each gene.
+6. Applies rank-based inverse normal (RankNorm) transformation to each gene by default, or centers and scales each gene when rank normalization is disabled.
 7. Merges the normalized expression values with TSS locations and writes the result to a compressed BED file (`.expression.bed.gz`).
 
 **Inputs:**
@@ -37,6 +37,7 @@ Prepares RNA-seq gene expression data for eQTL analysis.
 - `--AnnotationGTF`: GENCODE GTF file used to extract TSS locations.
 - `--SampleList`: File containing the list of sample IDs to include.
 - `--OutputPrefix`: Prefix for the output file.
+- `--RankNormalize`: Whether to apply RankNorm transformation (`true`, default) or only center and scale (`false`).
 
 **Output:** `<OutputPrefix>.expression.bed.gz`
 
@@ -52,7 +53,7 @@ Prepares Olink proteomics data for pQTL analysis.
 3. Uses Ensembl BioMart to map UniProt IDs to Ensembl gene IDs.
 4. Filters to a specified list of samples.
 5. Pivots data to wide format (proteins as columns, samples as rows).
-6. Applies rank-based inverse normal (RankNorm) transformation to each protein.
+6. Applies rank-based inverse normal (RankNorm) transformation to each protein by default, or centers and scales each protein when rank normalization is disabled.
 7. Merges with TSS locations and writes the result to a compressed BED file (`.protein.bed.gz`).
 
 **Inputs:**
@@ -60,6 +61,7 @@ Prepares Olink proteomics data for pQTL analysis.
 - `--AnnotationGTF`: GENCODE GTF file used to extract TSS locations.
 - `--SampleList`: File containing the list of sample IDs to include.
 - `--OutputPrefix`: Prefix for the output file.
+- `--RankNormalize`: Whether to apply RankNorm transformation (`true`, default) or only center and scale (`false`).
 
 **Output:** `<OutputPrefix>.protein.bed.gz`
 
@@ -72,7 +74,7 @@ Prepares LeafCutter splice junction data for sQTL analysis.
 **What it does:**
 1. Loads a BED file of splice junction quantifications produced by LeafCutter.
 2. Filters columns to a specified list of samples.
-3. Applies rank-based inverse normal (RankNorm) transformation to each splice junction.
+3. Applies rank-based inverse normal (RankNorm) transformation to each splice junction by default, or centers and scales each splice junction when rank normalization is disabled.
 4. Sorts junctions by chromosome, start, end, and Ensembl gene ID.
 5. Writes the normalized splice data to a compressed BED file (`.splicing.bed.gz`).
 
@@ -80,6 +82,7 @@ Prepares LeafCutter splice junction data for sQTL analysis.
 - `--SpliceData`: BED file of splice junction quantifications from LeafCutter.
 - `--SampleList`: File containing the list of sample IDs to include.
 - `--OutputPrefix`: Prefix for the output file.
+- `--RankNormalize`: Whether to apply RankNorm transformation (`true`, default) or only center and scale (`false`).
 
 **Output:** `<OutputPrefix>.splicing.bed.gz`
 
@@ -134,7 +137,7 @@ End-to-end workflow for preparing gene expression data for eQTL analysis.
 1. Runs `PrepareExpression.R` to normalize expression data and produce a BED file.
 2. Runs `calculate_PCs.R` (via `calculate_phenotypePCs.wdl`) to compute phenotype PCs from the expression BED file.
 
-**Inputs:** Raw count GCT file, GENCODE GTF, sample list, output prefix, resource parameters.  
+**Inputs:** Raw count GCT file, GENCODE GTF, sample list, output prefix, rank normalization toggle, resource parameters.
 **Outputs:** Expression BED file (`.expression.bed.gz`), phenotype PCs TSV.
 
 ---
@@ -147,7 +150,7 @@ End-to-end workflow for preparing Olink proteomics data for pQTL analysis.
 1. Runs `PrepareProteomics.R` to normalize protein expression data and produce a BED file.
 2. Runs `calculate_PCs.R` (via `calculate_phenotypePCs.wdl`) to compute phenotype PCs from the protein BED file.
 
-**Inputs:** Olink proteomics data file, GENCODE GTF, sample list, output prefix, resource parameters.  
+**Inputs:** Olink proteomics data file, GENCODE GTF, sample list, output prefix, rank normalization toggle, resource parameters.
 **Outputs:** Protein BED file (`.protein.bed.gz`), phenotype PCs TSV.
 
 ---
@@ -160,7 +163,7 @@ End-to-end workflow for preparing splice junction data for sQTL analysis.
 1. Runs `PrepareSpliceData.R` to normalize LeafCutter splice data and produce a BED file.
 2. Runs `calculate_PCs.R` (via `calculate_phenotypePCs.wdl`) to compute phenotype PCs from the splicing BED file.
 
-**Inputs:** LeafCutter BED file, sample list, output prefix, resource parameters.  
+**Inputs:** LeafCutter BED file, sample list, output prefix, rank normalization toggle, resource parameters.
 **Outputs:** Splicing BED file (`.splicing.bed.gz`), phenotype PCs TSV.
 
 ---

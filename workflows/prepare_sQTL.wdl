@@ -6,6 +6,7 @@ task PrepareSpliceData {
         File SampleList 
         File SpliceData 
         String OutputPrefix 
+        Boolean RankNormalize = true
         
         Int memory 
         Int disk_space 
@@ -15,7 +16,8 @@ task PrepareSpliceData {
         Rscript /tmp/PrepareSpliceData.R \
             --SpliceData ${SpliceData} \
             --SampleList ${SampleList} \
-            --OutputPrefix ${OutputPrefix}
+            --OutputPrefix ${OutputPrefix} \
+            --RankNormalize ${RankNormalize}
         }
 
     runtime {
@@ -36,6 +38,7 @@ workflow sQTLPrepareData  {
         File SampleList 
         File SpliceData
         String OutputPrefix
+        Boolean RankNormalize = true
 
         Int memory 
         Int disk_space 
@@ -48,7 +51,8 @@ workflow sQTLPrepareData  {
             num_threads = num_threads,
             SampleList = SampleList,
             SpliceData = SpliceData,
-            OutputPrefix = OutputPrefix
+            OutputPrefix = OutputPrefix,
+            RankNormalize = RankNormalize
     }
 
     call ComputePCs.PhenotypePCs {

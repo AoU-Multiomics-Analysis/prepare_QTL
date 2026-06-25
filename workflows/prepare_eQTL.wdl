@@ -10,6 +10,7 @@ task eqtl_prepare_expression {
         File AnnotationGTF 
         File SampleList 
         String OutputPrefix 
+        Boolean RankNormalize = true
         
 
         Int memory 
@@ -22,7 +23,8 @@ task eqtl_prepare_expression {
             --CountGCT ${CountGCT} \
             --AnnotationGTF ${AnnotationGTF} \
             --SampleList ${SampleList} \
-            --OutputPrefix ${OutputPrefix}
+            --OutputPrefix ${OutputPrefix} \
+            --RankNormalize ${RankNormalize}
 
         }
 
@@ -44,6 +46,7 @@ workflow eQTLPrepareData {
         File CountGCT 
         File AnnotationGTF 
         File SampleList 
+        Boolean RankNormalize = true
 
         Int memory 
         Int disk_space 
@@ -58,7 +61,8 @@ workflow eQTLPrepareData {
             num_threads = num_threads,
             CountGCT  = CountGCT,
             AnnotationGTF = AnnotationGTF,
-            SampleList = SampleList 
+            SampleList = SampleList,
+            RankNormalize = RankNormalize
     }
 
     call ComputePCs.PhenotypePCs {

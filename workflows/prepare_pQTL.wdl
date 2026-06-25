@@ -10,6 +10,7 @@ task PrepareProteomicData {
         File SampleList 
         File ProteomicData 
         String OutputPrefix 
+        Boolean RankNormalize = true
         
         Int memory 
         Int disk_space 
@@ -20,7 +21,8 @@ task PrepareProteomicData {
             --ProteomicData ${ProteomicData} \
             --AnnotationGTF ${AnnotationGTF} \
             --SampleList ${SampleList} \
-            --OutputPrefix ${OutputPrefix}
+            --OutputPrefix ${OutputPrefix} \
+            --RankNormalize ${RankNormalize}
         }
 
     runtime {
@@ -48,6 +50,7 @@ workflow pQTLPrepareData {
         File SampleList 
         File ProteomicData
         String OutputPrefix 
+        Boolean RankNormalize = true
     } 
     call PrepareProteomicData {
         input:
@@ -57,7 +60,8 @@ workflow pQTLPrepareData {
             AnnotationGTF = AnnotationGTF,
             SampleList = SampleList,
             OutputPrefix = OutputPrefix,
-            ProteomicData = ProteomicData
+            ProteomicData = ProteomicData,
+            RankNormalize = RankNormalize
 
     }
 

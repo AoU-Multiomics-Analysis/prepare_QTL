@@ -52,6 +52,24 @@ TSS_locations <- gencode_GTF  %>%
 TSS_locations
 }
 
+parse_bool <- function(x){
+    x <- tolower(as.character(x))
+    if (x %in% c("true", "t", "1", "yes", "y")) {
+        return(TRUE)
+    }
+    if (x %in% c("false", "f", "0", "no", "n")) {
+        return(FALSE)
+    }
+    stop("RankNormalize must be true or false")
+}
+
+transform_phenotype <- function(x, rank_normalize){
+    if (rank_normalize) {
+        return(RankNorm(x))
+    }
+    as.numeric(scale(x, center = TRUE, scale = TRUE))
+}
+
 
 
 ######## COMMAND LINE ARGUMENTS ############
@@ -65,12 +83,15 @@ option_list <- list(
     optparse::make_option(c("--AnnotationGTF"), type="character", default=NULL,
                         help="GTF file used to TSS locations for each gene", metavar = "type"),
     optparse::make_option(c("--SampleList"), type="character", default=NULL,
-                        help="File containing list of samples to run processing on", metavar = "type")
+                        help="File containing list of samples to run processing on", metavar = "type"),
+    optparse::make_option(c("--RankNormalize"), type="character", default="true",
+                        help="Apply rank-based inverse normal transformation before writing BED output", metavar = "type")
 )
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
+RankNormalize <- parse_bool(opt$RankNormalize)
 
-filepath <- opt$ProteomicsData
+filepath <- opt$ProteomicData
 ############### LOAD DATA ###################
 # load in proteomics data based on type of file 
 if (grepl("\\.tsv(\\.gz)?$", filepath)) {
@@ -104,11 +125,15 @@ message(paste0('Writing bed file to ',OutputFile))
 ############ BEGIN SCRIPT ##########
 
 
-message('Converting data to wide format and normalizing')
+if (RankNormalize) {
+    message('Converting data to wide format and applying rank-based inverse normal transformation')
+} else {
+    message('Converting data to wide format and centering/scaling')
+}
 # converts data to wide format such that 
 # each column is a protein and each row is the 
-# quantification in an individual and then normalizes 
-# the data with a RankNorm transformation
+# quantification in an individual and then transforms
+# each protein across samples.
 ProteomicsDataWide <- ProteomicsData %>% 
     filter(SampleID %in% SampleList) %>% 
     #group_by(ResearchID,OlinkID) %>% 
@@ -117,7 +142,7 @@ ProteomicsDataWide <- ProteomicsData %>%
     dplyr::select(ResearchID,PCNormalizedNPX,UniProt) %>% 
     pivot_wider(names_from = UniProt,values_from =PCNormalizedNPX )  %>% 
     column_to_rownames('ResearchID') %>% 
-    mutate(across(everything(),~RankNorm(.)))
+    mutate(across(everything(),~transform_phenotype(., RankNormalize)))
 
 
 message('Merging data with TSS locations')
@@ -145,5 +170,4 @@ message(paste0(nproteins, ' found'))
 
 # write data to output
 ProteomicsBed %>% fwrite(OutputFile,sep ='\t')
-
 
