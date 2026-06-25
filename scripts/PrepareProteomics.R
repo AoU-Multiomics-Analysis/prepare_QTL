@@ -22,6 +22,23 @@ if (length(missing_columns) > 0) {
 }
 }
 
+select_sample_id_column <- function(data, sample_list){
+sample_id_columns <- intersect(c("SampleID", "ResearchID"), colnames(data))
+if (length(sample_id_columns) == 0) {
+    stop("ProteomicData must contain at least one sample ID column: SampleID or ResearchID")
+}
+sample_list <- as.character(sample_list)
+overlap_counts <- sapply(sample_id_columns, function(column) {
+    sum(as.character(data[[column]]) %in% sample_list)
+})
+selected_column <- names(which.max(overlap_counts))
+if (overlap_counts[[selected_column]] == 0) {
+    stop("No samples in SampleList were found in ProteomicData SampleID or ResearchID columns")
+}
+message(paste0("Using ", selected_column, " as proteomics sample ID column; matched ", overlap_counts[[selected_column]], " rows"))
+selected_column
+}
+
 GetUniProtConversion <- function(proteomics_data, ensembl_version = 114){
 message(paste0('Using ensembl version ',ensembl_version))
 # use biomart to map unprot ids to ensembl gene ids
@@ -107,11 +124,12 @@ if (grepl("\\.tsv(\\.gz)?$", filepath)) {
     stop("Unsupported file extension. Use .tsv, .tsv.gz, or .parquet")
   }
 
-check_required_columns(ProteomicsData, c("SampleID", "ResearchID", "PCNormalizedNPX", "UniProt"), "ProteomicData")
+check_required_columns(ProteomicsData, c("PCNormalizedNPX", "UniProt"), "ProteomicData")
 
 message('Loading sample list')
 # load sample list data
-SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% pull(ID)
+SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% mutate(ID = as.character(ID)) %>% pull(ID)
+SampleIDColumn <- select_sample_id_column(ProteomicsData, SampleList)
 
 message('Creating UniProt ensembl id conversion')
 # create table containing UniProt and ensembl id conversions 
@@ -141,13 +159,13 @@ if (RankNormalize) {
 # quantification in an individual and then transforms
 # each protein across samples.
 ProteomicsDataWide <- ProteomicsData %>% 
-    filter(SampleID %in% SampleList) %>% 
+    filter(as.character(.data[[SampleIDColumn]]) %in% SampleList) %>%
     #group_by(ResearchID,OlinkID) %>% 
     #filter(row_number() == 1) %>% 
     #ungroup() %>% 
-    dplyr::select(ResearchID,PCNormalizedNPX,UniProt) %>% 
-    pivot_wider(names_from = UniProt,values_from =PCNormalizedNPX )  %>% 
-    column_to_rownames('ResearchID') %>% 
+    transmute(SampleIDForQTL = .data[[SampleIDColumn]], PCNormalizedNPX, UniProt) %>%
+    pivot_wider(names_from = UniProt,values_from =PCNormalizedNPX )  %>%
+    column_to_rownames('SampleIDForQTL') %>%
     mutate(across(everything(),~transform_phenotype(., RankNormalize)))
 
 
