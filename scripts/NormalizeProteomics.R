@@ -54,8 +54,22 @@ normed_data %>% write_tsv('Olink_10k_df_median_normalized.tsv')
 
 
 ###### FILTER DATA #################
-LongOlinkValues <- OlinkMedianNormalized %>% 
+warn_fail_assays <- OlinkMedianNormalized %>% 
     filter(!str_detect(SampleID, 'CONT|Control')  & AssayType == 'assay') %>% 
+    filter(SampleQC != 'PASS' | AssayQC != 'PASS')  
+
+assay_fail_list <- warn_fail_assays %>% 
+    filter(AssayQC != 'PASS') %>% 
+    distinct(Assay)
+sample_remove_list <- warn_fail_assays %>% 
+    filter(!Assay %in% assay_fail_list$Assay) %>% 
+    filter(SampleQC != 'PASS') %>% 
+    distinct(SampleID) 
+
+
+LongOlinkValues <- OlinkMedianNormalized %>% 
+    filter(!str_detect(SampleID, 'CONT|Control')  & AssayType == 'assay') %>%
+    filter(!Assay %in% assay_fail_list$Assay & !SampleID %in% sample_remove_list$SampleID) %>% 
     mutate(SampleID = str_remove(SampleID,'_.*')) %>% 
     select(SampleID,PlateID,NPX,UniProt)   %>% 
     mutate(joint_id = paste0(SampleID,'_',PlateID))  
