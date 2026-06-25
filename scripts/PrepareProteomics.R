@@ -1,12 +1,8 @@
 library(tidyverse)
 library(data.table)
-library(patchwork)
-library(OlinkAnalyze)
 library(magrittr)
-library(WGCNA)
 library(biomaRt)
 library(optparse)
-library(data.table)
 library(arrow)
 library(rtracklayer)
 library(RNOmni)
@@ -19,10 +15,17 @@ library(RNOmni)
 # This could error out depending on the GTF used  
 # and how that matches with ensembl version. GENCODE v48 
 # uses ensembl 114 so thats what im using by default here
-GetUniProtConversion <- function(ensembl_version = 114){
+check_required_columns <- function(data, required_columns, data_name){
+missing_columns <- setdiff(required_columns, colnames(data))
+if (length(missing_columns) > 0) {
+    stop(paste0(data_name, " is missing required columns: ", paste(missing_columns, collapse = ", ")))
+}
+}
+
+GetUniProtConversion <- function(proteomics_data, ensembl_version = 114){
 message(paste0('Using ensembl version ',ensembl_version))
 # use biomart to map unprot ids to ensembl gene ids
-protein_list <- olink_df %>% dplyr::select(UniProt) %>% distinct() %>% pull(UniProt)
+protein_list <- proteomics_data %>% dplyr::select(UniProt) %>% distinct() %>% pull(UniProt)
 mart <- useEnsembl("ensembl","hsapiens_gene_ensembl",version = ensembl_version)
 
 ensembl <- useDataset("hsapiens_gene_ensembl", mart = mart)
@@ -104,6 +107,7 @@ if (grepl("\\.tsv(\\.gz)?$", filepath)) {
     stop("Unsupported file extension. Use .tsv, .tsv.gz, or .parquet")
   }
 
+check_required_columns(ProteomicsData, c("SampleID", "ResearchID", "PCNormalizedNPX", "UniProt"), "ProteomicData")
 
 message('Loading sample list')
 # load sample list data
@@ -111,14 +115,16 @@ SampleList <-  readr::read_tsv(opt$SampleList) %>% dplyr::rename('ID' = 1) %>% p
 
 message('Creating UniProt ensembl id conversion')
 # create table containing UniProt and ensembl id conversions 
-UniProtConversion <- GetUniProtConversion()
+UniProtConversion <- GetUniProtConversion(ProteomicsData)
+check_required_columns(UniProtConversion, c("gene_id", "UniProt"), "UniProt conversion")
 
 message('Extracting TSS locations from GTF')
 # extract TSS locations from input GTF
 TSS_position <- extract_TSS_pos(opt$AnnotationGTF)
+check_required_columns(TSS_position, "gene_id", "TSS position table")
 
-message('Merging Uniprot conversion table and TSS locations')
-UniProtTSSLocations <- UniProtConversion %>% left_join(TSS_position,by = 'UniProt')
+message('Merging UniProt conversion table and TSS locations')
+UniProtTSSLocations <- UniProtConversion %>% left_join(TSS_position,by = 'gene_id')
 
 OutputFile <- paste0(opt$OutputPrefix,'.protein.bed.gz')
 message(paste0('Writing bed file to ',OutputFile))
@@ -170,4 +176,3 @@ message(paste0(nproteins, ' found'))
 
 # write data to output
 ProteomicsBed %>% fwrite(OutputFile,sep ='\t')
-
