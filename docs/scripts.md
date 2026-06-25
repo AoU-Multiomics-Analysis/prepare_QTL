@@ -12,7 +12,17 @@ All scripts are written in R and are invoked from the command line with `Rscript
 - `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
-For each `.INT` and `.scaled` BED, the scripts compute WGCNA sample connectivity outliers from the feature-by-sample matrix, remove samples with connectivity `Z_score < -3`, and write the removed samples to `<OutputPrefix>.<modality>.<normalization>.connectivity_outliers.tsv`. Raw BEDs keep all samples after the initial sample-list filter.
+For each `.INT` and `.scaled` matrix, the scripts compute WGCNA sample connectivity outliers from the feature-by-sample matrix before writing the BED. Raw BEDs keep all samples after the initial sample-list filter.
+
+WGCNA outlier detection uses the same implementation in all three prepare scripts:
+
+1. Compute sample-sample biweight midcorrelations with `WGCNA::bicor(phenotype_matrix, use = "pairwise.complete.obs")`.
+2. Convert correlations to adjacency with `0.5 + 0.5 * correlation`, replacing `NA` adjacency values with 0.
+3. Calculate sample connectivity with `WGCNA::fundamentalNetworkConcepts()`.
+4. Z-score the connectivity values and remove samples with `Z_score < -3`.
+5. Write removed samples to `<OutputPrefix>.<modality>.<normalization>.connectivity_outliers.tsv` with `SampleID` and `Z_score` columns.
+
+If a transformed matrix has fewer than 3 samples, fewer than 2 features, or zero/undefined connectivity variance, the scripts keep all samples and write an empty outlier TSV. Each outlier-removal round logs how many samples were removed and how many remain; raw outputs log that outlier removal was skipped.
 
 The scripts still accept `--RankNormalize` for backwards compatibility, but the option is deprecated and no longer selects a single output mode.
 

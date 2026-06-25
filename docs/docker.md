@@ -14,7 +14,7 @@ The image is built automatically on every push or pull request to `main` through
 
 The image includes the following R packages used by the scripts and WDL tasks:
 
-- `tidyverse`, `data.table`, `arrow`, `OlinkAnalyze`, `optparse`, `janitor`, `WGCNA`
+- `tidyverse`, `data.table`, `arrow`, `OlinkAnalyze`, `optparse`, `janitor`, `WGCNA` (`bioconda::r-wgcna`)
 - `PCAtools`, `RNOmni`, `edgeR`
 - `biomaRt`, `biomaRtr`, `rtracklayer`
 - `patchwork`
