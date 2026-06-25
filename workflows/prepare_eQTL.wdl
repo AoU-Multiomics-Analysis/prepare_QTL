@@ -1,6 +1,7 @@
 version 1.0
 
 import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs
+import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/MergeCovariates.wdl" as CovariateMerge
 
 
 
@@ -47,6 +48,7 @@ workflow eQTLPrepareData {
         File AnnotationGTF 
         File SampleList 
         Boolean RankNormalize = true
+        File? AdditionalCovariates
 
         Int memory 
         Int disk_space 
@@ -74,8 +76,18 @@ workflow eQTLPrepareData {
             num_threads = num_threads
     }
 
+    if (defined(AdditionalCovariates)) {
+        call CovariateMerge.MergeCovariates as MergeAdditionalCovariates {
+            input:
+                GenotypePCs = select_first([AdditionalCovariates]),
+                MolecularPCs = PhenotypePCs.OutPhenotypePCs,
+                OutputPrefix = OutputPrefix
+        }
+    }
+
     output {
         File BedFile = eqtl_prepare_expression.ExpressionBed 
         File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs 
+        File? QtlCovariates = MergeAdditionalCovariates.QtlCovariates
     }
 }

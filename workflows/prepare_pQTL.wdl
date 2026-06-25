@@ -1,5 +1,6 @@
 version 1.0
 import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs
+import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/MergeCovariates.wdl" as CovariateMerge
 
 
 
@@ -51,6 +52,7 @@ workflow pQTLPrepareData {
         File ProteomicData
         String OutputPrefix 
         Boolean RankNormalize = true
+        File? AdditionalCovariates
     } 
     call PrepareProteomicData {
         input:
@@ -73,8 +75,17 @@ workflow pQTLPrepareData {
             disk_space = disk_space,
             num_threads = num_threads
     }
+    if (defined(AdditionalCovariates)) {
+        call CovariateMerge.MergeCovariates as MergeAdditionalCovariates {
+            input:
+                GenotypePCs = select_first([AdditionalCovariates]),
+                MolecularPCs = PhenotypePCs.OutPhenotypePCs,
+                OutputPrefix = OutputPrefix
+        }
+    }
     output {
         File BedFile = PrepareProteomicData.ProteomicBed 
         File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs 
+        File? QtlCovariates = MergeAdditionalCovariates.QtlCovariates
     }
 }

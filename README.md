@@ -136,9 +136,10 @@ End-to-end workflow for preparing gene expression data for eQTL analysis.
 **Steps:**
 1. Runs `PrepareExpression.R` to normalize expression data and produce a BED file.
 2. Runs `calculate_PCs.R` (via `calculate_phenotypePCs.wdl`) to compute phenotype PCs from the expression BED file.
+3. Optionally runs `MergeCovariates.wdl` when `AdditionalCovariates` is provided.
 
-**Inputs:** Raw count GCT file, GENCODE GTF, sample list, output prefix, rank normalization toggle, resource parameters.
-**Outputs:** Expression BED file (`.expression.bed.gz`), phenotype PCs TSV.
+**Inputs:** Raw count GCT file, GENCODE GTF, sample list, output prefix, rank normalization toggle, optional additional covariates TSV, resource parameters.
+**Outputs:** Expression BED file (`.expression.bed.gz`), phenotype PCs TSV, and optionally merged QTL covariates TSV.
 
 ---
 
@@ -149,9 +150,10 @@ End-to-end workflow for preparing Olink proteomics data for pQTL analysis.
 **Steps:**
 1. Runs `PrepareProteomics.R` to normalize protein expression data and produce a BED file.
 2. Runs `calculate_PCs.R` (via `calculate_phenotypePCs.wdl`) to compute phenotype PCs from the protein BED file.
+3. Optionally runs `MergeCovariates.wdl` when `AdditionalCovariates` is provided.
 
-**Inputs:** Olink proteomics data file, GENCODE GTF, sample list, output prefix, rank normalization toggle, resource parameters.
-**Outputs:** Protein BED file (`.protein.bed.gz`), phenotype PCs TSV.
+**Inputs:** Olink proteomics data file, GENCODE GTF, sample list, output prefix, rank normalization toggle, optional additional covariates TSV, resource parameters.
+**Outputs:** Protein BED file (`.protein.bed.gz`), phenotype PCs TSV, and optionally merged QTL covariates TSV.
 
 ---
 
@@ -162,9 +164,10 @@ End-to-end workflow for preparing splice junction data for sQTL analysis.
 **Steps:**
 1. Runs `PrepareSpliceData.R` to normalize LeafCutter splice data and produce a BED file.
 2. Runs `calculate_PCs.R` (via `calculate_phenotypePCs.wdl`) to compute phenotype PCs from the splicing BED file.
+3. Optionally runs `MergeCovariates.wdl` when `AdditionalCovariates` is provided.
 
-**Inputs:** LeafCutter BED file, sample list, output prefix, rank normalization toggle, resource parameters.
-**Outputs:** Splicing BED file (`.splicing.bed.gz`), phenotype PCs TSV.
+**Inputs:** LeafCutter BED file, sample list, output prefix, rank normalization toggle, optional additional covariates TSV, resource parameters.
+**Outputs:** Splicing BED file (`.splicing.bed.gz`), phenotype PCs TSV, and optionally merged QTL covariates TSV.
 
 ---
 
@@ -182,12 +185,12 @@ Workflow that computes phenotype PCs from any normalized molecular phenotype BED
 
 ### `workflows/MergeCovariates.wdl`
 
-Workflow that merges genotype PCs and molecular phenotype PCs into a single covariate file ready for tensorQTL.
+Workflow that merges additional covariates, such as genotype PCs, and molecular phenotype PCs into a single covariate file ready for tensorQTL.
 
 **Steps:**
 1. Runs `MergeCovariates.R` to inner-join genotype and molecular PCs and transpose the result.
 
-**Inputs:** Genotype PCs TSV, molecular PCs TSV, output prefix.  
+**Inputs:** Additional covariates TSV with `sample_id`, molecular PCs TSV, output prefix.
 **Outputs:** Combined QTL covariate file (`<OutputPrefix>_QTL_covariates.tsv`).
 
 ---
