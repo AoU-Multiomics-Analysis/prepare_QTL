@@ -1,6 +1,7 @@
 version 1.0
 import  "calculate_phenotypePCs.wdl" as ComputePCs
 import  "MergeCovariates.wdl" as CovariateMerge
+import  "ResidualizePhenotypes.wdl" as Residualize
 
 
 
@@ -52,6 +53,7 @@ workflow pQTLPrepareData {
         File ProteomicData
         String OutputPrefix
         File? AdditionalCovariates
+        Boolean ResidualizeNormalizedInputs = false
     }
     call PrepareProteomicData {
         input:
@@ -101,6 +103,29 @@ workflow pQTLPrepareData {
                 OutputSuffix = ".scaled"
         }
     }
+
+    if (ResidualizeNormalizedInputs) {
+        call Residualize.ResidualizePhenotypes as ResidualizeIntPhenotypes {
+            input:
+                InputBed = PrepareProteomicData.IntProteomicBed,
+                Covariates = MergeIntAdditionalCovariates.QtlCovariates,
+                OutputFileName = OutputPrefix + ".protein.INT.residualized.bed.gz",
+                memory = memory,
+                disk_space = disk_space,
+                num_threads = num_threads
+        }
+
+        call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
+            input:
+                InputBed = PrepareProteomicData.ScaledProteomicBed,
+                Covariates = MergeScaledAdditionalCovariates.QtlCovariates,
+                OutputFileName = OutputPrefix + ".protein.scaled.residualized.bed.gz",
+                memory = memory,
+                disk_space = disk_space,
+                num_threads = num_threads
+        }
+    }
+
     output {
         File IntBedFile = PrepareProteomicData.IntProteomicBed
         File ScaledBedFile = PrepareProteomicData.ScaledProteomicBed
@@ -109,5 +134,7 @@ workflow pQTLPrepareData {
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         File? ScaledQtlCovariates = MergeScaledAdditionalCovariates.QtlCovariates
+        File? IntResidualizedBedFile = ResidualizeIntPhenotypes.ResidualizedBed
+        File? ScaledResidualizedBedFile = ResidualizeScaledPhenotypes.ResidualizedBed
     }
 }

@@ -142,3 +142,24 @@ Merges additional covariates, such as genotype PCs, and molecular phenotype PCs 
 - `--OutputSuffix`: Optional suffix added before the `.tsv` extension.
 
 **Output:** `<OutputPrefix>_QTL_covariates<OutputSuffix>.tsv`
+
+## `scripts/ResidualizePhenotypes.R`
+
+Residualizes a normalized molecular phenotype BED against merged covariates and then centers/scales each row of residuals.
+
+**What it does:**
+1. Reads a normalized molecular phenotype BED file.
+2. Optionally reads merged tensorQTL-style covariates with covariates as rows and samples as columns.
+3. Aligns samples between the BED and covariate matrix.
+4. For each phenotype row, regresses phenotype values on the covariate design matrix.
+5. Centers and scales each residual row across samples.
+6. Writes a BED file with the original first 4 metadata columns and residualized/scaled sample values.
+
+If no covariates are supplied, the script skips residualization and only centers/scales the input phenotype rows.
+
+**Inputs:**
+- `--InputBed`: Normalized molecular phenotype BED file.
+- `--Covariates`: Optional merged covariates TSV in tensorQTL format.
+- `--OutputFile`: Optional output BED file. If omitted, the script inserts `.residualized` before `.bed.gz`.
+
+**Output:** Residualized and centered/scaled BED file, for example `<OutputPrefix>.expression.INT.residualized.bed.gz`.

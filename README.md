@@ -21,9 +21,9 @@ prepare_QTL/
 
 ## Main Workflows
 
-- [`workflows/prepare_eQTL.wdl`](workflows/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files, plus phenotype PCs and optional QTL covariates for INT and scaled outputs.
-- [`workflows/prepare_sQTL.wdl`](workflows/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs and optional QTL covariates for INT and scaled outputs.
-- [`workflows/prepare_pQTL.wdl`](workflows/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs and optional QTL covariates for INT and scaled outputs.
+- [`workflows/prepare_eQTL.wdl`](workflows/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
+- [`workflows/prepare_sQTL.wdl`](workflows/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
+- [`workflows/prepare_pQTL.wdl`](workflows/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/normalize_pQTL.wdl`](workflows/normalize_pQTL.wdl): Median-normalizes Olink NPX parquet files before pQTL preparation.
 - [`workflows/prepare_VCF.wdl`](workflows/prepare_VCF.wdl): Prepares genotype data from an All of Us Hail MatrixTable.
 
@@ -35,5 +35,6 @@ The prepare scripts and workflows for eQTL, pQTL, and sQTL share this output pat
 - `.scaled`: Centered and scaled molecular phenotypes.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting. Raw BEDs are emitted as workflow outputs but are not used for phenotype PCs or covariate merging.
 - `AdditionalCovariates`: Optional WDL input for eQTL, pQTL, and sQTL prepare workflows. When provided, the workflow runs `MergeCovariates.wdl` for both `.INT` and `.scaled` phenotype PCs.
+- `ResidualizeNormalizedInputs`: Optional WDL toggle for eQTL, pQTL, and sQTL prepare workflows. When `true`, the workflow writes residualized BEDs for `.INT` and `.scaled` inputs; raw BEDs are not residualized.
 
 See the linked docs above for full input and output details.

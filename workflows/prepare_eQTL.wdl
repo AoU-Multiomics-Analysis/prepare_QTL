@@ -2,6 +2,7 @@ version 1.0
 
 import  "calculate_phenotypePCs.wdl" as ComputePCs
 import  "MergeCovariates.wdl" as CovariateMerge
+import  "ResidualizePhenotypes.wdl" as Residualize
 
 
 
@@ -48,6 +49,7 @@ workflow eQTLPrepareData {
         File AnnotationGTF
         File SampleList
         File? AdditionalCovariates
+        Boolean ResidualizeNormalizedInputs = false
 
         Int memory
         Int disk_space
@@ -103,6 +105,28 @@ workflow eQTLPrepareData {
         }
     }
 
+    if (ResidualizeNormalizedInputs) {
+        call Residualize.ResidualizePhenotypes as ResidualizeIntPhenotypes {
+            input:
+                InputBed = eqtl_prepare_expression.IntExpressionBed,
+                Covariates = MergeIntAdditionalCovariates.QtlCovariates,
+                OutputFileName = OutputPrefix + ".expression.INT.residualized.bed.gz",
+                memory = memory,
+                disk_space = disk_space,
+                num_threads = num_threads
+        }
+
+        call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
+            input:
+                InputBed = eqtl_prepare_expression.ScaledExpressionBed,
+                Covariates = MergeScaledAdditionalCovariates.QtlCovariates,
+                OutputFileName = OutputPrefix + ".expression.scaled.residualized.bed.gz",
+                memory = memory,
+                disk_space = disk_space,
+                num_threads = num_threads
+        }
+    }
+
     output {
         File IntBedFile = eqtl_prepare_expression.IntExpressionBed
         File ScaledBedFile = eqtl_prepare_expression.ScaledExpressionBed
@@ -111,5 +135,7 @@ workflow eQTLPrepareData {
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         File? ScaledQtlCovariates = MergeScaledAdditionalCovariates.QtlCovariates
+        File? IntResidualizedBedFile = ResidualizeIntPhenotypes.ResidualizedBed
+        File? ScaledResidualizedBedFile = ResidualizeScaledPhenotypes.ResidualizedBed
     }
 }
