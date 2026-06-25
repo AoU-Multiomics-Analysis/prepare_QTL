@@ -14,7 +14,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::r-janitor \
     bioconda::bioconductor-pcatools \
     conda-forge::r-rnomni \
-    conda-forge::r-wgcna \
+    bioconda::r-wgcna \
     bioconda::bioconductor-edger \
     bioconda::bioconductor-biomart \
     bioconda::r-biomartr \
