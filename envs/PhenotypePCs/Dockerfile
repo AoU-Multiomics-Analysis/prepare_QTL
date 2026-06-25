@@ -7,12 +7,14 @@ ENV PATH=/opt/conda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:
 ## Create a new environment and install packages
 RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::r-tidyverse \
-    conda-forge::datatable \
+    conda-forge::r-data.table \
+    conda-forge::r-arrow \
     conda-forge::r-optparse \
     conda-forge::r-janitor \
     bioconda::bioconductor-pcatools \
     conda-forge::r-rnomni \
     bioconda::bioconductor-edger \
+    bioconda::bioconductor-biomart \
     bioconda::r-biomartr \
     bioconda::bioconductor-rtracklayer \
     conda-forge::r-patchwork

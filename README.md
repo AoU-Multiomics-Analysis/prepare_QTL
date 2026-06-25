@@ -262,7 +262,7 @@ Workflow that extracts genotype dosage values from a VCF file.
 The `envs/PhenotypePCs/Dockerfile` defines the Docker image used by most WDL tasks (published as `ghcr.io/aou-multiomics-analysis/prepare_qtl:main`). It is built automatically on every push or pull request to `main` via the GitHub Actions workflow in `.github/workflows/docker-image.yml`.
 
 The image includes the following R packages:
-- `tidyverse`, `data.table`, `optparse`, `janitor`
+- `tidyverse`, `data.table`, `arrow`, `optparse`, `janitor`
 - `PCAtools`, `RNOmni`, `edgeR`
-- `biomaRtr`, `rtracklayer`
+- `biomaRt`, `biomaRtr`, `rtracklayer`
 - `patchwork`
