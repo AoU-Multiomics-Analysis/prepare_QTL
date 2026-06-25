@@ -1,6 +1,7 @@
 version 1.0
 import  "calculate_phenotypePCs.wdl" as ComputePCs
 import  "MergeCovariates.wdl" as CovariateMerge
+import  "ResidualizePhenotypes.wdl" as Residualize
 
 task PrepareSpliceData {
     input {
@@ -40,6 +41,7 @@ workflow sQTLPrepareData  {
         File SpliceData
         String OutputPrefix
         File? AdditionalCovariates
+        Boolean ResidualizeNormalizedInputs = false
 
         Int memory
         Int disk_space
@@ -91,6 +93,29 @@ workflow sQTLPrepareData  {
                 OutputSuffix = ".scaled"
         }
     }
+
+    if (ResidualizeNormalizedInputs) {
+        call Residualize.ResidualizePhenotypes as ResidualizeIntPhenotypes {
+            input:
+                InputBed = PrepareSpliceData.IntSplicingBed,
+                Covariates = MergeIntAdditionalCovariates.QtlCovariates,
+                OutputFileName = OutputPrefix + ".splicing.INT.residualized.bed.gz",
+                memory = memory,
+                disk_space = disk_space,
+                num_threads = num_threads
+        }
+
+        call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
+            input:
+                InputBed = PrepareSpliceData.ScaledSplicingBed,
+                Covariates = MergeScaledAdditionalCovariates.QtlCovariates,
+                OutputFileName = OutputPrefix + ".splicing.scaled.residualized.bed.gz",
+                memory = memory,
+                disk_space = disk_space,
+                num_threads = num_threads
+        }
+    }
+
     output {
         File IntBedFile = PrepareSpliceData.IntSplicingBed
         File ScaledBedFile = PrepareSpliceData.ScaledSplicingBed
@@ -99,6 +124,8 @@ workflow sQTLPrepareData  {
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         File? ScaledQtlCovariates = MergeScaledAdditionalCovariates.QtlCovariates
+        File? IntResidualizedBedFile = ResidualizeIntPhenotypes.ResidualizedBed
+        File? ScaledResidualizedBedFile = ResidualizeScaledPhenotypes.ResidualizedBed
         #File PhenotypeGroups = PrepareSpliceData.PhenotypeGroups
     }
 
