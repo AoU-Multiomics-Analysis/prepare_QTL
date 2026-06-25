@@ -1,6 +1,6 @@
 library(tidyverse)
 library(data.table)
-library(magrittr)
+library(OlinkAnalyze)
 library(biomaRt)
 library(optparse)
 library(arrow)
@@ -47,7 +47,7 @@ mart <- useEnsembl("ensembl","hsapiens_gene_ensembl",version = ensembl_version)
 
 ensembl <- useDataset("hsapiens_gene_ensembl", mart = mart)
 conversion_list <- getBM(c("ensembl_gene_id_version","uniprot_gn_id"), "uniprot_gn_id", protein_list, ensembl) 
-conversion_list %<>% dplyr::rename('gene_id' = 1,'UniProt' = 2)
+conversion_list <- conversion_list %>% dplyr::rename('gene_id' = 1,'UniProt' = 2)
 conversion_list
 
 }
@@ -163,7 +163,7 @@ ProteomicsDataWide <- ProteomicsData %>%
     #group_by(ResearchID,OlinkID) %>% 
     #filter(row_number() == 1) %>% 
     #ungroup() %>% 
-    transmute(SampleIDForQTL = .data[[SampleIDColumn]], PCNormalizedNPX, UniProt) %>%
+    transmute(SampleIDForQTL = as.character(.data[[SampleIDColumn]]), PCNormalizedNPX, UniProt) %>%
     pivot_wider(names_from = UniProt,values_from =PCNormalizedNPX )  %>%
     column_to_rownames('SampleIDForQTL') %>%
     mutate(across(everything(),~transform_phenotype(., RankNormalize)))
@@ -177,12 +177,12 @@ message('Merging data with TSS locations')
 ProteomicsBed <- ProteomicsDataWide %>% 
     t() %>% 
     data.frame() %>%
-    dplyr::rename_with(~str_remove(.,'X')) %>% 
+    dplyr::rename_with(~str_remove(.,'^X')) %>%
     rownames_to_column('UniProt') %>%
     left_join(UniProtTSSLocations,by = 'UniProt') %>% 
     dplyr::select(seqnames,start, end, UniProt, gene_id, everything()) %>% 
     filter(!is.na(seqnames)) %>% 
-    dplyr::rename_with(~str_remove(.,'X')) %>% 
+    dplyr::rename_with(~str_remove(.,'^X')) %>%
     mutate(gene_id = paste0(UniProt, '_', gene_id)) %>% 
     dplyr::select(-UniProt) %>% 
     arrange(seqnames,start) %>% 

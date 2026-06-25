@@ -9,6 +9,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::r-tidyverse \
     conda-forge::r-data.table \
     conda-forge::r-arrow \
+    conda-forge::r-olinkanalyze \
     conda-forge::r-optparse \
     conda-forge::r-janitor \
     bioconda::bioconductor-pcatools \

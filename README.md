@@ -67,6 +67,20 @@ Prepares Olink proteomics data for pQTL analysis.
 
 ---
 
+### `scripts/NormalizeProteomics.R`
+
+Median-normalizes Olink NPX parquet files and writes filtered long-format protein values for pQTL preparation.
+
+**Inputs:**
+- `--OlinkDataDir`: Directory containing Olink NPX parquet files.
+- `--OutputPrefix`: Prefix for output files.
+- `--OutputDir`: Directory for output files.
+- `--ReferencePlate`: Plate ID used to calculate reference medians.
+
+**Outputs:** `<OutputPrefix>_median_normalized.tsv.gz`, `<OutputPrefix>_npx_values.tsv.gz`
+
+---
+
 ### `scripts/PrepareSpliceData.R`
 
 Prepares LeafCutter splice junction data for sQTL analysis.
@@ -154,6 +168,15 @@ End-to-end workflow for preparing Olink proteomics data for pQTL analysis.
 
 **Inputs:** Olink proteomics data file, GENCODE GTF, sample list, output prefix, rank normalization toggle, optional additional covariates TSV, resource parameters.
 **Outputs:** Protein BED file (`.protein.bed.gz`), phenotype PCs TSV, and optionally merged QTL covariates TSV.
+
+---
+
+### `workflows/normalize_pQTL.wdl`
+
+Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
+
+**Inputs:** Array of Olink NPX parquet files, output prefix, reference plate ID, resource parameters.
+**Outputs:** Median-normalized Olink TSV and filtered long-format proteomics TSV.
 
 ---
 
@@ -265,7 +288,7 @@ Workflow that extracts genotype dosage values from a VCF file.
 The `envs/PhenotypePCs/Dockerfile` defines the Docker image used by most WDL tasks (published as `ghcr.io/aou-multiomics-analysis/prepare_qtl:main`). It is built automatically on every push or pull request to `main` via the GitHub Actions workflow in `.github/workflows/docker-image.yml`.
 
 The image includes the following R packages:
-- `tidyverse`, `data.table`, `arrow`, `optparse`, `janitor`
+- `tidyverse`, `data.table`, `arrow`, `OlinkAnalyze`, `optparse`, `janitor`
 - `PCAtools`, `RNOmni`, `edgeR`
 - `biomaRt`, `biomaRtr`, `rtracklayer`
 - `patchwork`
