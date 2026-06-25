@@ -7,6 +7,25 @@ library(rtracklayer)
 library(RNOmni)
 
 
+parse_bool <- function(x){
+    x <- tolower(as.character(x))
+    if (x %in% c("true", "t", "1", "yes", "y")) {
+        return(TRUE)
+    }
+    if (x %in% c("false", "f", "0", "no", "n")) {
+        return(FALSE)
+    }
+    stop("RankNormalize must be true or false")
+}
+
+transform_phenotype <- function(x, rank_normalize){
+    if (rank_normalize) {
+        return(RankNorm(x))
+    }
+    as.numeric(scale(x, center = TRUE, scale = TRUE))
+}
+
+
 ######## COMMAND LINE ARGUMENTS ############
 
 option_list <- list(
@@ -16,10 +35,13 @@ option_list <- list(
     optparse::make_option(c("--OutputPrefix"), type="character", default=NULL,
                         help="Prefix for output data", metavar = "type"),
     optparse::make_option(c("--SampleList"), type="character", default=NULL,
-                        help="File containing list of samples to run processing on", metavar = "type")
+                        help="File containing list of samples to run processing on", metavar = "type"),
+    optparse::make_option(c("--RankNormalize"), type="character", default="true",
+                        help="Apply rank-based inverse normal transformation before writing BED output", metavar = "type")
 )
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
+RankNormalize <- parse_bool(opt$RankNormalize)
 
 
 OutputFile <- paste0(opt$OutputPrefix,'.splicing.bed.gz')
@@ -49,14 +71,18 @@ message('Extracting interval information')
 SpliceDataTSS <- SpliceData %>% select(1,2,3,4)
 
 
-message('Performing normalization')
+if (RankNormalize) {
+    message('Applying rank-based inverse normal transformation to splice data')
+} else {
+    message('Centering and scaling splice data')
+}
 # drops splice interval information and 
-# performs RankNorm transformation
+# transforms each splice junction across samples
 SpliceDataNorm <- SpliceData %>% 
     dplyr::select(-1,-2,-3,-4) %>% 
     t() %>% 
     data.frame() %>% 
-    mutate(across(everything(),~RankNorm(.))) %>% 
+    mutate(across(everything(),~transform_phenotype(., RankNormalize))) %>%
     t() %>% 
     data.frame() %>%
     dplyr::rename_with(~str_remove(.,'X')) 
@@ -85,4 +111,3 @@ SpliceDataBed %>%  fwrite(OutputFile,sep ='\t')
 
 #message('Writing phenotype groups')
 #SpliceDataBed %>% select(phenotype_id,group_id)%>% fwrite(OutputFileGroups,sep ='\t',col.names = FALSE)
-
