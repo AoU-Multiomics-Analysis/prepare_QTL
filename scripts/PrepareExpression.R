@@ -7,6 +7,7 @@ library(data.table)
 library(rtracklayer)
 library(RNOmni)
 library(edgeR)
+library(WGCNA)
 
 
 # use rtracklayer to import GTF file and extract TSS locations.
@@ -33,6 +34,49 @@ transform_phenotype <- function(x, rank_normalize){
         return(RankNorm(x))
     }
     as.numeric(scale(x, center = TRUE, scale = TRUE))
+}
+
+remove_connectivity_outliers <- function(phenotype_matrix, output_file, transform_label){
+    outliers_file <- str_replace(output_file, "\\.bed\\.gz$", ".connectivity_outliers.tsv")
+    message(paste0('Computing connectivity outliers for ', transform_label, ' data'))
+
+    n_samples_before <- ncol(phenotype_matrix)
+    empty_outliers <- tibble(SampleID = character(), Z_score = numeric())
+    if (ncol(phenotype_matrix) < 3 || nrow(phenotype_matrix) < 2) {
+        message('Not enough data to compute connectivity outliers; keeping all samples')
+        message(paste0('Connectivity outlier removal for ', transform_label, ' data: removed 0 of ', n_samples_before, ' samples; ', n_samples_before, ' samples remain'))
+        empty_outliers %>% write_tsv(outliers_file)
+        return(phenotype_matrix)
+    }
+
+    phenotype_matrix <- as.data.frame(phenotype_matrix, check.names = FALSE)
+    norm_adj <- 0.5 + 0.5 * WGCNA::bicor(phenotype_matrix, use = "pairwise.complete.obs")
+    norm_adj[is.na(norm_adj)] <- 0
+
+    net_summary <- WGCNA::fundamentalNetworkConcepts(norm_adj)
+    net_connectivity <- net_summary$Connectivity
+    connectivity_sd <- sd(net_connectivity, na.rm = TRUE)
+
+    if (is.na(connectivity_sd) || connectivity_sd == 0) {
+        message('Connectivity scores have zero or undefined variance; keeping all samples')
+        message(paste0('Connectivity outlier removal for ', transform_label, ' data: removed 0 of ', n_samples_before, ' samples; ', n_samples_before, ' samples remain'))
+        empty_outliers %>% write_tsv(outliers_file)
+        return(phenotype_matrix)
+    }
+
+    connectivity_zscore <- ((net_connectivity - mean(net_connectivity, na.rm = TRUE)) / connectivity_sd) %>%
+        data.frame() %>%
+        dplyr::rename('Z_score' = 1) %>%
+        rownames_to_column('SampleID')
+
+    connectivity_zscore_outliers <- connectivity_zscore %>% filter(Z_score < -3)
+    n_samples_removed <- nrow(connectivity_zscore_outliers)
+    n_samples_after <- n_samples_before - n_samples_removed
+    message(paste0('Connectivity outlier removal for ', transform_label, ' data: removed ', n_samples_removed, ' of ', n_samples_before, ' samples; ', n_samples_after, ' samples remain'))
+    connectivity_zscore_outliers %>% write_tsv(outliers_file)
+
+    kept_samples <- setdiff(colnames(phenotype_matrix), connectivity_zscore_outliers$SampleID)
+    phenotype_matrix[, kept_samples, drop = FALSE]
 }
 
 
@@ -104,23 +148,29 @@ DataEdgeR <- edgeR::calcNormFactors(DataEdgeR)
 message('Computing CPMs')
 DataCPM <- edgeR::cpm(DataEdgeR, log=FALSE) %>% data.frame()
 
-write_expression_bed <- function(cpm_data, tss_positions, output_file, transform_label, rank_normalize = NULL){
+write_expression_bed <- function(cpm_data, tss_positions, output_file, transform_label, rank_normalize = NULL, remove_outliers = TRUE){
     message(paste0('Preparing ', transform_label, ' CPM BED'))
     if (is.null(rank_normalize)) {
-        NormalizedCPMs <- cpm_data %>%
+        NormalizedCPMsMatrix <- cpm_data %>%
                         data.frame() %>%
-                        dplyr::rename_with(~str_remove(.,'^X')) %>%
-                        rownames_to_column('gene_id')
+                        dplyr::rename_with(~str_remove(.,'^X'))
     } else {
-        NormalizedCPMs <- cpm_data %>%
+        NormalizedCPMsMatrix <- cpm_data %>%
                         t() %>%
                         data.frame() %>%
                         mutate(across(everything(),~transform_phenotype(., rank_normalize))) %>%
                         t() %>%
                         data.frame() %>%
-                        dplyr::rename_with(~str_remove(.,'^X')) %>%
-                        rownames_to_column('gene_id')
+                        dplyr::rename_with(~str_remove(.,'^X'))
     }
+
+    if (remove_outliers) {
+        NormalizedCPMsMatrix <- remove_connectivity_outliers(NormalizedCPMsMatrix, output_file, transform_label)
+    } else {
+        message(paste0('Skipping connectivity outlier removal for ', transform_label, ' data; keeping ', ncol(NormalizedCPMsMatrix), ' samples'))
+    }
+
+    NormalizedCPMs <- NormalizedCPMsMatrix %>% rownames_to_column('gene_id')
 
     LengthNormalziedCPMS <- NormalizedCPMs %>% nrow
     message(paste0('Number of genes found: ',LengthNormalziedCPMS))
@@ -150,4 +200,4 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
 
 write_expression_bed(DataCPM, PositionTSS, IntOutputFile, 'rank-normalized', TRUE)
 write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE)
-write_expression_bed(DataCPM, PositionTSS, RawOutputFile, 'raw')
+write_expression_bed(DataCPM, PositionTSS, RawOutputFile, 'raw', remove_outliers = FALSE)

@@ -12,6 +12,8 @@ All scripts are written in R and are invoked from the command line with `Rscript
 - `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
+For each `.INT` and `.scaled` BED, the scripts compute WGCNA sample connectivity outliers from the feature-by-sample matrix, remove samples with connectivity `Z_score < -3`, and write the removed samples to `<OutputPrefix>.<modality>.<normalization>.connectivity_outliers.tsv`. Raw BEDs keep all samples after the initial sample-list filter.
+
 The scripts still accept `--RankNormalize` for backwards compatibility, but the option is deprecated and no longer selects a single output mode.
 
 ## `scripts/PrepareExpression.R`
@@ -38,6 +40,8 @@ Prepares RNA-seq gene expression data for eQTL analysis.
 - `<OutputPrefix>.expression.INT.bed.gz`
 - `<OutputPrefix>.expression.scaled.bed.gz`
 - `<OutputPrefix>.expression.raw.bed.gz`
+- `<OutputPrefix>.expression.INT.connectivity_outliers.tsv`
+- `<OutputPrefix>.expression.scaled.connectivity_outliers.tsv`
 
 ## `scripts/PrepareProteomics.R`
 
@@ -63,6 +67,8 @@ Prepares Olink proteomics data for pQTL analysis.
 - `<OutputPrefix>.protein.INT.bed.gz`
 - `<OutputPrefix>.protein.scaled.bed.gz`
 - `<OutputPrefix>.protein.raw.bed.gz`
+- `<OutputPrefix>.protein.INT.connectivity_outliers.tsv`
+- `<OutputPrefix>.protein.scaled.connectivity_outliers.tsv`
 
 ## `scripts/NormalizeProteomics.R`
 
@@ -107,6 +113,8 @@ Prepares LeafCutter splice junction data for sQTL analysis.
 - `<OutputPrefix>.splicing.INT.bed.gz`
 - `<OutputPrefix>.splicing.scaled.bed.gz`
 - `<OutputPrefix>.splicing.raw.bed.gz`
+- `<OutputPrefix>.splicing.INT.connectivity_outliers.tsv`
+- `<OutputPrefix>.splicing.scaled.connectivity_outliers.tsv`
 
 ## `scripts/calculate_PCs.R`
 

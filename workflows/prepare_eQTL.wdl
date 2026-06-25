@@ -39,6 +39,8 @@ task eqtl_prepare_expression {
         File IntExpressionBed="${OutputPrefix}.expression.INT.bed.gz"
         File ScaledExpressionBed="${OutputPrefix}.expression.scaled.bed.gz"
         File RawExpressionBed="${OutputPrefix}.expression.raw.bed.gz"
+        File IntConnectivityOutliers="${OutputPrefix}.expression.INT.connectivity_outliers.tsv"
+        File ScaledConnectivityOutliers="${OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
     }
 }
 
@@ -131,6 +133,8 @@ workflow eQTLPrepareData {
         File IntBedFile = eqtl_prepare_expression.IntExpressionBed
         File ScaledBedFile = eqtl_prepare_expression.ScaledExpressionBed
         File RawBedFile = eqtl_prepare_expression.RawExpressionBed
+        File IntConnectivityOutliers = eqtl_prepare_expression.IntConnectivityOutliers
+        File ScaledConnectivityOutliers = eqtl_prepare_expression.ScaledConnectivityOutliers
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates

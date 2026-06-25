@@ -6,6 +6,7 @@ library(optparse)
 library(arrow)
 library(rtracklayer)
 library(RNOmni)
+library(WGCNA)
 
 
 #########  FUNCTIONS ##########
@@ -77,6 +78,49 @@ transform_phenotype <- function(x, rank_normalize){
         return(RankNorm(x))
     }
     as.numeric(scale(x, center = TRUE, scale = TRUE))
+}
+
+remove_connectivity_outliers <- function(phenotype_matrix, output_file, transform_label){
+    outliers_file <- str_replace(output_file, "\\.bed\\.gz$", ".connectivity_outliers.tsv")
+    message(paste0('Computing connectivity outliers for ', transform_label, ' data'))
+
+    n_samples_before <- ncol(phenotype_matrix)
+    empty_outliers <- tibble(SampleID = character(), Z_score = numeric())
+    if (ncol(phenotype_matrix) < 3 || nrow(phenotype_matrix) < 2) {
+        message('Not enough data to compute connectivity outliers; keeping all samples')
+        message(paste0('Connectivity outlier removal for ', transform_label, ' data: removed 0 of ', n_samples_before, ' samples; ', n_samples_before, ' samples remain'))
+        empty_outliers %>% write_tsv(outliers_file)
+        return(phenotype_matrix)
+    }
+
+    phenotype_matrix <- as.data.frame(phenotype_matrix, check.names = FALSE)
+    norm_adj <- 0.5 + 0.5 * WGCNA::bicor(phenotype_matrix, use = "pairwise.complete.obs")
+    norm_adj[is.na(norm_adj)] <- 0
+
+    net_summary <- WGCNA::fundamentalNetworkConcepts(norm_adj)
+    net_connectivity <- net_summary$Connectivity
+    connectivity_sd <- sd(net_connectivity, na.rm = TRUE)
+
+    if (is.na(connectivity_sd) || connectivity_sd == 0) {
+        message('Connectivity scores have zero or undefined variance; keeping all samples')
+        message(paste0('Connectivity outlier removal for ', transform_label, ' data: removed 0 of ', n_samples_before, ' samples; ', n_samples_before, ' samples remain'))
+        empty_outliers %>% write_tsv(outliers_file)
+        return(phenotype_matrix)
+    }
+
+    connectivity_zscore <- ((net_connectivity - mean(net_connectivity, na.rm = TRUE)) / connectivity_sd) %>%
+        data.frame() %>%
+        dplyr::rename('Z_score' = 1) %>%
+        rownames_to_column('SampleID')
+
+    connectivity_zscore_outliers <- connectivity_zscore %>% filter(Z_score < -3)
+    n_samples_removed <- nrow(connectivity_zscore_outliers)
+    n_samples_after <- n_samples_before - n_samples_removed
+    message(paste0('Connectivity outlier removal for ', transform_label, ' data: removed ', n_samples_removed, ' of ', n_samples_before, ' samples; ', n_samples_after, ' samples remain'))
+    connectivity_zscore_outliers %>% write_tsv(outliers_file)
+
+    kept_samples <- setdiff(colnames(phenotype_matrix), connectivity_zscore_outliers$SampleID)
+    phenotype_matrix[, kept_samples, drop = FALSE]
 }
 
 
@@ -155,7 +199,7 @@ ProteomicsDataWideRaw <- ProteomicsData %>%
     column_to_rownames('SampleIDForQTL')
 
 
-write_proteomics_bed <- function(proteomics_data_wide, uniprot_tss_locations, output_file, transform_label, rank_normalize = NULL){
+write_proteomics_bed <- function(proteomics_data_wide, uniprot_tss_locations, output_file, transform_label, rank_normalize = NULL, remove_outliers = TRUE){
     if (is.null(rank_normalize)) {
         message('Preparing raw proteomics data')
         ProteomicsDataWide <- proteomics_data_wide
@@ -170,10 +214,18 @@ write_proteomics_bed <- function(proteomics_data_wide, uniprot_tss_locations, ou
     # bed format where each row is a gene/protein
     # and columns contain interval TSS location, molecular trait id
     # and other columns are participant quantifications
-    ProteomicsBed <- ProteomicsDataWide %>%
+    ProteomicsFeatureMatrix <- ProteomicsDataWide %>%
         t() %>%
         data.frame() %>%
-        dplyr::rename_with(~str_remove(.,'^X')) %>%
+        dplyr::rename_with(~str_remove(.,'^X'))
+
+    if (remove_outliers) {
+        ProteomicsFeatureMatrix <- remove_connectivity_outliers(ProteomicsFeatureMatrix, output_file, transform_label)
+    } else {
+        message(paste0('Skipping connectivity outlier removal for ', transform_label, ' data; keeping ', ncol(ProteomicsFeatureMatrix), ' samples'))
+    }
+
+    ProteomicsBed <- ProteomicsFeatureMatrix %>%
         rownames_to_column('UniProt') %>%
         left_join(uniprot_tss_locations,by = 'UniProt') %>%
         dplyr::select(seqnames,start, end, UniProt, gene_id, everything()) %>%
@@ -193,4 +245,4 @@ write_proteomics_bed <- function(proteomics_data_wide, uniprot_tss_locations, ou
 
 write_proteomics_bed(ProteomicsDataWideRaw, UniProtTSSLocations, IntOutputFile, 'rank-normalized', TRUE)
 write_proteomics_bed(ProteomicsDataWideRaw, UniProtTSSLocations, ScaledOutputFile, 'scaled', FALSE)
-write_proteomics_bed(ProteomicsDataWideRaw, UniProtTSSLocations, RawOutputFile, 'raw')
+write_proteomics_bed(ProteomicsDataWideRaw, UniProtTSSLocations, RawOutputFile, 'raw', remove_outliers = FALSE)
