@@ -1,5 +1,6 @@
 version 1.0
 import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs
+import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/MergeCovariates.wdl" as CovariateMerge
 
 task PrepareSpliceData {
     input {
@@ -39,6 +40,7 @@ workflow sQTLPrepareData  {
         File SpliceData
         String OutputPrefix
         Boolean RankNormalize = true
+        File? AdditionalCovariates
 
         Int memory 
         Int disk_space 
@@ -63,9 +65,18 @@ workflow sQTLPrepareData  {
             disk_space = disk_space,
             num_threads = num_threads
     }
+    if (defined(AdditionalCovariates)) {
+        call CovariateMerge.MergeCovariates as MergeAdditionalCovariates {
+            input:
+                GenotypePCs = select_first([AdditionalCovariates]),
+                MolecularPCs = PhenotypePCs.OutPhenotypePCs,
+                OutputPrefix = OutputPrefix
+        }
+    }
     output {
         File BedFile = PrepareSpliceData.SplicingBed 
         File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs
+        File? QtlCovariates = MergeAdditionalCovariates.QtlCovariates
         #File PhenotypeGroups = PrepareSpliceData.PhenotypeGroups
     }
 
