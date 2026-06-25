@@ -19,6 +19,10 @@ prepare_QTL/
 
 All scripts are written in R and are invoked via the command line using `Rscript`. They are also bundled in the Docker image defined in `envs/PhenotypePCs/Dockerfile`.
 
+### Shared normalization behavior
+
+`PrepareExpression.R`, `PrepareProteomics.R`, and `PrepareSpliceData.R` all accept `--RankNormalize`. The default is `true`, which applies a rank-based inverse normal transformation to each molecular phenotype across samples. When `--RankNormalize false` is provided, the scripts skip rank normalization and instead center and scale each phenotype with `scale(..., center = TRUE, scale = TRUE)`.
+
 ### `scripts/PrepareExpression.R`
 
 Prepares RNA-seq gene expression data for eQTL analysis.
@@ -51,13 +55,13 @@ Prepares Olink proteomics data for pQTL analysis.
 1. Reads Olink proteomics data from a TSV, gzipped TSV, or Parquet file.
 2. Loads a GENCODE GTF file to extract TSS positions.
 3. Uses Ensembl BioMart to map UniProt IDs to Ensembl gene IDs.
-4. Filters to a specified list of samples.
+4. Filters to a specified list of samples using either `SampleID` or `ResearchID`.
 5. Pivots data to wide format (proteins as columns, samples as rows).
 6. Applies rank-based inverse normal (RankNorm) transformation to each protein by default, or centers and scales each protein when rank normalization is disabled.
-7. Merges with TSS locations and writes the result to a compressed BED file (`.protein.bed.gz`).
+7. Joins the UniProt-to-Ensembl mapping to TSS locations by `gene_id` and writes the result to a compressed BED file (`.protein.bed.gz`).
 
 **Inputs:**
-- `--ProteomicData`: TSV, TSV.gz, or Parquet file of normalized Olink protein expression data.
+- `--ProteomicData`: TSV, TSV.gz, or Parquet file of normalized Olink protein expression data. The file must contain `PCNormalizedNPX`, `UniProt`, and at least one sample ID column: `SampleID` or `ResearchID`. If both sample ID columns are present, the script uses the one with the largest overlap with `--SampleList`.
 - `--AnnotationGTF`: GENCODE GTF file used to extract TSS locations.
 - `--SampleList`: File containing the list of sample IDs to include.
 - `--OutputPrefix`: Prefix for the output file.
@@ -71,13 +75,23 @@ Prepares Olink proteomics data for pQTL analysis.
 
 Median-normalizes Olink NPX parquet files and writes filtered long-format protein values for pQTL preparation.
 
+**What it does:**
+1. Loads all parquet files in `--OlinkDataDir` with `OlinkAnalyze::read_NPX`.
+2. Keeps Olink assay rows and removes control samples.
+3. Calculates assay-level reference medians from `--ReferencePlate`.
+4. Runs Olink plate normalization with `OlinkAnalyze::olink_normalization`.
+5. Writes the full median-normalized Olink table.
+6. Filters missing samples, keeps one valid sample-plate row per sample, removes UniProt IDs `P32455` and `Q02750`, and writes the long-format pQTL input table.
+
 **Inputs:**
-- `--OlinkDataDir`: Directory containing Olink NPX parquet files.
+- `--OlinkDataDir`: Directory containing Olink NPX parquet files. Input files must include `SampleID`, `PlateID`, `AssayType`, `OlinkID`, `NPX`, and `UniProt`.
 - `--OutputPrefix`: Prefix for output files.
 - `--OutputDir`: Directory for output files.
 - `--ReferencePlate`: Plate ID used to calculate reference medians.
 
-**Outputs:** `<OutputPrefix>_median_normalized.tsv.gz`, `<OutputPrefix>_npx_values.tsv.gz`
+**Outputs:**
+- `<OutputPrefix>_median_normalized.tsv.gz`: Full median-normalized Olink table.
+- `<OutputPrefix>_npx_values.tsv.gz`: Filtered long-format table with `ResearchID`, `UniProt`, and `PCNormalizedNPX`. This file can be used as `--ProteomicData` for `PrepareProteomics.R` or as `ProteomicData` for `workflows/prepare_pQTL.wdl`.
 
 ---
 
@@ -122,17 +136,17 @@ Computes phenotype principal components (PCs) from a normalized BED file.
 
 ### `scripts/MergeCovariates.R`
 
-Merges genotype PCs and molecular phenotype PCs into a single covariate file for QTL analysis.
+Merges additional covariates, such as genotype PCs, and molecular phenotype PCs into a single covariate file for QTL analysis.
 
 **What it does:**
-1. Reads genotype PCs and molecular phenotype PCs from TSV files.
-2. Inner-joins the two tables by sample ID.
+1. Reads additional covariates and molecular phenotype PCs from TSV files.
+2. Inner-joins the two tables by sample ID, using `sample_id` in the additional covariates file and `ID` in the phenotype PCs file.
 3. Transposes the merged table so that rows are covariate names and columns are sample IDs, as required by tensorQTL.
 4. Writes the combined covariate matrix to a TSV file.
 
 **Inputs:**
-- `--GenotypePCs`: TSV file of genotype principal components.
-- `--MolecularPCs`: TSV file of molecular (phenotype) principal components.
+- `--GenotypePCs`: TSV file of additional covariates. This file must contain a `sample_id` column.
+- `--MolecularPCs`: TSV file of molecular phenotype PCs. This file must contain an `ID` column.
 - `--OutputPrefix`: Prefix for the output file.
 
 **Output:** `<OutputPrefix>_QTL_covariates.tsv`
@@ -142,6 +156,10 @@ Merges genotype PCs and molecular phenotype PCs into a single covariate file for
 ## Workflows
 
 All workflows are written in WDL (Workflow Description Language) and are designed to run on a cloud platform such as Terra. Each workflow wraps one or more tasks that call the scripts above or external tools.
+
+The prepare workflows for eQTL, pQTL, and sQTL expose the same two optional data-processing controls:
+- `RankNormalize`: Defaults to `true`. Set to `false` to center and scale molecular phenotypes without rank-normalizing them.
+- `AdditionalCovariates`: Optional TSV of covariates with a `sample_id` column. When provided, the workflow runs `MergeCovariates.wdl` to merge those covariates with the phenotype PCs and emits `QtlCovariates`.
 
 ### `workflows/prepare_eQTL.wdl`
 
@@ -175,8 +193,8 @@ End-to-end workflow for preparing Olink proteomics data for pQTL analysis.
 
 Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 
-**Inputs:** Array of Olink NPX parquet files, output prefix, reference plate ID, resource parameters.
-**Outputs:** Median-normalized Olink TSV and filtered long-format proteomics TSV.
+**Inputs:** `Array[File] OlinkData` containing Olink NPX parquet files, output prefix, reference plate ID, resource parameters.
+**Outputs:** Median-normalized Olink TSV and filtered long-format proteomics TSV. The filtered output can be passed directly to `workflows/prepare_pQTL.wdl` as `ProteomicData`.
 
 ---
 
@@ -287,7 +305,7 @@ Workflow that extracts genotype dosage values from a VCF file.
 
 The `envs/PhenotypePCs/Dockerfile` defines the Docker image used by most WDL tasks (published as `ghcr.io/aou-multiomics-analysis/prepare_qtl:main`). It is built automatically on every push or pull request to `main` via the GitHub Actions workflow in `.github/workflows/docker-image.yml`.
 
-The image includes the following R packages:
+The image includes the following R packages used by the scripts and WDL tasks:
 - `tidyverse`, `data.table`, `arrow`, `OlinkAnalyze`, `optparse`, `janitor`
 - `PCAtools`, `RNOmni`, `edgeR`
 - `biomaRt`, `biomaRtr`, `rtracklayer`
