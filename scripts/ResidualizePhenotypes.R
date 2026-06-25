@@ -1,6 +1,7 @@
 library(tidyverse)
 library(data.table)
 library(optparse)
+library(janitor)
 
 
 ######## FUNCTIONS ########
@@ -53,10 +54,12 @@ scale_rows <- function(mat){
 load_covariates <- function(covariate_file){
     covariates <- fread(
         covariate_file,
+        header = FALSE,
         data.table = FALSE,
         check.names = FALSE,
         na.strings = c("", "NA", "NaN", ".")
-    )
+    ) %>%
+        janitor::row_to_names(row_number = 1)
 
     if (ncol(covariates) < 2) {
         stop("Covariates file must contain one covariate ID column and at least one sample column")
