@@ -7,6 +7,9 @@ workflows:
   - subclass: WDL 
     primaryDescriptorPath: /workflows/prepare_pQTL.wdl
     name: prepare_pQTL
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/normalize_pQTL.wdl
+    name: normalize_pQTL
   - subclass: WDL 
     primaryDescriptorPath: /workflows/prepare_sQTL.wdl
     name: prepare_sQTL

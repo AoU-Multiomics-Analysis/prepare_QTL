@@ -7,17 +7,6 @@ library(rtracklayer)
 library(RNOmni)
 
 
-parse_bool <- function(x){
-    x <- tolower(as.character(x))
-    if (x %in% c("true", "t", "1", "yes", "y")) {
-        return(TRUE)
-    }
-    if (x %in% c("false", "f", "0", "no", "n")) {
-        return(FALSE)
-    }
-    stop("RankNormalize must be true or false")
-}
-
 transform_phenotype <- function(x, rank_normalize){
     if (rank_normalize) {
         return(RankNorm(x))
@@ -37,15 +26,18 @@ option_list <- list(
     optparse::make_option(c("--SampleList"), type="character", default=NULL,
                         help="File containing list of samples to run processing on", metavar = "type"),
     optparse::make_option(c("--RankNormalize"), type="character", default="true",
-                        help="Apply rank-based inverse normal transformation before writing BED output", metavar = "type")
+                        help="Deprecated; both INT and scaled BED outputs are always written", metavar = "type")
 )
 
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
-RankNormalize <- parse_bool(opt$RankNormalize)
 
 
-OutputFile <- paste0(opt$OutputPrefix,'.splicing.bed.gz')
-message(paste0('Writing to output file: ',OutputFile))
+IntOutputFile <- paste0(opt$OutputPrefix,'.splicing.INT.bed.gz')
+ScaledOutputFile <- paste0(opt$OutputPrefix,'.splicing.scaled.bed.gz')
+RawOutputFile <- paste0(opt$OutputPrefix,'.splicing.raw.bed.gz')
+message(paste0('Writing INT bed file to: ', IntOutputFile))
+message(paste0('Writing scaled bed file to: ', ScaledOutputFile))
+message(paste0('Writing raw bed file to: ', RawOutputFile))
 
 OutputFileGroups <- paste0(opt$OutputPrefix,'.phenotype_groups.tsv')
 message(paste0('Writing to groups file: ',OutputFileGroups))
@@ -60,7 +52,7 @@ message(paste0('Number of samples in SampleList:',SampleList %>% length()))
 
 
 message('Loading splice data')
-SpliceData <-  fread(opt$SpliceData) %>% 
+SpliceData <-  fread(opt$SpliceData) %>%
     dplyr::select(1,2,3,4,any_of(SampleList))
 NumSampleSpliceData <- SpliceData %>% ncol - 4
 message(paste0('Number of samples found in SpliceData matching SampleList:', NumSampleSpliceData ))
@@ -69,45 +61,53 @@ message(paste0('Number of samples found in SpliceData matching SampleList:', Num
 message('Extracting interval information')
 # extracts interval information for splice junctions
 SpliceDataTSS <- SpliceData %>% select(1,2,3,4)
+SpliceDataValues <- SpliceData %>% dplyr::select(-1,-2,-3,-4)
 
 
-if (RankNormalize) {
-    message('Applying rank-based inverse normal transformation to splice data')
-} else {
-    message('Centering and scaling splice data')
+write_splice_bed <- function(splice_data_values, splice_data_tss, output_file, transform_label, rank_normalize = NULL){
+    if (is.null(rank_normalize)) {
+        message('Preparing raw splice data')
+        SpliceDataNorm <- splice_data_values %>%
+            data.frame() %>%
+            dplyr::rename_with(~str_remove(.,'X'))
+    } else {
+        message(paste0('Applying ', transform_label, ' transformation to splice data'))
+        # transforms each splice junction across samples
+        SpliceDataNorm <- splice_data_values %>%
+            t() %>%
+            data.frame() %>%
+            mutate(across(everything(),~transform_phenotype(., rank_normalize))) %>%
+            t() %>%
+            data.frame() %>%
+            dplyr::rename_with(~str_remove(.,'X'))
+    }
+
+    message('Merging normalized splice data and TSS info')
+    SpliceDataBed <- bind_cols(splice_data_tss,SpliceDataNorm) %>%
+        #arrange(`#chr`,start) %>%
+        dplyr::rename('phenotype_id' = 'ID')
+    #    mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)"))  %>%
+        #arrange(group_id, `#chr`, start, end, phenotype_id)
+
+    message('Extracting phenotype groups')
+    #PhenotypeGroups <- SpliceDataBed %>%
+            #select(phenotype_id) %>%
+            #select(phenotype_id,group_id)
+
+    # Extract ENSG, Sort by CHR, and then ENSG
+    SpliceDataBed <- SpliceDataBed %>%
+      mutate(ENSG_id = str_extract(phenotype_id, "ENSG[0-9]+"))
+    SpliceDataBed <- SpliceDataBed %>%
+      arrange(`#chr`, start, end, ENSG_id) %>%
+      select(-ENSG_id)
+
+    message(paste0('Writing ', transform_label, ' bedfile to ', output_file))
+    SpliceDataBed %>%  fwrite(output_file,sep ='\t')
 }
-# drops splice interval information and 
-# transforms each splice junction across samples
-SpliceDataNorm <- SpliceData %>% 
-    dplyr::select(-1,-2,-3,-4) %>% 
-    t() %>% 
-    data.frame() %>% 
-    mutate(across(everything(),~transform_phenotype(., RankNormalize))) %>%
-    t() %>% 
-    data.frame() %>%
-    dplyr::rename_with(~str_remove(.,'X')) 
 
-message('Merging normalized splice data and TSS info')
-SpliceDataBed <- bind_cols(SpliceDataTSS,SpliceDataNorm) %>%
-    #arrange(`#chr`,start) %>%
-    dplyr::rename('phenotype_id' = 'ID') 
-#    mutate(group_id = str_remove(phenotype_id,".*(?=ENSG)"))  %>%
-    #arrange(group_id, `#chr`, start, end, phenotype_id) 
-
-message('Extracting phenotype groups')
-#PhenotypeGroups <- SpliceDataBed %>% 
-        #select(phenotype_id) %>% 
-        #select(phenotype_id,group_id)
-
-# Extract ENSG, Sort by CHR, and then ENSG
-SpliceDataBed <- SpliceDataBed %>%
-  mutate(ENSG_id = str_extract(phenotype_id, "ENSG[0-9]+"))
-SpliceDataBed <- SpliceDataBed %>%
-  arrange(`#chr`, start, end, ENSG_id) %>%
-  select(-ENSG_id)
-
-message('Writing bedfile')
-SpliceDataBed %>%  fwrite(OutputFile,sep ='\t')
+write_splice_bed(SpliceDataValues, SpliceDataTSS, IntOutputFile, 'rank-normalized', TRUE)
+write_splice_bed(SpliceDataValues, SpliceDataTSS, ScaledOutputFile, 'scaled', FALSE)
+write_splice_bed(SpliceDataValues, SpliceDataTSS, RawOutputFile, 'raw')
 
 #message('Writing phenotype groups')
 #SpliceDataBed %>% select(phenotype_id,group_id)%>% fwrite(OutputFileGroups,sep ='\t',col.names = FALSE)

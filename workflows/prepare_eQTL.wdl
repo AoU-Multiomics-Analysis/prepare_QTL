@@ -1,22 +1,21 @@
 version 1.0
 
-import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/calculate_phenotypePCs.wdl" as ComputePCs
-import  "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/prepare_QTL/refs/heads/main/workflows/MergeCovariates.wdl" as CovariateMerge
+import  "calculate_phenotypePCs.wdl" as ComputePCs
+import  "MergeCovariates.wdl" as CovariateMerge
 
 
 
 task eqtl_prepare_expression {
     input {
-        File CountGCT 
-        File AnnotationGTF 
-        File SampleList 
-        String OutputPrefix 
-        Boolean RankNormalize = true
-        
+        File CountGCT
+        File AnnotationGTF
+        File SampleList
+        String OutputPrefix
 
-        Int memory 
-        Int disk_space 
-        Int num_threads 
+
+        Int memory
+        Int disk_space
+        Int num_threads
 
         }
     command {
@@ -24,8 +23,7 @@ task eqtl_prepare_expression {
             --CountGCT ${CountGCT} \
             --AnnotationGTF ${AnnotationGTF} \
             --SampleList ${SampleList} \
-            --OutputPrefix ${OutputPrefix} \
-            --RankNormalize ${RankNormalize}
+            --OutputPrefix ${OutputPrefix}
 
         }
 
@@ -37,24 +35,25 @@ task eqtl_prepare_expression {
     }
 
     output {
-        File ExpressionBed="${OutputPrefix}.expression.bed.gz"
+        File IntExpressionBed="${OutputPrefix}.expression.INT.bed.gz"
+        File ScaledExpressionBed="${OutputPrefix}.expression.scaled.bed.gz"
+        File RawExpressionBed="${OutputPrefix}.expression.raw.bed.gz"
     }
 }
 
 workflow eQTLPrepareData {
     input {
-        String OutputPrefix 
-        File CountGCT 
-        File AnnotationGTF 
-        File SampleList 
-        Boolean RankNormalize = true
+        String OutputPrefix
+        File CountGCT
+        File AnnotationGTF
+        File SampleList
         File? AdditionalCovariates
 
-        Int memory 
-        Int disk_space 
-        Int num_threads 
-        
-            } 
+        Int memory
+        Int disk_space
+        Int num_threads
+
+            }
     call eqtl_prepare_expression {
         input:
             OutputPrefix = OutputPrefix,
@@ -63,31 +62,54 @@ workflow eQTLPrepareData {
             num_threads = num_threads,
             CountGCT  = CountGCT,
             AnnotationGTF = AnnotationGTF,
-            SampleList = SampleList,
-            RankNormalize = RankNormalize
+            SampleList = SampleList
     }
 
-    call ComputePCs.PhenotypePCs {
+    call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
-            BedFile = eqtl_prepare_expression.ExpressionBed,
-            OutputPrefix = OutputPrefix,
+            BedFile = eqtl_prepare_expression.IntExpressionBed,
+            OutputPrefix = OutputPrefix + ".expression",
+            OutputSuffix = ".INT",
+            memory = memory,
+            disk_space = disk_space,
+            num_threads = num_threads
+    }
+
+    call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
+        input:
+            BedFile = eqtl_prepare_expression.ScaledExpressionBed,
+            OutputPrefix = OutputPrefix + ".expression",
+            OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads
     }
 
     if (defined(AdditionalCovariates)) {
-        call CovariateMerge.MergeCovariates as MergeAdditionalCovariates {
+        call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
             input:
                 GenotypePCs = select_first([AdditionalCovariates]),
-                MolecularPCs = PhenotypePCs.OutPhenotypePCs,
-                OutputPrefix = OutputPrefix
+                MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
+                OutputPrefix = OutputPrefix + ".expression",
+                OutputSuffix = ".INT"
+        }
+
+        call CovariateMerge.MergeCovariates as MergeScaledAdditionalCovariates {
+            input:
+                GenotypePCs = select_first([AdditionalCovariates]),
+                MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
+                OutputPrefix = OutputPrefix + ".expression",
+                OutputSuffix = ".scaled"
         }
     }
 
     output {
-        File BedFile = eqtl_prepare_expression.ExpressionBed 
-        File PhenotypePCsOut = PhenotypePCs.OutPhenotypePCs 
-        File? QtlCovariates = MergeAdditionalCovariates.QtlCovariates
+        File IntBedFile = eqtl_prepare_expression.IntExpressionBed
+        File ScaledBedFile = eqtl_prepare_expression.ScaledExpressionBed
+        File RawBedFile = eqtl_prepare_expression.RawExpressionBed
+        File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
+        File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
+        File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
+        File? ScaledQtlCovariates = MergeScaledAdditionalCovariates.QtlCovariates
     }
 }
