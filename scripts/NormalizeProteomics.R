@@ -91,10 +91,30 @@ normed_data %>% write_tsv(median_normalized_output)
 
 
 ###### FILTER DATA #################
+warn_fail_assays <- normed_data %>% 
+    filter(!str_detect(SampleID, 'CONT|Control')  & AssayType == 'assay') %>% 
+    filter(SampleQC != 'PASS' | AssayQC != 'PASS')  
+
+assay_fail_list <- warn_fail_assays %>% 
+    filter(AssayQC != 'PASS') %>% 
+    distinct(Assay)
+sample_remove_list <- warn_fail_assays %>% 
+    filter(!Assay %in% assay_fail_list$Assay) %>% 
+    filter(SampleQC != 'PASS') %>% 
+    distinct(SampleID) 
+n_assays_removed <- assay_fail_list  %>% nrow
+n_samples_removed <- sample_remove_list  %>% nrow
+
+
+message('Removing',n_assays_removed,'assays')
+message('Removing',n_samples_removed,'samples')
+
+
 
 message("Filtering normalized Olink data")
 LongOlinkValues <- normed_data %>%
     filter(!str_detect(SampleID, "CONTROL_SAMPLE|Control|CONT") & AssayType == "assay") %>%
+    filter(!Assay %in% assay_fail_list$Assay & !SampleID %in% sample_remove_list$SampleID) %>% 
     mutate(SampleID = str_remove(SampleID, "_.*")) %>%
     select(SampleID, PlateID, NPX, UniProt) %>%
     mutate(joint_id = paste0(SampleID, "_", PlateID))
