@@ -2,14 +2,14 @@
 
 [Back to main README](../README.md)
 
-These WDL workflows prepare molecular phenotype data for expression, splicing, and proteomics QTL analyses. They are designed to run on a cloud platform such as Terra and wrap the R scripts documented in [R scripts](scripts.md).
+These WDL workflows prepare molecular phenotype data for expression, splicing, and proteomics QTL analyses. They are designed to run on a cloud platform such as Terra and wrap the R scripts documented in [R scripts](scripts.md). For modality-specific normalization and filtering details, see [Phenotype normalization and filtering](phenotype-normalization-filtering.md).
 
 ## Shared Prepare Workflow Outputs
 
 The eQTL, pQTL, and sQTL prepare workflows now compute both molecular phenotype transformations:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
-- `.scaled`: Centered and scaled molecular phenotypes.
+- `.scaled`: Centered and scaled molecular phenotypes. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
 Each workflow computes phenotype PCs separately for the `.INT` and `.scaled` outputs only. Raw BED files are emitted as workflow outputs but are not used for phenotype PCs, covariate merging, or residualization. `AdditionalCovariates` is an optional TSV of covariates with a `sample_id` column. When provided, the workflow runs [`MergeCovariates.wdl`](../workflows/MergeCovariates.wdl) twice to merge those covariates with the `.INT` and `.scaled` phenotype PCs.
@@ -23,7 +23,7 @@ Set `ResidualizeNormalizedInputs` to `true` to run [`ResidualizePhenotypes.wdl`]
 End-to-end workflow for preparing gene expression data for eQTL analysis.
 
 **Steps:**
-1. Runs `PrepareExpression.R` to produce `.INT`, `.scaled`, and `.raw` expression BED files.
+1. Runs `PrepareExpression.R` to produce `.INT`, `.scaled`, and `.raw` expression BED files. The `.scaled` expression branch applies `log2(CPM + 1)` before centering/scaling; the `.INT` branch rank-normalizes unlogged CPMs.
 2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` expression BED files.
 3. Optionally runs [`MergeCovariates.wdl`](../workflows/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
 4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.

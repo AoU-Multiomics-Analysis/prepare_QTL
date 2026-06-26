@@ -2,14 +2,14 @@
 
 [Back to main README](../README.md)
 
-All scripts are written in R and are invoked from the command line with `Rscript`. They are bundled in the Docker image defined in [`envs/PhenotypePCs/Dockerfile`](../envs/PhenotypePCs/Dockerfile).
+All scripts are written in R and are invoked from the command line with `Rscript`. They are bundled in the Docker image defined in [`envs/PhenotypePCs/Dockerfile`](../envs/PhenotypePCs/Dockerfile). For modality-specific normalization and filtering details, see [Phenotype normalization and filtering](phenotype-normalization-filtering.md).
 
 ## Shared Dual-Output Behavior
 
 [`PrepareExpression.R`](../scripts/PrepareExpression.R), [`PrepareProteomics.R`](../scripts/PrepareProteomics.R), and [`PrepareSpliceData.R`](../scripts/PrepareSpliceData.R) each write three BED files:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
-- `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`.
+- `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
 For each `.INT` and `.scaled` matrix, the scripts compute WGCNA sample connectivity outliers from the feature-by-sample matrix before writing the BED. Raw BEDs keep all samples after the initial sample-list filter.
@@ -36,7 +36,7 @@ Prepares RNA-seq gene expression data for eQTL analysis.
 3. Filters to a specified list of samples.
 4. Filters genes by expression count, retaining genes with counts > 6 in at least 20% of samples.
 5. Normalizes counts using edgeR TMM normalization followed by CPM transformation.
-6. Creates rank-based inverse normal transformed, centered/scaled, and raw CPM matrices.
+6. Creates rank-based inverse normal transformed, `log2(CPM + 1)` centered/scaled, and raw CPM matrices. The log2 transform is only applied to the centered/scaled expression branch, not the INT branch.
 7. Merges each matrix with TSS locations and writes compressed BED files.
 
 **Inputs:**
@@ -90,10 +90,10 @@ Median-normalizes Olink NPX parquet files and writes filtered long-format protei
 3. Calculates assay-level reference medians from `--ReferencePlate`.
 4. Runs Olink plate normalization with `OlinkAnalyze::olink_normalization`.
 5. Writes the full median-normalized Olink table.
-6. Filters missing samples, keeps one valid sample-plate row per sample, removes UniProt IDs `P32455` and `Q02750`, and writes the long-format pQTL input table.
+6. Removes assays with non-`PASS` assay QC, removes samples with non-`PASS` sample QC when the warning/failure is not already explained by a removed assay, filters missing samples, keeps one valid sample-plate row per sample, removes UniProt IDs `P32455` and `Q02750`, and writes the long-format pQTL input table.
 
 **Inputs:**
-- `--OlinkDataDir`: Directory containing Olink NPX parquet files. Input files must include `SampleID`, `PlateID`, `AssayType`, `OlinkID`, `NPX`, and `UniProt`.
+- `--OlinkDataDir`: Directory containing Olink NPX parquet files. Input files must include `SampleID`, `PlateID`, `AssayType`, `OlinkID`, `NPX`, and `UniProt`; QC filtering also uses `Assay`, `AssayQC`, and `SampleQC`.
 - `--OutputPrefix`: Prefix for output files.
 - `--OutputDir`: Directory for output files.
 - `--ReferencePlate`: Plate ID used to calculate reference medians.

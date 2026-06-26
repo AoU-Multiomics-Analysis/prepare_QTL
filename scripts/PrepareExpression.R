@@ -29,9 +29,12 @@ TSS_locations <- gencode_GTF  %>%
 TSS_locations
 }
 
-transform_phenotype <- function(x, rank_normalize){
+transform_phenotype <- function(x, rank_normalize, log2_transform = FALSE){
     if (rank_normalize) {
         return(RankNorm(x))
+    }
+    if (log2_transform) {
+        x <- log2(x + 1)
     }
     as.numeric(scale(x, center = TRUE, scale = TRUE))
 }
@@ -148,17 +151,20 @@ DataEdgeR <- edgeR::calcNormFactors(DataEdgeR)
 message('Computing CPMs')
 DataCPM <- edgeR::cpm(DataEdgeR, log=FALSE) %>% data.frame()
 
-write_expression_bed <- function(cpm_data, tss_positions, output_file, transform_label, rank_normalize = NULL, remove_outliers = TRUE){
+write_expression_bed <- function(cpm_data, tss_positions, output_file, transform_label, rank_normalize = NULL, log2_transform = FALSE, remove_outliers = TRUE){
     message(paste0('Preparing ', transform_label, ' CPM BED'))
     if (is.null(rank_normalize)) {
         NormalizedCPMsMatrix <- cpm_data %>%
                         data.frame() %>%
                         dplyr::rename_with(~str_remove(.,'^X'))
     } else {
+        if (log2_transform) {
+            message('Applying log2(CPM + 1) before centering and scaling')
+        }
         NormalizedCPMsMatrix <- cpm_data %>%
                         t() %>%
                         data.frame() %>%
-                        mutate(across(everything(),~transform_phenotype(., rank_normalize))) %>%
+                        mutate(across(everything(),~transform_phenotype(., rank_normalize, log2_transform))) %>%
                         t() %>%
                         data.frame() %>%
                         dplyr::rename_with(~str_remove(.,'^X'))
@@ -199,5 +205,5 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
 }
 
 write_expression_bed(DataCPM, PositionTSS, IntOutputFile, 'rank-normalized', TRUE)
-write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE)
+write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = TRUE)
 write_expression_bed(DataCPM, PositionTSS, RawOutputFile, 'raw', remove_outliers = FALSE)

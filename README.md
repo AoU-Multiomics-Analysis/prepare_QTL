@@ -15,6 +15,7 @@ prepare_QTL/
 ## Documentation
 
 - [R scripts](docs/scripts.md): Command-line script inputs, outputs, and processing behavior.
+- [Phenotype normalization and filtering](docs/phenotype-normalization-filtering.md): Modality-specific filtering, normalization, transformations, and WGCNA outlier removal.
 - [Molecular QTL workflows](docs/molecular-qtl-workflows.md): eQTL, sQTL, pQTL, proteomics normalization, phenotype PC, and covariate merge WDLs.
 - [Genotype workflows](docs/genotype-workflows.md): VCF, PLINK, genotype PC, allele frequency, and dosage WDLs.
 - [Docker environment](docs/docker.md): Docker image location and included R package dependencies.
@@ -32,7 +33,7 @@ prepare_QTL/
 The prepare scripts and workflows for eQTL, pQTL, and sQTL share this output pattern:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
-- `.scaled`: Centered and scaled molecular phenotypes.
+- `.scaled`: Centered and scaled molecular phenotypes. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting. Raw BEDs are emitted as workflow outputs but are not used for phenotype PCs or covariate merging.
 - Connectivity outliers: `.INT` and `.scaled` BEDs have WGCNA sample connectivity outliers removed before downstream PC, covariate, or residualization steps. Removed samples are written to `*.connectivity_outliers.tsv`; raw BEDs keep all samples after the initial sample-list filter.
 - `AdditionalCovariates`: Optional WDL input for eQTL, pQTL, and sQTL prepare workflows. When provided, the workflow runs `MergeCovariates.wdl` for both `.INT` and `.scaled` phenotype PCs.
