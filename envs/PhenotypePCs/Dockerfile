@@ -19,6 +19,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     bioconda::bioconductor-biomart \
     bioconda::r-biomartr \
     bioconda::bioconductor-rtracklayer \
+    bioconda::bioconductor-plyranges \
     conda-forge::r-patchwork
 COPY scripts/*  . 
 ## Default command to run when the container starts

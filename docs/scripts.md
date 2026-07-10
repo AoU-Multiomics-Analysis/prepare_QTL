@@ -132,6 +132,7 @@ The pb-CpG-tools 5mC workflow is intentionally split into two executable stages,
 
 - `scripts/FilterMethylationShard.R` applies chromosome, minimum-coverage, and extreme-coverage QC to one manifest shard. It writes the passing calls, all calls with QC flags, and one-row-per-sample QC summaries.
 - `scripts/MergeMethylationCohort.R` reduces all shard outputs, applies cohort sample-presence and MAD filters, creates metadata and QC plots, mean-imputes retained features, and writes raw and INT QTL phenotype BEDs.
+- `scripts/AnnotateMethylationSites.R` annotates retained sites with the nearest strand-aware TSS, promoter/gene-body/intergenic context, and V4/V5/type fields for overlapping enhancer intervals.
 
 See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for the input schema, all command-line options, QC logic, outputs, and QTL phenotype format.
 

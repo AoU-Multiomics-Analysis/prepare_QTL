@@ -148,6 +148,38 @@ task MergeMethylationShards {
     }
 }
 
+task AnnotateMethylationSites {
+    input {
+        File SiteMetadata
+        File AnnotationGTF
+        File EnhancerAnnotations
+        String OutputPrefix
+        Int PromoterWindow
+        Int MemoryGB
+        Int DiskGB
+    }
+
+    command <<<
+        Rscript /tmp/AnnotateMethylationSites.R \
+            --SiteMetadata "~{SiteMetadata}" \
+            --AnnotationGTF "~{AnnotationGTF}" \
+            --EnhancerAnnotations "~{EnhancerAnnotations}" \
+            --OutputPrefix "~{OutputPrefix}" \
+            --PromoterWindow ~{PromoterWindow}
+    >>>
+
+    runtime {
+        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        memory: "~{MemoryGB}G"
+        disks: "local-disk ~{DiskGB} HDD"
+        cpu: 1
+    }
+
+    output {
+        File PassingSiteAnnotations = "~{OutputPrefix}.methylation.passing_site_annotations.tsv.gz"
+    }
+}
+
 workflow MergeMethylation {
     input {
         # TSV with sample_id and absolute paths to pb-CpG-tools .combined.bed.gz
@@ -157,6 +189,8 @@ workflow MergeMethylation {
         File SampleManifest
         String OutputPrefix
         File? AdditionalCovariates
+        File AnnotationGTF
+        File EnhancerAnnotations
 
         Int SamplesPerShard = 25
         Float MinCoverage = 10.0
@@ -165,6 +199,7 @@ workflow MergeMethylation {
         Float MinMethylationMAD = 0.003
         String FilterChroms = "X|Y|M|_"
         Float FenceK = 3.0
+        Int PromoterWindow = 2000
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
 
@@ -172,6 +207,8 @@ workflow MergeMethylation {
         Int ShardDiskGB = 100
         Int MergeMemoryGB = 64
         Int MergeDiskGB = 200
+        Int AnnotationMemoryGB = 16
+        Int AnnotationDiskGB = 100
         Int NumThreads = 1
     }
 
@@ -215,6 +252,17 @@ workflow MergeMethylation {
             NumThreads = NumThreads
     }
 
+    call AnnotateMethylationSites {
+        input:
+            SiteMetadata = MergeMethylationShards.SiteMetadata,
+            AnnotationGTF = AnnotationGTF,
+            EnhancerAnnotations = EnhancerAnnotations,
+            OutputPrefix = OutputPrefix,
+            PromoterWindow = PromoterWindow,
+            MemoryGB = AnnotationMemoryGB,
+            DiskGB = AnnotationDiskGB
+    }
+
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
             BedFile = MergeMethylationShards.IntMethylationBed,
@@ -245,6 +293,7 @@ workflow MergeMethylation {
         File FilterUpsetPlot = MergeMethylationShards.FilterUpsetPlot
         File RawMethylationBed = MergeMethylationShards.RawMethylationBed
         File IntMethylationBed = MergeMethylationShards.IntMethylationBed
+        File PassingSiteAnnotations = AnnotateMethylationSites.PassingSiteAnnotations
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         Array[File] ShardSampleQC = FilterMethylationShard.SampleQC

@@ -2,7 +2,7 @@
 
 [Back to main README](../README.md)
 
-This guide describes how to prepare pb-CpG-tools site-level 5mC calls for molecular QTL mapping. The workflow applies coverage QC per sample, filters sites against the whole cohort, applies a cohort methylation-MAD filter, mean-imputes the limited remaining missing values per feature, produces raw beta-value and inverse-normal transformed phenotype BEDs, calculates phenotype PCs, and can merge those PCs with additional QTL covariates.
+This guide describes how to prepare pb-CpG-tools site-level 5mC calls for molecular QTL mapping. The workflow applies coverage QC per sample, filters sites against the whole cohort, applies a cohort methylation-MAD filter, annotates retained sites with gene/TSS and enhancer context, mean-imputes the limited remaining missing values per feature, produces raw beta-value and inverse-normal transformed phenotype BEDs, calculates phenotype PCs, and can merge those PCs with additional QTL covariates.
 
 ## What to provide
 
@@ -30,6 +30,8 @@ SAMPLE_002	/mnt/methylation/SAMPLE_002.combined.bed.gz
 
 `file_path` must be an absolute path that is readable inside every WDL task container. WDL localizes the manifest itself, but does not localize file paths embedded within its contents.
 
+The workflow also requires a GTF built on the same reference genome and an enhancer reference with the six columns shown below (no header required): chromosome, BED start, BED end, V4 ID, V5 ID, and enhancer type. The enhancer intervals are interpreted as BED coordinates.
+
 ## Workflow design
 
 ```mermaid
@@ -38,8 +40,9 @@ flowchart LR
     B --> C["Per-sample QC\nchromosome, coverage, extreme coverage"]
     C --> D["Global cohort reduction\napply MinSampleFraction and MinSamples"]
     D --> E["Cohort MAD filter\nfeature-mean imputation"]
-    E --> F["Raw and INT phenotype BEDs\nQC and all-site metadata"]
-    F --> G["Phenotype PCs\noptional covariate merge"]
+    E --> F["Gene/TSS and enhancer annotation\nof passing sites"]
+    F --> G["Raw and INT phenotype BEDs\nQC and all-site metadata"]
+    G --> H["Phenotype PCs\noptional covariate merge"]
 ```
 
 The cohort threshold is deliberately evaluated only after every shard has completed per-sample QC. This means the required number of samples is always:
@@ -73,6 +76,9 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `MinSamples` | `0` | Optional additional minimum number of samples passing per-sample QC. |
 | `MinMethylationMAD` | `0.003` | Minimum methylation MAD across per-sample-QC-passing observations required for QTL output. |
 | `FenceK` | `3.0` | Far-out-fence multiplier used for extreme coverage. |
+| `AnnotationGTF` | required | GTF gene model on the same reference build as the methylation calls. |
+| `EnhancerAnnotations` | required | Headerless six-column enhancer annotation file: BED coordinates, V4 ID, V5 ID, and type. |
+| `PromoterWindow` | `2000` | Bases either side of each strand-aware TSS classified as promoter. |
 | `ValueColumn` | `mod_score` | Column used as methylation phenotype. |
 | `ValueMultiplier` | `0.01` | Converts pb-CpG `mod_score` percentages to 0–1 beta values. |
 | `AdditionalCovariates` | unset | Optional TSV containing `sample_id` plus genotype PCs or other covariates to merge with INT phenotype PCs. |
@@ -90,6 +96,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `<prefix>.methylation.filter_summary.tsv` | Counts of sites at each mutually exclusive cohort-QC stage. |
 | `<prefix>.methylation.filter_counts.png` | Bar chart of the sequential cohort-QC counts. |
 | `<prefix>.methylation.filter_upset.png` | UpSet-style chart showing overlap of low/missing coverage, extreme coverage, cohort sample-presence, and methylation-MAD conditions. |
+| `<prefix>.methylation.passing_site_annotations.tsv.gz` | One row per retained site with nearest TSS/gene, promoter, gene-body/intergenic, and enhancer annotations. |
 | `<prefix>.methylation.raw.bed.gz` | TensorQTL-compatible phenotype BED with raw 0–1 methylation beta values. |
 | `<prefix>.methylation.INT.bed.gz` | TensorQTL-compatible phenotype BED after site-wise rank-based inverse normal transformation. |
 | `<prefix>.methylation_phenotype_PCs.INT.tsv` | Phenotype PCs calculated from the INT BED. |
@@ -103,6 +110,12 @@ The site metadata has two metric families:
 `fraction_samples_min_coverage` uses the complete input cohort as its denominator. `fraction_samples_passing_per_sample_qc` additionally excludes extreme-coverage calls. `pass_sample_presence_filter` and `pass_methylation_mad_filter` show the two cohort filters separately; `keep_site` is their final combined decision.
 
 The filter-count chart and TSV use mutually exclusive stages so the counts add up to every observed site: insufficient minimum-coverage samples, loss of sufficient samples after extreme-coverage exclusions, low MAD after sample-presence QC, or passing all cohort filters. The UpSet-style plot is complementary: it retains overlapping conditions, including a site that still passes overall QC despite one or more missing or extreme-coverage calls.
+
+## Gene and enhancer annotation
+
+The annotation task reads only `keep_site == TRUE` rows from the all-site metadata. It reports the nearest strand-aware gene TSS (`nearest_tss_distance`, gene ID/name, and strand), promoter overlaps within ±2 kb by default, gene-body overlaps, and a mutually exclusive `genomic_context` of `promoter`, `gene_body`, or `intergenic`. Promoter takes priority when a site overlaps both a promoter and a gene body. Multiple overlapping genes are retained as semicolon-delimited IDs and names.
+
+Enhancer overlaps are reported separately because they may occur in any genic context. The annotation includes `in_enhancer`, `n_overlapping_enhancers`, `enhancer_v4_id`, `enhancer_v5_id`, and `enhancer_type`; multiple overlaps are semicolon-delimited. The V4/V5 values are preserved exactly from the enhancer reference.
 
 ## QTL phenotype BEDs, PCs, and covariates
 
@@ -124,6 +137,7 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 - [`scripts/FilterMethylationShard.R`](../scripts/FilterMethylationShard.R): per-shard chromosome and coverage QC.
 - [`scripts/MergeMethylationCohort.R`](../scripts/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
 - [`scripts/MethylationUtils.R`](../scripts/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
+- [`scripts/AnnotateMethylationSites.R`](../scripts/AnnotateMethylationSites.R): passing-site gene/TSS and enhancer annotation task.
 - [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl): WDL wrapper for parallel execution.
 - [R script reference](scripts.md): reference for all project scripts.
 - [Molecular QTL workflow reference](molecular-qtl-workflows.md): reference for all molecular workflow wrappers.
