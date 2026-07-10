@@ -16,7 +16,8 @@ prepare_QTL/
 
 - [R scripts](docs/scripts.md): Command-line script inputs, outputs, and processing behavior.
 - [Phenotype normalization and filtering](docs/phenotype-normalization-filtering.md): Modality-specific filtering, normalization, transformations, and WGCNA outlier removal.
-- [Molecular QTL workflows](docs/molecular-qtl-workflows.md): eQTL, sQTL, pQTL, proteomics normalization, phenotype PC, and covariate merge WDLs.
+- [Molecular QTL workflows](docs/molecular-qtl-workflows.md): eQTL, sQTL, pQTL, methylation, proteomics normalization, phenotype PC, and covariate merge WDLs.
+- [PacBio 5mC QTL workflow](docs/methylation-qtl.md): pb-CpG-tools inputs, QC, sharding, site metadata, and TensorQTL phenotype output.
 - [Genotype workflows](docs/genotype-workflows.md): VCF, PLINK, genotype PC, allele frequency, and dosage WDLs.
 - [Docker environment](docs/docker.md): Docker image location and included R package dependencies.
 
@@ -26,6 +27,7 @@ prepare_QTL/
 - [`workflows/prepare_sQTL.wdl`](workflows/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/prepare_pQTL.wdl`](workflows/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/normalize_pQTL.wdl`](workflows/normalize_pQTL.wdl): Median-normalizes Olink NPX parquet files before pQTL preparation.
+- [`workflows/merge_methylation.wdl`](workflows/merge_methylation.wdl): Shards pb-CpG-tools 5mC calls for per-sample QC, applies a cohort-level site filter, and writes raw and inverse-normalized methylation BEDs, phenotype PCs, optional QTL covariates, and QC metadata.
 - [`workflows/prepare_VCF.wdl`](workflows/prepare_VCF.wdl): Prepares genotype data from an All of Us Hail MatrixTable.
 
 ## Common Options

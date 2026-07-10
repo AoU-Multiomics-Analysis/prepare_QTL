@@ -56,16 +56,10 @@ Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 
 ## `workflows/merge_methylation.wdl`
 
-Merges per-sample pb-CpG-tools 5mC calls with parallel per-sample QC and a single cohort-level site filter. The input `SampleManifest` must be a TSV with `sample_id` and **absolute** paths to `.combined.bed.gz` `file_path` values. Its file paths must be readable from each task container, such as from a mounted shared filesystem. WDL localizes the manifest itself but does not localize file references embedded inside that TSV. By default, the workflow uses pb-CpG `mod_score` and multiplies it by `0.01` to write 0–1 beta values.
 
-**Steps:**
-1. Splits the manifest into groups of `SamplesPerShard` samples.
-2. Scatters per-sample chromosome, minimum-coverage, and extreme-coverage filtering across those groups.
-3. Collects all QC-passing calls and applies `MinSampleFraction` and `MinSamples` once, using the total number of rows in the original manifest as the denominator.
+Parallel wrapper for pb-CpG-tools 5mC QTL preparation. It applies per-sample QC in parallel, then evaluates sample-presence and methylation-MAD filters once across the complete cohort. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
 
-This final reduction is essential: applying the fraction threshold independently in each shard would make the retained-site set depend on shard boundaries.
-
-**Outputs:** Cohort-filtered long calls, per-site QC, all-site metadata, per-sample QC, a TensorQTL-compatible beta-value BED, and the per-shard sample QC files. The all-site metadata includes mean, standard deviation, and CV for coverage and methylation across all observed calls and per-sample-QC-passing calls; it also includes both coverage fractions and `keep_site`. The QTL BED begins with `#chr`, `start`, `end`, and `phenotype_id`; by default, its methylation values are `mod_score / 100`.
+See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for the sample manifest requirements, configuration, sharding behavior, QC logic, and outputs.
 
 ## `workflows/prepare_sQTL.wdl`
 

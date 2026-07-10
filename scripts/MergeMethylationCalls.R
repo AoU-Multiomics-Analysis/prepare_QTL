@@ -11,15 +11,19 @@
 #   --InputManifest methylation_manifest.tsv \
 #   --OutputPrefix results/cohort \
 #   --MinCoverage 10 \
-#   --MinSampleFraction 0.8 \
-#   --ValueColumn methylation_fraction
+#   --MinSampleFraction 0.95 \
+#   --ValueColumn mod_score
 #
 # The script writes:
 #   <prefix>.methylation.filtered.long.tsv.gz  calls that passed all QC
 #   <prefix>.methylation.site_qc.tsv.gz        per-site cohort QC summary
 #   <prefix>.methylation.site_metadata.tsv.gz  all-site coverage/methylation metrics
 #   <prefix>.methylation.sample_qc.tsv         per-sample QC summary
-#   <prefix>.methylation.matrix.bed.gz         TensorQTL-compatible phenotype BED
+#   <prefix>.methylation.filter_summary.tsv     sequential cohort-filter counts
+#   <prefix>.methylation.filter_counts.png      sequential cohort-filter bar chart
+#   <prefix>.methylation.filter_upset.png       QC-condition intersection chart
+#   <prefix>.methylation.raw.bed.gz             raw beta-value phenotype BED
+#   <prefix>.methylation.INT.bed.gz             inverse-normal phenotype BED
 #
 # For sharded execution, run once per shard with --PerSampleOnly. Then call
 # the script a final time with --FilteredCallList and --TotalSamples to apply
@@ -243,6 +247,150 @@ safe_max <- function(x) {
     if (length(x) == 0) NA_real_ else max(x)
 }
 
+safe_mad <- function(x) {
+    x <- x[is.finite(x)]
+    if (length(x) == 0) NA_real_ else median(abs(x - median(x)))
+}
+
+inverse_normal_transform <- function(x) {
+    transformed <- rep(NA_real_, length(x))
+    valid <- is.finite(x)
+    if (any(valid)) {
+        ranks <- rank(x[valid], ties.method = "average")
+        transformed[valid] <- qnorm((ranks - 0.5) / sum(valid))
+    }
+    transformed
+}
+
+write_filter_plots <- function(site_metadata, output_prefix) {
+    failure_levels <- c(
+        "Insufficient minimum coverage",
+        "Extreme coverage exclusion",
+        "Low methylation MAD",
+        "Pass all cohort filters"
+    )
+    filter_summary <- site_metadata[, .N, by = failure_reason]
+    filter_summary <- merge(
+        data.table(failure_reason = failure_levels),
+        filter_summary,
+        by = "failure_reason",
+        all.x = TRUE,
+        sort = FALSE
+    )
+    filter_summary[is.na(N), N := 0L]
+    filter_summary[, failure_reason := factor(failure_reason, levels = failure_levels)]
+
+    summary_output <- paste0(output_prefix, ".methylation.filter_summary.tsv")
+    count_plot_output <- paste0(output_prefix, ".methylation.filter_counts.png")
+    upset_plot_output <- paste0(output_prefix, ".methylation.filter_upset.png")
+    fwrite(filter_summary, summary_output, sep = "\t")
+
+    count_plot <- ggplot2::ggplot(
+        filter_summary,
+        ggplot2::aes(x = failure_reason, y = N, fill = failure_reason)
+    ) +
+        ggplot2::geom_col(show.legend = FALSE) +
+        ggplot2::geom_text(ggplot2::aes(label = N), vjust = -0.3, size = 3) +
+        ggplot2::labs(
+            title = "Cohort methylation site filtering",
+            x = NULL,
+            y = "Number of sites"
+        ) +
+        ggplot2::theme_minimal(base_size = 12) +
+        ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 25, hjust = 1))
+    ggplot2::ggsave(
+        count_plot_output,
+        count_plot,
+        width = 10,
+        height = 6,
+        dpi = 200,
+        bg = "white"
+    )
+
+    upset_labels <- c(
+        "At least one missing/low-coverage call",
+        "At least one extreme-coverage call",
+        "Fails cohort sample-presence filter",
+        "Fails methylation MAD filter"
+    )
+    pattern_code <-
+        as.integer(site_metadata$has_missing_or_low_coverage) +
+        2L * as.integer(site_metadata$has_extreme_coverage_loss) +
+        4L * as.integer(!site_metadata$pass_sample_presence_filter) +
+        8L * as.integer(!site_metadata$pass_methylation_mad_filter)
+    intersection_counts <- data.table(pattern_code = pattern_code)[, .N, by = pattern_code]
+    setorder(intersection_counts, -N, pattern_code)
+    intersection_counts[, intersection := factor(pattern_code, levels = pattern_code)]
+
+    # Draw this simple UpSet-style plot with base graphics. This avoids a
+    # layout-package dependency and keeps the script usable in lightweight R
+    # environments while preserving the bar/matrix representation.
+    grDevices::png(upset_plot_output, width = 2400, height = 1600, res = 200)
+    graphics::layout(matrix(c(1, 2), ncol = 1), heights = c(2, 1.25))
+    graphics::par(mar = c(2.5, 4.5, 3, 1))
+    bar_positions <- graphics::barplot(
+        intersection_counts$N,
+        names.arg = rep("", nrow(intersection_counts)),
+        col = "#2C7FB8",
+        border = NA,
+        ylab = "Number of sites",
+        main = "Overlap of cohort-level filter failures"
+    )
+    graphics::text(
+        bar_positions,
+        intersection_counts$N,
+        labels = intersection_counts$N,
+        pos = 3,
+        cex = 0.8
+    )
+
+    graphics::par(mar = c(4.5, 19, 0.5, 1))
+    n_intersections <- nrow(intersection_counts)
+    graphics::plot(
+        NA,
+        xlim = c(0.5, n_intersections + 0.5),
+        ylim = c(0.5, length(upset_labels) + 0.5),
+        xaxt = "n",
+        yaxt = "n",
+        xlab = "Filter-failure intersections",
+        ylab = ""
+    )
+    graphics::axis(
+        2,
+        at = rev(seq_along(upset_labels)),
+        labels = upset_labels,
+        las = 1,
+        tick = FALSE,
+        cex.axis = 0.75
+    )
+    for (i in seq_len(n_intersections)) {
+        y_positions <- rev(seq_along(upset_labels))
+        graphics::points(rep(i, length(y_positions)), y_positions, pch = 16, col = "grey85", cex = 1.4)
+        included_indices <- which(bitwAnd(
+            intersection_counts$pattern_code[i],
+            as.integer(2^(seq_along(upset_labels) - 1))
+        ) > 0)
+        if (length(included_indices) > 1) {
+            included_y <- rev(seq_along(upset_labels))[included_indices]
+            graphics::segments(i, min(included_y), i, max(included_y), col = "#2C7FB8", lwd = 2)
+        }
+        if (length(included_indices) > 0) {
+            graphics::points(
+                rep(i, length(included_indices)),
+                rev(seq_along(upset_labels))[included_indices],
+                pch = 16,
+                col = "#2C7FB8",
+                cex = 1.4
+            )
+        }
+    }
+    grDevices::dev.off()
+
+    message("Wrote filter summary: ", summary_output)
+    message("Wrote filter-count plot: ", count_plot_output)
+    message("Wrote filter UpSet plot: ", upset_plot_output)
+}
+
 option_list <- list(
     make_option("--InputManifest", type = "character", default = NULL,
                 help = "TSV with sample_id and file_path columns (normal/per-shard mode)"),
@@ -251,7 +399,7 @@ option_list <- list(
     make_option("--AllCallList", type = "character", default = NULL,
                 help = "One per-sample-QC call file path per line for all-site metadata in final sharded-merge mode"),
     make_option("--FilteredSampleQcList", type = "character", default = NULL,
-                help = "Optional one per-shard sample-QC file path per line (final sharded-merge mode)"),
+                help = "One per-shard sample-QC file path per line (required in final sharded-merge mode)"),
     make_option("--TotalSamples", type = "integer", default = 0,
                 help = "Total input sample count for final sharded-merge mode [default: %default]"),
     make_option("--PerSampleOnly", action = "store_true", default = FALSE,
@@ -260,10 +408,12 @@ option_list <- list(
                 help = "Prefix for output files [required]"),
     make_option("--MinCoverage", type = "double", default = 10,
                 help = "Minimum per-call coverage to retain [default: %default]"),
-    make_option("--MinSampleFraction", type = "double", default = 0.8,
+    make_option("--MinSampleFraction", type = "double", default = 0.95,
                 help = "Minimum fraction of all samples passing per-site QC [default: %default]"),
     make_option("--MinSamples", type = "integer", default = 0,
                 help = "Additional minimum number of samples passing per-site QC [default: %default]"),
+    make_option("--MinMethylationMAD", type = "double", default = 0.003,
+                help = "Minimum cohort methylation MAD among per-sample-QC-passing calls [default: %default]"),
     make_option("--FilterChroms", type = "character", default = "X|Y|M|_",
                 help = "Regex for chromosomes/contigs to remove; use '' to keep all [default: %default]"),
     make_option("--FenceK", type = "double", default = 3,
@@ -292,6 +442,12 @@ if (has_filtered_call_list && opt$TotalSamples <= 0) {
 if (has_filtered_call_list && is.null(opt$AllCallList)) {
     stop("--AllCallList is required with --FilteredCallList to calculate all-site metadata")
 }
+if (has_filtered_call_list && is.null(opt$FilteredSampleQcList)) {
+    stop(
+        "--FilteredSampleQcList is required with --FilteredCallList to construct ",
+        "a complete cohort-level QTL phenotype matrix"
+    )
+}
 if (has_manifest && opt$TotalSamples != 0) {
     warning("--TotalSamples is ignored when --InputManifest is supplied")
 }
@@ -307,6 +463,9 @@ if (!is.finite(opt$MinSampleFraction) || opt$MinSampleFraction <= 0 || opt$MinSa
 if (is.na(opt$MinSamples) || opt$MinSamples < 0) {
     stop("--MinSamples must be a non-negative integer")
 }
+if (!is.finite(opt$MinMethylationMAD) || opt$MinMethylationMAD < 0) {
+    stop("--MinMethylationMAD must be a non-negative number")
+}
 if (!is.finite(opt$FenceK) || opt$FenceK < 0) {
     stop("--FenceK must be a non-negative number")
 }
@@ -318,6 +477,7 @@ sample_qc <- NULL
 if (has_manifest) {
     manifest <- read_manifest(opt$InputManifest)
     n_samples <- nrow(manifest)
+    cohort_sample_ids <- manifest$sample_id
     message("Processing ", n_samples, " samples")
 
     filtered_calls <- vector("list", n_samples)
@@ -441,6 +601,7 @@ if (has_manifest) {
             )
         }
     }
+    cohort_sample_ids <- sample_qc$sample_id
     message("Reading per-sample-QC-passing calls and all-site metadata from ",
             length(filtered_call_paths), " shard(s) for ", n_samples, " total samples")
 }
@@ -512,19 +673,39 @@ site_metadata <- all_site_calls[, {
         max_cov_passing_per_sample_qc = safe_max(cov[per_sample_pass]),
         mean_methylation_passing_per_sample_qc = safe_mean(methylation_value_for_metrics[per_sample_pass]),
         sd_methylation_passing_per_sample_qc = safe_sd(methylation_value_for_metrics[per_sample_pass]),
-        cv_methylation_passing_per_sample_qc = safe_cv(methylation_value_for_metrics[per_sample_pass])
+        cv_methylation_passing_per_sample_qc = safe_cv(methylation_value_for_metrics[per_sample_pass]),
+        methylation_mad_passing_per_sample_qc = safe_mad(methylation_value_for_metrics[per_sample_pass])
     )
 }, by = .(`#chrom`, begin, end, site_key)]
 site_metadata[, `:=`(
     n_samples_required = required_samples,
-    keep_site = n_samples_passing_per_sample_qc >= required_samples
+    pass_minimum_coverage_filter = n_samples_min_coverage >= required_samples,
+    pass_sample_presence_filter = n_samples_passing_per_sample_qc >= required_samples,
+    pass_methylation_mad_filter = !is.na(methylation_mad_passing_per_sample_qc) &
+        methylation_mad_passing_per_sample_qc >= opt$MinMethylationMAD
+)]
+site_metadata[, `:=`(
+    has_missing_or_low_coverage = n_samples_min_coverage < n_samples,
+    has_extreme_coverage_loss = n_samples_passing_per_sample_qc < n_samples_min_coverage,
+    keep_site = pass_sample_presence_filter & pass_methylation_mad_filter
+)]
+site_metadata[, failure_reason := fcase(
+    !pass_minimum_coverage_filter, "Insufficient minimum coverage",
+    !pass_sample_presence_filter, "Extreme coverage exclusion",
+    !pass_methylation_mad_filter, "Low methylation MAD",
+    default = "Pass all cohort filters"
 )]
 setorder(site_metadata, `#chrom`, begin, end)
 
 n_sites_total <- nrow(site_metadata)
 n_sites_with_min_coverage <- site_metadata[n_samples_min_coverage > 0, .N]
 n_sites_with_per_sample_qc <- site_metadata[n_samples_passing_per_sample_qc > 0, .N]
-n_sites_failing_cohort_qc <- site_metadata[keep_site == FALSE, .N]
+n_sites_failing_sample_presence <- site_metadata[pass_sample_presence_filter == FALSE, .N]
+n_sites_passing_sample_presence <- site_metadata[pass_sample_presence_filter == TRUE, .N]
+n_sites_failing_mad <- site_metadata[
+    pass_sample_presence_filter == TRUE & pass_methylation_mad_filter == FALSE,
+    .N
+]
 n_sites_passing_cohort_qc <- site_metadata[keep_site == TRUE, .N]
 message(
     "Cohort site summary: ", n_sites_total,
@@ -533,13 +714,106 @@ message(
     n_sites_with_per_sample_qc, " have >=1 sample passing per-sample QC"
 )
 message(
-    "Cohort threshold: ", n_sites_failing_cohort_qc,
+    "Cohort sample-presence threshold: ", n_sites_failing_sample_presence,
     " fail the required ", required_samples, "/", n_samples,
-    " sample threshold; ", n_sites_passing_cohort_qc, " sites pass"
+    " sample threshold; ", n_sites_passing_sample_presence, " sites pass"
+)
+message(
+    "Cohort methylation MAD filter: ", n_sites_failing_mad,
+    " sample-presence-passing site(s) fail MAD < ", opt$MinMethylationMAD,
+    "; ", n_sites_passing_cohort_qc, " sites pass all cohort filters"
 )
 
-# Preserve the compact QC output while the metadata output below contains the
-# all-call and passing-call coverage/methylation summaries.
+kept_site_keys <- site_metadata[keep_site == TRUE, site_key]
+merged_calls <- all_calls[site_key %chin% kept_site_keys]
+setcolorder(merged_calls, c("sample_id", setdiff(names(merged_calls), "sample_id")))
+
+long_output <- paste0(opt$OutputPrefix, ".methylation.filtered.long.tsv.gz")
+site_qc_output <- paste0(opt$OutputPrefix, ".methylation.site_qc.tsv.gz")
+site_metadata_output <- paste0(opt$OutputPrefix, ".methylation.site_metadata.tsv.gz")
+raw_bed_output <- paste0(opt$OutputPrefix, ".methylation.raw.bed.gz")
+int_bed_output <- paste0(opt$OutputPrefix, ".methylation.INT.bed.gz")
+
+site_metadata[, n_samples_imputed_in_qtl_bed := 0L]
+
+if (!is.null(opt$ValueColumn)) {
+    merged_calls[, methylation_value_for_qtl :=
+        suppressWarnings(as.numeric(get(opt$ValueColumn))) * opt$ValueMultiplier]
+    matrix_formula <- as.formula("`#chrom` + begin + end + site_key ~ sample_id")
+    raw_methylation_bed <- dcast(
+        merged_calls,
+        formula = matrix_formula,
+        value.var = "methylation_value_for_qtl"
+    )
+    setorder(raw_methylation_bed, `#chrom`, begin, end)
+    setnames(
+        raw_methylation_bed,
+        c("#chrom", "begin", "end", "site_key"),
+        c("#chr", "start", "end", "phenotype_id")
+    )
+    phenotype_columns <- c("#chr", "start", "end", "phenotype_id")
+    missing_sample_columns <- setdiff(cohort_sample_ids, names(raw_methylation_bed))
+    if (length(missing_sample_columns) > 0) {
+        raw_methylation_bed[, (missing_sample_columns) := NA_real_]
+    }
+    setcolorder(raw_methylation_bed, c(phenotype_columns, cohort_sample_ids))
+
+    sample_columns <- cohort_sample_ids
+    raw_values <- as.matrix(raw_methylation_bed[, ..sample_columns])
+    n_samples_imputed <- rowSums(is.na(raw_values))
+    if (nrow(raw_methylation_bed) > 0 && length(sample_columns) > 0) {
+        for (row_index in which(n_samples_imputed > 0)) {
+            feature_mean <- mean(raw_values[row_index, ], na.rm = TRUE)
+            if (!is.finite(feature_mean)) {
+                stop(
+                    "Cannot impute a retained QTL feature with no observed methylation values: ",
+                    raw_methylation_bed$phenotype_id[[row_index]]
+                )
+            }
+            raw_values[row_index, is.na(raw_values[row_index, ])] <- feature_mean
+        }
+        for (column_index in seq_along(sample_columns)) {
+            set(
+                raw_methylation_bed,
+                j = sample_columns[[column_index]],
+                value = raw_values[, column_index]
+            )
+        }
+    }
+
+    imputation_summary <- data.table(
+        site_key = raw_methylation_bed$phenotype_id,
+        n_samples_imputed_in_qtl_bed = as.integer(n_samples_imputed)
+    )
+    site_metadata[
+        imputation_summary,
+        on = .(site_key),
+        n_samples_imputed_in_qtl_bed := i.n_samples_imputed_in_qtl_bed
+    ]
+    message(
+        "Cohort mean imputation: ", sum(n_samples_imputed), " sample/site value(s) imputed ",
+        "across ", sum(n_samples_imputed > 0), " retained QTL feature(s)"
+    )
+
+    int_methylation_bed <- copy(raw_methylation_bed)
+    if (nrow(int_methylation_bed) > 0 && length(sample_columns) > 0) {
+        int_values <- t(vapply(
+            seq_len(nrow(raw_methylation_bed)),
+            function(row_index) inverse_normal_transform(as.numeric(raw_values[row_index, ])),
+            FUN.VALUE = numeric(length(sample_columns))
+        ))
+        for (column_index in seq_along(sample_columns)) {
+            set(
+                int_methylation_bed,
+                j = sample_columns[[column_index]],
+                value = int_values[, column_index]
+            )
+        }
+    }
+}
+
+# Preserve the compact QC output while the metadata output contains the
+# all-call and passing-call coverage/methylation summaries and imputation count.
 site_qc <- site_metadata[, .(
     `#chrom`, begin, end, site_key,
     n_samples_passing = n_samples_passing_per_sample_qc,
@@ -552,20 +826,17 @@ site_qc <- site_metadata[, .(
 )]
 setorder(site_qc, `#chrom`, begin, end)
 
-kept_site_keys <- site_metadata[keep_site == TRUE, site_key]
-merged_calls <- all_calls[site_key %chin% kept_site_keys]
-setcolorder(merged_calls, c("sample_id", setdiff(names(merged_calls), "sample_id")))
-
-long_output <- paste0(opt$OutputPrefix, ".methylation.filtered.long.tsv.gz")
-site_qc_output <- paste0(opt$OutputPrefix, ".methylation.site_qc.tsv.gz")
-site_metadata_output <- paste0(opt$OutputPrefix, ".methylation.site_metadata.tsv.gz")
-
 fwrite(merged_calls, long_output, sep = "\t", na = "NA")
 fwrite(site_qc, site_qc_output, sep = "\t", na = "NA")
 fwrite(site_metadata, site_metadata_output, sep = "\t", na = "NA")
 if (!is.null(sample_qc)) {
     fwrite(sample_qc, sample_qc_output, sep = "\t", na = "NA")
 }
+if (!is.null(opt$ValueColumn)) {
+    fwrite(raw_methylation_bed, raw_bed_output, sep = "\t", na = "NA")
+    fwrite(int_methylation_bed, int_bed_output, sep = "\t", na = "NA")
+}
+write_filter_plots(site_metadata, opt$OutputPrefix)
 message("Kept ", length(kept_site_keys), " / ", nrow(site_qc), " sites after cohort-level QC")
 message("Wrote filtered long calls: ", long_output)
 message("Wrote site QC: ", site_qc_output)
@@ -573,23 +844,7 @@ message("Wrote all-site metadata: ", site_metadata_output)
 if (!is.null(sample_qc)) {
     message("Wrote sample QC: ", sample_qc_output)
 }
-
 if (!is.null(opt$ValueColumn)) {
-    matrix_output <- paste0(opt$OutputPrefix, ".methylation.matrix.bed.gz")
-    merged_calls[, methylation_value_for_qtl :=
-        suppressWarnings(as.numeric(get(opt$ValueColumn))) * opt$ValueMultiplier]
-    matrix_formula <- as.formula("`#chrom` + begin + end + site_key ~ sample_id")
-    methylation_matrix <- dcast(
-        merged_calls,
-        formula = matrix_formula,
-        value.var = "methylation_value_for_qtl"
-    )
-    setorder(methylation_matrix, `#chrom`, begin, end)
-    setnames(
-        methylation_matrix,
-        c("#chrom", "begin", "end", "site_key"),
-        c("#chr", "start", "end", "phenotype_id")
-    )
-    fwrite(methylation_matrix, matrix_output, sep = "\t", na = "NA")
-    message("Wrote TensorQTL-compatible beta-value phenotype BED: ", matrix_output)
+    message("Wrote TensorQTL-compatible raw beta-value BED: ", raw_bed_output)
+    message("Wrote TensorQTL-compatible inverse-normal BED: ", int_bed_output)
 }

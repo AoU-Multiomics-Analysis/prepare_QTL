@@ -1,4 +1,6 @@
 version 1.0
+import "calculate_phenotypePCs.wdl" as ComputePCs
+import "MergeCovariates.wdl" as CovariateMerge
 
 # The global merge is deliberately outside the scatter.  A per-shard site
 # filter would use a different denominator in every shard and would therefore
@@ -100,6 +102,7 @@ task MergeMethylationShards {
         String OutputPrefix
         Float MinSampleFraction
         Int MinSamples
+        Float MinMethylationMAD
         String ValueColumn
         Float ValueMultiplier
         Int MemoryGB
@@ -121,6 +124,7 @@ task MergeMethylationShards {
             --OutputPrefix "~{OutputPrefix}" \
             --MinSampleFraction ~{MinSampleFraction} \
             --MinSamples ~{MinSamples} \
+            --MinMethylationMAD ~{MinMethylationMAD} \
             --ValueColumn "~{ValueColumn}" \
             --ValueMultiplier ~{ValueMultiplier}
     >>>
@@ -137,7 +141,11 @@ task MergeMethylationShards {
         File SiteQC = "~{OutputPrefix}.methylation.site_qc.tsv.gz"
         File SiteMetadata = "~{OutputPrefix}.methylation.site_metadata.tsv.gz"
         File SampleQC = "~{OutputPrefix}.methylation.sample_qc.tsv"
-        File MethylationMatrix = "~{OutputPrefix}.methylation.matrix.bed.gz"
+        File FilterSummary = "~{OutputPrefix}.methylation.filter_summary.tsv"
+        File FilterCountsPlot = "~{OutputPrefix}.methylation.filter_counts.png"
+        File FilterUpsetPlot = "~{OutputPrefix}.methylation.filter_upset.png"
+        File RawMethylationBed = "~{OutputPrefix}.methylation.raw.bed.gz"
+        File IntMethylationBed = "~{OutputPrefix}.methylation.INT.bed.gz"
     }
 }
 
@@ -149,11 +157,13 @@ workflow MergeMethylation {
         # filesystem); embedded file references are not localized by WDL.
         File SampleManifest
         String OutputPrefix
+        File? AdditionalCovariates
 
         Int SamplesPerShard = 25
         Float MinCoverage = 10.0
-        Float MinSampleFraction = 0.8
+        Float MinSampleFraction = 0.95
         Int MinSamples = 0
+        Float MinMethylationMAD = 0.003
         String FilterChroms = "X|Y|M|_"
         Float FenceK = 3.0
         String ValueColumn = "mod_score"
@@ -198,6 +208,7 @@ workflow MergeMethylation {
             OutputPrefix = OutputPrefix,
             MinSampleFraction = MinSampleFraction,
             MinSamples = MinSamples,
+            MinMethylationMAD = MinMethylationMAD,
             ValueColumn = ValueColumn,
             ValueMultiplier = ValueMultiplier,
             MemoryGB = MergeMemoryGB,
@@ -205,12 +216,38 @@ workflow MergeMethylation {
             NumThreads = NumThreads
     }
 
+    call ComputePCs.PhenotypePCs as IntPhenotypePCs {
+        input:
+            BedFile = MergeMethylationShards.IntMethylationBed,
+            OutputPrefix = OutputPrefix + ".methylation",
+            OutputSuffix = ".INT",
+            memory = MergeMemoryGB,
+            disk_space = MergeDiskGB,
+            num_threads = NumThreads
+    }
+
+    if (defined(AdditionalCovariates)) {
+        call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
+            input:
+                GenotypePCs = select_first([AdditionalCovariates]),
+                MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
+                OutputPrefix = OutputPrefix + ".methylation",
+                OutputSuffix = ".INT"
+        }
+    }
+
     output {
         File FilteredCalls = MergeMethylationShards.FilteredCalls
         File SiteQC = MergeMethylationShards.SiteQC
         File SiteMetadata = MergeMethylationShards.SiteMetadata
         File SampleQC = MergeMethylationShards.SampleQC
-        File MethylationMatrix = MergeMethylationShards.MethylationMatrix
+        File FilterSummary = MergeMethylationShards.FilterSummary
+        File FilterCountsPlot = MergeMethylationShards.FilterCountsPlot
+        File FilterUpsetPlot = MergeMethylationShards.FilterUpsetPlot
+        File RawMethylationBed = MergeMethylationShards.RawMethylationBed
+        File IntMethylationBed = MergeMethylationShards.IntMethylationBed
+        File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
+        File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         Array[File] ShardSampleQC = FilterMethylationShard.SampleQC
     }
 }
