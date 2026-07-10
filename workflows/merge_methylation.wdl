@@ -152,7 +152,8 @@ task AnnotateMethylationSites {
     input {
         File SiteMetadata
         File AnnotationGTF
-        File EnhancerAnnotations
+        File CCREAnnotations
+        File CpGIslandAnnotations
         String OutputPrefix
         Int PromoterWindow
         Int MemoryGB
@@ -163,7 +164,8 @@ task AnnotateMethylationSites {
         Rscript /tmp/AnnotateMethylationSites.R \
             --SiteMetadata "~{SiteMetadata}" \
             --AnnotationGTF "~{AnnotationGTF}" \
-            --EnhancerAnnotations "~{EnhancerAnnotations}" \
+            --CCREAnnotations "~{CCREAnnotations}" \
+            --CpGIslandAnnotations "~{CpGIslandAnnotations}" \
             --OutputPrefix "~{OutputPrefix}" \
             --PromoterWindow ~{PromoterWindow}
     >>>
@@ -190,7 +192,8 @@ workflow MergeMethylation {
         String OutputPrefix
         File? AdditionalCovariates
         File AnnotationGTF
-        File EnhancerAnnotations
+        File CCREAnnotations
+        File CpGIslandAnnotations
 
         Int SamplesPerShard = 25
         Float MinCoverage = 10.0
@@ -256,7 +259,8 @@ workflow MergeMethylation {
         input:
             SiteMetadata = MergeMethylationShards.SiteMetadata,
             AnnotationGTF = AnnotationGTF,
-            EnhancerAnnotations = EnhancerAnnotations,
+            CCREAnnotations = CCREAnnotations,
+            CpGIslandAnnotations = CpGIslandAnnotations,
             OutputPrefix = OutputPrefix,
             PromoterWindow = PromoterWindow,
             MemoryGB = AnnotationMemoryGB,

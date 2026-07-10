@@ -2,7 +2,7 @@
 
 [Back to main README](../README.md)
 
-This guide describes how to prepare pb-CpG-tools site-level 5mC calls for molecular QTL mapping. The workflow applies coverage QC per sample, filters sites against the whole cohort, applies a cohort methylation-MAD filter, annotates retained sites with gene/TSS and enhancer context, mean-imputes the limited remaining missing values per feature, produces raw beta-value and inverse-normal transformed phenotype BEDs, calculates phenotype PCs, and can merge those PCs with additional QTL covariates.
+This guide describes how to prepare pb-CpG-tools site-level 5mC calls for molecular QTL mapping. The workflow applies coverage QC per sample, filters sites against the whole cohort, applies a cohort methylation-MAD filter, annotates retained sites with gene/TSS, GTF subfeature, cCRE, and CpG-island context, mean-imputes the limited remaining missing values per feature, produces raw beta-value and inverse-normal transformed phenotype BEDs, calculates phenotype PCs, and can merge those PCs with additional QTL covariates.
 
 ## What to provide
 
@@ -30,7 +30,7 @@ SAMPLE_002	/mnt/methylation/SAMPLE_002.combined.bed.gz
 
 `file_path` must be an absolute path that is readable inside every WDL task container. WDL localizes the manifest itself, but does not localize file paths embedded within its contents.
 
-The workflow also requires a GTF built on the same reference genome and an enhancer reference with the six columns shown below (no header required): chromosome, BED start, BED end, V4 ID, V5 ID, and enhancer type. The enhancer intervals are interpreted as BED coordinates.
+The workflow also requires a GTF, an ENCODE cCRE reference, and a UCSC `cpgIslandExt` reference built on the same genome assembly. The cCRE reference is a headerless six-column file: chromosome, BED start, BED end, V4 ID, V5 ID, and cCRE type. The cCRE intervals are interpreted as BED coordinates. This is deliberately broader than an enhancer annotation: V6 may also identify CTCF-only or DNase-H3K4me3 elements.
 
 ## Workflow design
 
@@ -40,7 +40,7 @@ flowchart LR
     B --> C["Per-sample QC\nchromosome, coverage, extreme coverage"]
     C --> D["Global cohort reduction\napply MinSampleFraction and MinSamples"]
     D --> E["Cohort MAD filter\nfeature-mean imputation"]
-    E --> F["Gene/TSS and enhancer annotation\nof passing sites"]
+    E --> F["Gene/TSS, GTF subfeature, cCRE, and CpG-island\nannotation of passing sites"]
     F --> G["Raw and INT phenotype BEDs\nQC and all-site metadata"]
     G --> H["Phenotype PCs\noptional covariate merge"]
 ```
@@ -77,7 +77,8 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `MinMethylationMAD` | `0.003` | Minimum methylation MAD across per-sample-QC-passing observations required for QTL output. |
 | `FenceK` | `3.0` | Far-out-fence multiplier used for extreme coverage. |
 | `AnnotationGTF` | required | GTF gene model on the same reference build as the methylation calls. |
-| `EnhancerAnnotations` | required | Headerless six-column enhancer annotation file: BED coordinates, V4 ID, V5 ID, and type. |
+| `CCREAnnotations` | required | Headerless six-column ENCODE cCRE file: BED coordinates, V4 ID, V5 ID, and type. |
+| `CpGIslandAnnotations` | required | UCSC `cpgIslandExt` table from the same reference build; accepts named columns or a headerless UCSC table. |
 | `PromoterWindow` | `2000` | Bases either side of each strand-aware TSS classified as promoter. |
 | `ValueColumn` | `mod_score` | Column used as methylation phenotype. |
 | `ValueMultiplier` | `0.01` | Converts pb-CpG `mod_score` percentages to 0–1 beta values. |
@@ -96,7 +97,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `<prefix>.methylation.filter_summary.tsv` | Counts of sites at each mutually exclusive cohort-QC stage. |
 | `<prefix>.methylation.filter_counts.png` | Bar chart of the sequential cohort-QC counts. |
 | `<prefix>.methylation.filter_upset.png` | UpSet-style chart showing overlap of low/missing coverage, extreme coverage, cohort sample-presence, and methylation-MAD conditions. |
-| `<prefix>.methylation.passing_site_annotations.tsv.gz` | One row per retained site with nearest TSS/gene, promoter, gene-body/intergenic, and enhancer annotations. |
+| `<prefix>.methylation.passing_site_annotations.tsv.gz` | One row per retained site with nearest TSS/gene, promoter, GTF subfeatures, gene-body/intergenic, cCRE, and CpG-island annotations. |
 | `<prefix>.methylation.raw.bed.gz` | TensorQTL-compatible phenotype BED with raw 0–1 methylation beta values. |
 | `<prefix>.methylation.INT.bed.gz` | TensorQTL-compatible phenotype BED after site-wise rank-based inverse normal transformation. |
 | `<prefix>.methylation_phenotype_PCs.INT.tsv` | Phenotype PCs calculated from the INT BED. |
@@ -111,11 +112,20 @@ The site metadata has two metric families:
 
 The filter-count chart and TSV use mutually exclusive stages so the counts add up to every observed site: insufficient minimum-coverage samples, loss of sufficient samples after extreme-coverage exclusions, low MAD after sample-presence QC, or passing all cohort filters. The UpSet-style plot is complementary: it retains overlapping conditions, including a site that still passes overall QC despite one or more missing or extreme-coverage calls.
 
-## Gene and enhancer annotation
+## Gene, cCRE, and CpG-island annotation
 
-The annotation task reads only `keep_site == TRUE` rows from the all-site metadata. It reports the nearest strand-aware gene TSS (`nearest_tss_distance`, gene ID/name, and strand), promoter overlaps within ±2 kb by default, gene-body overlaps, and a mutually exclusive `genomic_context` of `promoter`, `gene_body`, or `intergenic`. Promoter takes priority when a site overlaps both a promoter and a gene body. Multiple overlapping genes are retained as semicolon-delimited IDs and names.
+The annotation task reads only `keep_site == TRUE` rows from the all-site metadata. It reports the nearest strand-aware gene TSS (`nearest_tss_distance`, gene ID/name, and strand), promoter overlaps within ±2 kb by default, gene-body overlaps, and a mutually exclusive `genomic_context` of `promoter`, `gene_body`, or `intergenic`. `gene_feature_context` further distinguishes `exon`, `intron`, and `gene_body_unclassified`; `in_exon`, `in_intron`, `in_cds`, `in_five_prime_utr`, `in_three_prime_utr`, and `in_utr` each have matching count and gene ID/name fields. Promoter takes priority when a site overlaps both a promoter and a gene body. Multiple overlapping genes are retained as semicolon-delimited IDs and names.
 
-Enhancer overlaps are reported separately because they may occur in any genic context. The annotation includes `in_enhancer`, `n_overlapping_enhancers`, `enhancer_v4_id`, `enhancer_v5_id`, and `enhancer_type`; multiple overlaps are semicolon-delimited. The V4/V5 values are preserved exactly from the enhancer reference.
+cCRE overlaps are reported separately because they may occur in any genic context. The annotation includes `in_ccre`, `n_overlapping_ccres`, `ccre_v4_id`, `ccre_v5_id`, and `ccre_type`; multiple overlaps are semicolon-delimited. The V4/V5 values are preserved exactly from the reference. `is_enhancer_like` identifies pELS/dELS overlaps, while `is_ctcf_only` identifies CTCF-only overlaps.
+
+The UCSC `cpgIslandExt` table is read from its `chrom`, `chromStart`, `chromEnd`, and `name` columns (or their standard headerless column positions). `chromStart` and `chromEnd` are interpreted as UCSC BED coordinates. A passing CpG is classified with the following mutually exclusive priority:
+
+1. `island`: the CpG overlaps an annotated CpG island.
+2. `shore`: the CpG does not overlap an island but lies within 2,000 bp of an island boundary.
+3. `shelf`: the CpG is not an island or shore site but lies 2,001–4,000 bp from an island boundary.
+4. `open_sea`: the CpG is more than 4,000 bp from every annotated island, or its chromosome has no annotated island.
+
+The output records this in `cpg_island_context`, together with `in_cpg_island`, overlapping island count/name, and the nearest island name and boundary distance. The classification is based on a 2 kb expansion of each island for shores and a 4 kb expansion for shelves; island overlap takes precedence, followed by shore, then shelf. All references must use the same genome build and chromosome naming convention as the PacBio calls.
 
 ## QTL phenotype BEDs, PCs, and covariates
 
@@ -137,7 +147,7 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 - [`scripts/FilterMethylationShard.R`](../scripts/FilterMethylationShard.R): per-shard chromosome and coverage QC.
 - [`scripts/MergeMethylationCohort.R`](../scripts/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
 - [`scripts/MethylationUtils.R`](../scripts/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
-- [`scripts/AnnotateMethylationSites.R`](../scripts/AnnotateMethylationSites.R): passing-site gene/TSS and enhancer annotation task.
+- [`scripts/AnnotateMethylationSites.R`](../scripts/AnnotateMethylationSites.R): passing-site gene/TSS, GTF-subfeature, cCRE, and CpG-island annotation task.
 - [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl): WDL wrapper for parallel execution.
 - [R script reference](scripts.md): reference for all project scripts.
 - [Molecular QTL workflow reference](molecular-qtl-workflows.md): reference for all molecular workflow wrappers.
