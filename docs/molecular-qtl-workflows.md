@@ -56,7 +56,7 @@ Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 
 ## `workflows/merge_methylation.wdl`
 
-Merges per-sample PacBio 5mC BED calls with parallel per-sample QC and a single cohort-level site filter. The input `SampleManifest` must be a TSV with `sample_id` and **absolute** `file_path` columns. Its file paths must be readable from each task container, such as from a mounted shared filesystem. WDL localizes the manifest itself but does not localize file references embedded inside that TSV.
+Merges per-sample pb-CpG-tools 5mC calls with parallel per-sample QC and a single cohort-level site filter. The input `SampleManifest` must be a TSV with `sample_id` and **absolute** paths to `.combined.bed.gz` `file_path` values. Its file paths must be readable from each task container, such as from a mounted shared filesystem. WDL localizes the manifest itself but does not localize file references embedded inside that TSV. By default, the workflow uses pb-CpG `mod_score` and multiplies it by `0.01` to write 0–1 beta values.
 
 **Steps:**
 1. Splits the manifest into groups of `SamplesPerShard` samples.
@@ -65,7 +65,7 @@ Merges per-sample PacBio 5mC BED calls with parallel per-sample QC and a single 
 
 This final reduction is essential: applying the fraction threshold independently in each shard would make the retained-site set depend on shard boundaries.
 
-**Outputs:** Cohort-filtered long calls, per-site QC, all-site metadata, per-sample QC, a site-by-sample methylation matrix, and the per-shard sample QC files. The all-site metadata includes mean, standard deviation, and CV for coverage and methylation across all observed calls and per-sample-QC-passing calls; it also includes both coverage fractions and `keep_site`. `ValueColumn` is required and names the methylation measure for the matrix and methylation metrics.
+**Outputs:** Cohort-filtered long calls, per-site QC, all-site metadata, per-sample QC, a TensorQTL-compatible beta-value BED, and the per-shard sample QC files. The all-site metadata includes mean, standard deviation, and CV for coverage and methylation across all observed calls and per-sample-QC-passing calls; it also includes both coverage fractions and `keep_site`. The QTL BED begins with `#chr`, `start`, `end`, and `phenotype_id`; by default, its methylation values are `mod_score / 100`.
 
 ## `workflows/prepare_sQTL.wdl`
 

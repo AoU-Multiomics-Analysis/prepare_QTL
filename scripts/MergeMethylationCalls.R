@@ -19,7 +19,7 @@
 #   <prefix>.methylation.site_qc.tsv.gz        per-site cohort QC summary
 #   <prefix>.methylation.site_metadata.tsv.gz  all-site coverage/methylation metrics
 #   <prefix>.methylation.sample_qc.tsv         per-sample QC summary
-#   <prefix>.methylation.matrix.bed.gz         optional site-by-sample matrix
+#   <prefix>.methylation.matrix.bed.gz         TensorQTL-compatible phenotype BED
 #
 # For sharded execution, run once per shard with --PerSampleOnly. Then call
 # the script a final time with --FilteredCallList and --TotalSamples to apply
@@ -33,15 +33,17 @@ suppressPackageStartupMessages({
 load_methylation_data <- function(file_path,
                                   filter_chroms = "X|Y|M|_",
                                   fence_k = 3) {
-    loaded_data <- data.table::fread(file_path)
+    # pb-CpG-tools prepends ## metadata lines before the #chrom header. Using
+    # the header marker also supports already-cleaned BED files.
+    loaded_data <- data.table::fread(file_path, skip = "#chrom")
     n_input_rows <- nrow(loaded_data)
-    required_columns <- c("#chrom", "begin", "end", "cov")
+    required_columns <- c("#chrom", "begin", "end", "mod_score", "type", "cov")
     missing_columns <- setdiff(required_columns, names(loaded_data))
     if (length(missing_columns) > 0) {
         stop(
             "Missing required column(s) in ", file_path, ": ",
             paste(missing_columns, collapse = ", "),
-            ". Expected #chrom, begin, end, and cov."
+            ". Expected pb-CpG-tools columns #chrom, begin, end, mod_score, type, and cov."
         )
     }
 
@@ -56,6 +58,14 @@ load_methylation_data <- function(file_path,
     }
     if (nrow(loaded_data) == 0) {
         stop("No rows remain after chromosome filtering in ", file_path)
+    }
+
+    call_types <- unique(as.character(loaded_data$type[!is.na(loaded_data$type)]))
+    if (length(call_types) != 1) {
+        stop(
+            "Expected one pb-CpG-tools 'type' per input file, but found: ",
+            paste(call_types, collapse = ", "), ". For a standard meQTL, use one .combined.bed.gz file per sample."
+        )
     }
 
     median_cov <- median(loaded_data$cov, na.rm = TRUE)
@@ -90,6 +100,7 @@ load_methylation_data <- function(file_path,
     setattr(loaded_data, "median_cov", median_cov)
     setattr(loaded_data, "extreme_cut", extreme_cut)
     setattr(loaded_data, "n_input_rows", n_input_rows)
+    setattr(loaded_data, "call_type", call_types[[1]])
     loaded_data
 }
 
@@ -257,8 +268,10 @@ option_list <- list(
                 help = "Regex for chromosomes/contigs to remove; use '' to keep all [default: %default]"),
     make_option("--FenceK", type = "double", default = 3,
                 help = "Tukey log10-coverage far-out fence multiplier [default: %default]"),
-    make_option("--ValueColumn", type = "character", default = NULL,
-                help = "Optional call column to pivot into the site-by-sample BED matrix")
+    make_option("--ValueColumn", type = "character", default = "mod_score",
+                help = "pb-CpG-tools methylation column; mod_score is the recommended model-pileup value [default: %default]"),
+    make_option("--ValueMultiplier", type = "double", default = 0.01,
+                help = "Multiplier applied to ValueColumn before QTL output; 0.01 converts pb-CpG mod_score percent to beta values [default: %default]")
 )
 
 opt <- parse_args(OptionParser(option_list = option_list))
@@ -296,6 +309,9 @@ if (is.na(opt$MinSamples) || opt$MinSamples < 0) {
 }
 if (!is.finite(opt$FenceK) || opt$FenceK < 0) {
     stop("--FenceK must be a non-negative number")
+}
+if (!is.finite(opt$ValueMultiplier) || opt$ValueMultiplier <= 0) {
+    stop("--ValueMultiplier must be a positive number")
 }
 
 sample_qc <- NULL
@@ -342,6 +358,9 @@ if (has_manifest) {
 
         coverage_pass <- !is.na(methylation_data$cov) & methylation_data$cov >= opt$MinCoverage
         extreme_pass <- methylation_data$extreme_cov_flag == "ok"
+        n_below_min_coverage <- sum(!coverage_pass)
+        n_extreme_coverage <- sum(!extreme_pass)
+        n_extreme_after_min_coverage <- sum(coverage_pass & !extreme_pass)
         current_sample_id <- sample_id
         methylation_data[, `:=`(
             sample_id = current_sample_id,
@@ -356,16 +375,29 @@ if (has_manifest) {
             n_input_rows = attr(methylation_data, "n_input_rows"),
             n_rows_after_chrom_filter = nrow(methylation_data),
             n_removed_by_chrom_filter = attr(methylation_data, "n_input_rows") - nrow(methylation_data),
+            pb_cpg_type = attr(methylation_data, "call_type"),
             median_cov = attr(methylation_data, "median_cov"),
             extreme_coverage_cutoff = attr(methylation_data, "extreme_cut"),
-            n_below_min_coverage = sum(!coverage_pass),
-            n_extreme_coverage = sum(!extreme_pass),
+            n_below_min_coverage = n_below_min_coverage,
+            n_extreme_coverage = n_extreme_coverage,
+            n_extreme_coverage_after_min_coverage = n_extreme_after_min_coverage,
             n_passing_per_sample_qc = nrow(retained)
         )
         filtered_calls[[i]] <- retained
         site_metric_calls[[i]] <- methylation_data
-        message("  Retained ", nrow(retained), " / ", nrow(methylation_data),
-                " calls after per-sample coverage QC")
+        message(
+            "  Input sites: ", attr(methylation_data, "n_input_rows"),
+            "; removed by chromosome filter: ",
+            attr(methylation_data, "n_input_rows") - nrow(methylation_data),
+            "; evaluated for coverage: ", nrow(methylation_data)
+        )
+        message(
+            "  Per-sample thresholds: ", n_below_min_coverage,
+            " fail MinCoverage (<", opt$MinCoverage, "); ",
+            n_extreme_after_min_coverage,
+            " fail extreme coverage after MinCoverage; ",
+            nrow(retained), " pass both thresholds"
+        )
     }
     all_calls <- rbindlist(filtered_calls, use.names = TRUE)
     all_site_calls <- rbindlist(site_metric_calls, use.names = TRUE)
@@ -450,7 +482,7 @@ if (!is.null(opt$ValueColumn)) {
     if (all(is.na(methylation_values)) && any(!is.na(all_site_calls[[opt$ValueColumn]]))) {
         stop("--ValueColumn '", opt$ValueColumn, "' must be numeric")
     }
-    all_site_calls[, methylation_value_for_metrics := methylation_values]
+    all_site_calls[, methylation_value_for_metrics := methylation_values * opt$ValueMultiplier]
 } else {
     all_site_calls[, methylation_value_for_metrics := NA_real_]
 }
@@ -488,6 +520,23 @@ site_metadata[, `:=`(
     keep_site = n_samples_passing_per_sample_qc >= required_samples
 )]
 setorder(site_metadata, `#chrom`, begin, end)
+
+n_sites_total <- nrow(site_metadata)
+n_sites_with_min_coverage <- site_metadata[n_samples_min_coverage > 0, .N]
+n_sites_with_per_sample_qc <- site_metadata[n_samples_passing_per_sample_qc > 0, .N]
+n_sites_failing_cohort_qc <- site_metadata[keep_site == FALSE, .N]
+n_sites_passing_cohort_qc <- site_metadata[keep_site == TRUE, .N]
+message(
+    "Cohort site summary: ", n_sites_total,
+    " sites observed after chromosome filtering; ",
+    n_sites_with_min_coverage, " have >=1 sample meeting MinCoverage; ",
+    n_sites_with_per_sample_qc, " have >=1 sample passing per-sample QC"
+)
+message(
+    "Cohort threshold: ", n_sites_failing_cohort_qc,
+    " fail the required ", required_samples, "/", n_samples,
+    " sample threshold; ", n_sites_passing_cohort_qc, " sites pass"
+)
 
 # Preserve the compact QC output while the metadata output below contains the
 # all-call and passing-call coverage/methylation summaries.
@@ -527,13 +576,20 @@ if (!is.null(sample_qc)) {
 
 if (!is.null(opt$ValueColumn)) {
     matrix_output <- paste0(opt$OutputPrefix, ".methylation.matrix.bed.gz")
+    merged_calls[, methylation_value_for_qtl :=
+        suppressWarnings(as.numeric(get(opt$ValueColumn))) * opt$ValueMultiplier]
     matrix_formula <- as.formula("`#chrom` + begin + end + site_key ~ sample_id")
     methylation_matrix <- dcast(
         merged_calls,
         formula = matrix_formula,
-        value.var = opt$ValueColumn
+        value.var = "methylation_value_for_qtl"
     )
     setorder(methylation_matrix, `#chrom`, begin, end)
+    setnames(
+        methylation_matrix,
+        c("#chrom", "begin", "end", "site_key"),
+        c("#chr", "start", "end", "phenotype_id")
+    )
     fwrite(methylation_matrix, matrix_output, sep = "\t", na = "NA")
-    message("Wrote site-by-sample methylation matrix: ", matrix_output)
+    message("Wrote TensorQTL-compatible beta-value phenotype BED: ", matrix_output)
 }

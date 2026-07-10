@@ -128,7 +128,7 @@ Prepares LeafCutter splice junction data for sQTL analysis.
 
 ## `scripts/MergeMethylationCalls.R`
 
-Merges per-sample PacBio 5mC BED calls after per-sample and cohort-level coverage QC. The input manifest is a TSV with `sample_id` and `file_path` columns; relative paths are resolved from the manifest's location. Each BED must contain `#chrom`, `begin`, `end`, and `cov` columns and must have the same schema as every other input BED.
+Merges per-sample pb-CpG-tools 5mC calls after per-sample and cohort-level coverage QC. Point each manifest `file_path` at the sample's `.combined.bed.gz` output. The script safely skips pb-CpG-tools metadata lines and requires its `#chrom`, `begin`, `end`, `mod_score`, `type`, and `cov` columns.
 
 **What it does:**
 1. Removes contigs matching `--FilterChroms` (by default `X|Y|M|_`).
@@ -136,6 +136,8 @@ Merges per-sample PacBio 5mC BED calls after per-sample and cohort-level coverag
 3. Removes calls below `--MinCoverage` and all extreme-coverage calls.
 4. Retains only sites that pass per-sample QC in at least `max(ceiling(n_samples * MinSampleFraction), MinSamples)` samples.
 5. Writes the retained long-format calls and per-sample/per-site QC tables. It also writes all-site metadata, including coverage and methylation mean, standard deviation, coefficient of variation (CV), coverage fractions, and the final `keep_site` flag. When `--ValueColumn` is supplied, it is used for methylation metrics and for the site-by-sample matrix.
+
+The run log reports, for every sample, input sites, chromosome-filtered sites, sites failing `MinCoverage`, sites failing the extreme-coverage filter after passing `MinCoverage`, and sites passing both. It also reports cohort-wide site counts after each stage and the numbers passing/failing the final sample-presence threshold.
 
 For a sharded run, use `--PerSampleOnly` for each shard. It writes both `<OutputPrefix>.methylation.per_sample_filtered.long.tsv.gz` and `<OutputPrefix>.methylation.per_sample_qc.long.tsv.gz`, plus sample QC, without applying the cohort-level threshold. Run the final aggregation with `--FilteredCallList`, `--AllCallList`, `--TotalSamples`, and optionally `--FilteredSampleQcList`; only this final aggregation applies `--MinSampleFraction` and `--MinSamples` across the complete cohort.
 
@@ -149,14 +151,15 @@ For a sharded run, use `--PerSampleOnly` for each shard. It writes both `<Output
 - `--MinSamples`: Optional additional minimum count of passing samples (default `0`).
 - `--FilterChroms`: Regex for contigs to remove; pass an empty string to retain all contigs (default `X|Y|M|_`).
 - `--FenceK`: Tukey far-out-fence multiplier (default `3`).
-- `--ValueColumn`: Optional numeric methylation column used for all-site methylation metrics and the site-by-sample matrix.
+- `--ValueColumn`: pb-CpG-tools methylation column used for all-site methylation metrics and the QTL BED (default `mod_score`).
+- `--ValueMultiplier`: Multiplier for `ValueColumn` before QTL output (default `0.01`, converting pb-CpG `mod_score` percent to 0–1 beta values).
 
 **Outputs:**
 - `<OutputPrefix>.methylation.filtered.long.tsv.gz`
 - `<OutputPrefix>.methylation.site_qc.tsv.gz`
 - `<OutputPrefix>.methylation.site_metadata.tsv.gz`: One row for every site observed after chromosome filtering, including raw-call and per-sample-QC-passing coverage/methylation metrics and `keep_site`.
 - `<OutputPrefix>.methylation.sample_qc.tsv`
-- `<OutputPrefix>.methylation.matrix.bed.gz` when `--ValueColumn` is supplied.
+- `<OutputPrefix>.methylation.matrix.bed.gz`: TensorQTL-compatible beta-value BED, with `#chr`, `start`, `end`, and `phenotype_id` as its first four columns.
 
 ## `scripts/calculate_PCs.R`
 

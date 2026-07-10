@@ -101,6 +101,7 @@ task MergeMethylationShards {
         Float MinSampleFraction
         Int MinSamples
         String ValueColumn
+        Float ValueMultiplier
         Int MemoryGB
         Int DiskGB
         Int NumThreads
@@ -120,7 +121,8 @@ task MergeMethylationShards {
             --OutputPrefix "~{OutputPrefix}" \
             --MinSampleFraction ~{MinSampleFraction} \
             --MinSamples ~{MinSamples} \
-            --ValueColumn "~{ValueColumn}"
+            --ValueColumn "~{ValueColumn}" \
+            --ValueMultiplier ~{ValueMultiplier}
     >>>
 
     runtime {
@@ -141,7 +143,8 @@ task MergeMethylationShards {
 
 workflow MergeMethylation {
     input {
-        # TSV with sample_id and absolute file_path values. The paths must be
+        # TSV with sample_id and absolute paths to pb-CpG-tools .combined.bed.gz
+        # output files. The paths must be
         # readable by each task container (for example, from a mounted shared
         # filesystem); embedded file references are not localized by WDL.
         File SampleManifest
@@ -153,7 +156,8 @@ workflow MergeMethylation {
         Int MinSamples = 0
         String FilterChroms = "X|Y|M|_"
         Float FenceK = 3.0
-        String ValueColumn
+        String ValueColumn = "mod_score"
+        Float ValueMultiplier = 0.01
 
         Int ShardMemoryGB = 16
         Int ShardDiskGB = 100
@@ -195,6 +199,7 @@ workflow MergeMethylation {
             MinSampleFraction = MinSampleFraction,
             MinSamples = MinSamples,
             ValueColumn = ValueColumn,
+            ValueMultiplier = ValueMultiplier,
             MemoryGB = MergeMemoryGB,
             DiskGB = MergeDiskGB,
             NumThreads = NumThreads
