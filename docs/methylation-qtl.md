@@ -28,7 +28,7 @@ SAMPLE_001	gs://my-bucket/SAMPLE_001.combined.bed.gz
 SAMPLE_002	gs://my-bucket/SAMPLE_002.combined.bed.gz
 ```
 
-The columns must be named `sample_id` and `file_path` and remain in that order. The workflow parses each `file_path` cell into a WDL `File`, so Cromwell localizes `gs://` objects into the filtering tasks.
+The columns must be named `sample_id` and `file_path`. The workflow parses each `file_path` cell into a WDL `File`, so Cromwell localizes `gs://` objects into the filtering tasks.
 
 The workflow also requires a GTF, an ENCODE cCRE reference, and a UCSC `cpgIslandExt` reference built on the same genome assembly. The cCRE reference is a headerless six-column file: chromosome, BED start, BED end, V4 ID, V5 ID, and cCRE type. The cCRE intervals are interpreted as BED coordinates. This is deliberately broader than an enhancer annotation: V6 may also identify CTCF-only or DNase-H3K4me3 elements.
 

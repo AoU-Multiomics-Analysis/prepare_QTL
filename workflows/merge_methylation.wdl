@@ -167,12 +167,12 @@ workflow MergeMethylation {
         Int NumThreads = 1
     }
 
-    Array[Array[String]] manifest_rows = read_tsv(SampleManifest)
+    Array[Map[String, String]] manifest_rows = read_objects(SampleManifest)
 
-    scatter (sample_index in range(length(manifest_rows) - 1)) {
-        Array[String] manifest_row = manifest_rows[sample_index + 1]
-        String sample_id = manifest_row[0]
-        File methylation_bed = manifest_row[1]
+    scatter (sample_index in range(length(manifest_rows))) {
+        Map[String, String] manifest_row = manifest_rows[sample_index]
+        String sample_id = manifest_row["sample_id"]
+        File methylation_bed = manifest_row["file_path"]
         String sample_output_prefix = "~{OutputPrefix}.sample.~{sample_index}"
 
         call FilterMethylationShard {
@@ -194,7 +194,7 @@ workflow MergeMethylation {
             FilteredCallShards = FilterMethylationShard.FilteredCalls,
             AllCallShards = FilterMethylationShard.AllCalls,
             SampleQcShards = FilterMethylationShard.SampleQC,
-            TotalSamples = length(manifest_rows) - 1,
+            TotalSamples = length(manifest_rows),
             OutputPrefix = OutputPrefix,
             MinSampleFraction = MinSampleFraction,
             MinSamples = MinSamples,
