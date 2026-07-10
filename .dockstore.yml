@@ -13,6 +13,9 @@ workflows:
   - subclass: WDL 
     primaryDescriptorPath: /workflows/prepare_sQTL.wdl
     name: prepare_sQTL
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/merge_methylation.wdl
+    name: merge_methylation
   - subclass: WDL 
     primaryDescriptorPath: /workflows/calculate_phenotypePCs.wdl
     name: calculate_phenotypePCs
