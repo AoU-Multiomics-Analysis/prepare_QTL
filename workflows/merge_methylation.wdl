@@ -2,14 +2,65 @@ version 1.0
 import "calculate_phenotypePCs.wdl" as ComputePCs
 import "MergeCovariates.wdl" as CovariateMerge
 
-# The global merge is deliberately outside the scatter. A per-sample site
-# filter would use a different denominator in every task and would therefore
+# The global merge is deliberately outside the scatter. A per-shard site
+# filter would use a different denominator in every shard and would therefore
 # not implement MinSampleFraction across the cohort.
+
+task ShardMethylationManifest {
+    input {
+        File SampleManifest
+        Int SamplesPerShard
+    }
+
+    command <<<
+        set -euo pipefail
+
+        # shellcheck disable=SC2016
+        Rscript -e '
+        library(data.table)
+        manifest <- fread("~{SampleManifest}", sep = "\t", header = TRUE, quote = "", data.table = FALSE)
+        required <- c("sample_id", "file_path")
+        missing <- setdiff(required, names(manifest))
+        if (length(missing) > 0) {
+            stop("SampleManifest is missing required column(s): ", paste(missing, collapse = ", "))
+        }
+        manifest <- manifest[, required, drop = FALSE]
+        if (nrow(manifest) < 1) stop("SampleManifest must contain at least one data row")
+        if (anyNA(manifest$sample_id) || any(!nzchar(manifest$sample_id))) stop("SampleManifest contains an empty sample_id")
+        if (any(!grepl("^[A-Za-z0-9._-]+$", manifest$sample_id))) {
+            stop("sample_id values must match [A-Za-z0-9._-]+")
+        }
+        if (anyDuplicated(manifest$sample_id)) stop("Each sample_id must occur exactly once in SampleManifest")
+        if (anyNA(manifest$file_path) || any(!nzchar(manifest$file_path))) stop("SampleManifest contains an empty file_path")
+        shard_size <- as.integer("~{SamplesPerShard}")
+        if (is.na(shard_size) || shard_size < 1) stop("SamplesPerShard must be at least 1")
+        dir.create("shards", showWarnings = FALSE)
+        starts <- seq.int(1L, nrow(manifest), by = shard_size)
+        for (i in seq_along(starts)) {
+            end <- min(nrow(manifest), starts[[i]] + shard_size - 1L)
+            fwrite(manifest[starts[[i]]:end, , drop = FALSE],
+                   sprintf("shards/methylation_manifest.shard.%05d.tsv", i - 1L), sep = "\t")
+        }
+        writeLines(as.character(nrow(manifest)), "total_samples.txt")
+        '
+    >>>
+
+    runtime {
+        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        memory: "2G"
+        disks: "local-disk 10 HDD"
+        cpu: 1
+    }
+
+    output {
+        Array[File] ShardManifests = glob("shards/methylation_manifest.shard.*.tsv")
+        Int TotalSamples = read_int("total_samples.txt")
+    }
+}
 
 task FilterMethylationShard {
     input {
-        String SampleId
-        File MethylationBed
+        File ShardManifest
         String OutputPrefix
         Float MinCoverage
         String FilterChroms
@@ -22,8 +73,23 @@ task FilterMethylationShard {
     command <<<
         set -euo pipefail
 
-        printf 'sample_id\tfile_path\n%s\t%s\n' \
-            "~{SampleId}" "~{MethylationBed}" > localized_manifest.tsv
+        mkdir -p input_beds
+        printf 'sample_id\tfile_path\n' > localized_manifest.tsv
+
+        tail -n +2 "~{ShardManifest}" | while IFS=$'\t' read -r sample_id source_path; do
+            [ -n "$sample_id" ] || continue
+            local_path="input_beds/${sample_id}.combined.bed.gz"
+            if [[ "$source_path" == gs://* ]]; then
+                gsutil cp "$source_path" "$local_path"
+            else
+                if [ ! -f "$source_path" ]; then
+                    echo "Input BED file for ${sample_id} is not accessible inside the task: ${source_path}" >&2
+                    exit 1
+                fi
+                cp "$source_path" "$local_path"
+            fi
+            printf '%s\t%s\n' "$sample_id" "$local_path" >> localized_manifest.tsv
+        done
 
         Rscript /tmp/FilterMethylationShard.R \
             --InputManifest localized_manifest.tsv \
@@ -139,8 +205,8 @@ task AnnotateMethylationSites {
 
 workflow MergeMethylation {
     input {
-        # TSV with sample_id and file_path columns. The workflow parses each
-        # file_path into a typed File so Cromwell localizes gs:// objects.
+        # TSV with sample_id and file_path columns. gs:// files are localized
+        # inside each shard task with gsutil.
         File SampleManifest
         String OutputPrefix
         File? AdditionalCovariates
@@ -148,6 +214,7 @@ workflow MergeMethylation {
         File CCREAnnotations
         File CpGIslandAnnotations
 
+        Int SamplesPerShard = 25
         Float MinCoverage = 10.0
         Float MinSampleFraction = 0.95
         Int MinSamples = 0
@@ -167,19 +234,20 @@ workflow MergeMethylation {
         Int NumThreads = 1
     }
 
-    Array[Map[String, String]] manifest_rows = read_objects(SampleManifest)
+    call ShardMethylationManifest {
+        input:
+            SampleManifest = SampleManifest,
+            SamplesPerShard = SamplesPerShard
+    }
 
-    scatter (sample_index in range(length(manifest_rows))) {
-        Map[String, String] manifest_row = manifest_rows[sample_index]
-        String sample_id = manifest_row["sample_id"]
-        File methylation_bed = manifest_row["file_path"]
-        String sample_output_prefix = "~{OutputPrefix}.sample.~{sample_index}"
+    scatter (shard_index in range(length(ShardMethylationManifest.ShardManifests))) {
+        File shard_manifest = ShardMethylationManifest.ShardManifests[shard_index]
+        String shard_output_prefix = "~{OutputPrefix}.shard.~{shard_index}"
 
         call FilterMethylationShard {
             input:
-                SampleId = sample_id,
-                MethylationBed = methylation_bed,
-                OutputPrefix = sample_output_prefix,
+                ShardManifest = shard_manifest,
+                OutputPrefix = shard_output_prefix,
                 MinCoverage = MinCoverage,
                 FilterChroms = FilterChroms,
                 FenceK = FenceK,
@@ -194,7 +262,7 @@ workflow MergeMethylation {
             FilteredCallShards = FilterMethylationShard.FilteredCalls,
             AllCallShards = FilterMethylationShard.AllCalls,
             SampleQcShards = FilterMethylationShard.SampleQC,
-            TotalSamples = length(manifest_rows),
+            TotalSamples = ShardMethylationManifest.TotalSamples,
             OutputPrefix = OutputPrefix,
             MinSampleFraction = MinSampleFraction,
             MinSamples = MinSamples,

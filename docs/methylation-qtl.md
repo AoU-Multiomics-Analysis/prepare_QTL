@@ -28,7 +28,7 @@ SAMPLE_001	gs://my-bucket/SAMPLE_001.combined.bed.gz
 SAMPLE_002	gs://my-bucket/SAMPLE_002.combined.bed.gz
 ```
 
-The columns must be named `sample_id` and `file_path`. The workflow parses each `file_path` cell into a WDL `File`, so Cromwell localizes `gs://` objects into the filtering tasks.
+The columns must be named `sample_id` and `file_path`. The workflow partitions the manifest into `SamplesPerShard` rows per task, and each task uses `gsutil` to localize only the `gs://` BEDs assigned to that shard.
 
 The workflow also requires a GTF, an ENCODE cCRE reference, and a UCSC `cpgIslandExt` reference built on the same genome assembly. The cCRE reference is a headerless six-column file: chromosome, BED start, BED end, V4 ID, V5 ID, and cCRE type. The cCRE intervals are interpreted as BED coordinates. This is deliberately broader than an enhancer annotation: V6 may also identify CTCF-only or DNase-H3K4me3 elements.
 
@@ -36,7 +36,7 @@ The workflow also requires a GTF, an ENCODE cCRE reference, and a UCSC `cpgIslan
 
 ```mermaid
 flowchart LR
-    A["Manifest with one BED per sample"] --> B["Parse each BED as a localized WDL File"]
+    A["Manifest with one BED per sample"] --> B["Split manifest into sample shards"]
     B --> C["Per-sample QC\nchromosome, coverage, extreme coverage"]
     C --> D["Global cohort reduction\napply MinSampleFraction and MinSamples"]
     D --> E["Cohort MAD filter\nfeature-mean imputation"]
@@ -70,6 +70,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 
 | Input | Default | Meaning |
 | --- | --- | --- |
+| `SamplesPerShard` | `25` | Number of samples processed by each parallel filtering task. |
 | `MinCoverage` | `10` | Minimum `cov` required for a sample/site call. |
 | `MinSampleFraction` | `0.95` | Fraction of the complete cohort that must pass per-sample QC for a site to be retained. Remaining QTL-BED missing values are imputed with the feature mean. |
 | `MinSamples` | `0` | Optional additional minimum number of samples passing per-sample QC. |
@@ -82,7 +83,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `ValueColumn` | `mod_score` | Column used as methylation phenotype. |
 | `ValueMultiplier` | `0.01` | Converts pb-CpG `mod_score` percentages to 0–1 beta values. |
 | `AdditionalCovariates` | unset | Optional TSV containing `sample_id` plus genotype PCs or other covariates to merge with INT phenotype PCs. |
-| `ShardMemoryGB` / `ShardDiskGB` | `16` / `100` | Resources for each parallel sample-filtering task. |
+| `ShardMemoryGB` / `ShardDiskGB` | `16` / `100` | Resources for each parallel shard. Disk must accommodate the shard's input BEDs and outputs. |
 | `MergeMemoryGB` / `MergeDiskGB` | `64` / `200` | Resources for the final cohort-wide reduction. |
 
 ## Outputs
