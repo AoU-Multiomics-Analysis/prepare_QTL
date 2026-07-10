@@ -2,64 +2,14 @@ version 1.0
 import "calculate_phenotypePCs.wdl" as ComputePCs
 import "MergeCovariates.wdl" as CovariateMerge
 
-# The global merge is deliberately outside the scatter.  A per-shard site
-# filter would use a different denominator in every shard and would therefore
+# The global merge is deliberately outside the scatter. A per-sample site
+# filter would use a different denominator in every task and would therefore
 # not implement MinSampleFraction across the cohort.
-
-task ShardMethylationManifest {
-    input {
-        File SampleManifest
-        Int SamplesPerShard
-    }
-
-    command <<<
-        set -euo pipefail
-
-        if [ "~{SamplesPerShard}" -lt 1 ]; then
-            echo "SamplesPerShard must be at least 1" >&2
-            exit 1
-        fi
-
-        n_samples=$(awk 'END { print NR - 1 }' "~{SampleManifest}")
-        if [ "$n_samples" -lt 1 ]; then
-            echo "SampleManifest must have a header and at least one sample" >&2
-            exit 1
-        fi
-        printf '%s\n' "$n_samples" > total_samples.txt
-
-        awk -v shard_size="~{SamplesPerShard}" '
-            NR == 1 {
-                header = $0
-                next
-            }
-            {
-                shard = int((NR - 2) / shard_size)
-                output = sprintf("methylation_manifest.shard.%05d.tsv", shard)
-                if (!(output in seen)) {
-                    print header > output
-                    seen[output] = 1
-                }
-                print >> output
-            }
-        ' "~{SampleManifest}"
-    >>>
-
-    runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        memory: "2G"
-        disks: "local-disk 10 HDD"
-        cpu: 1
-    }
-
-    output {
-        Array[File] ShardManifests = glob("methylation_manifest.shard.*.tsv")
-        Int TotalSamples = read_int("total_samples.txt")
-    }
-}
 
 task FilterMethylationShard {
     input {
-        File ShardManifest
+        String SampleId
+        File MethylationBed
         String OutputPrefix
         Float MinCoverage
         String FilterChroms
@@ -70,8 +20,13 @@ task FilterMethylationShard {
     }
 
     command <<<
+        set -euo pipefail
+
+        printf 'sample_id\tfile_path\n%s\t%s\n' \
+            "~{SampleId}" "~{MethylationBed}" > localized_manifest.tsv
+
         Rscript /tmp/FilterMethylationShard.R \
-            --InputManifest "~{ShardManifest}" \
+            --InputManifest localized_manifest.tsv \
             --OutputPrefix "~{OutputPrefix}" \
             --MinCoverage ~{MinCoverage} \
             --FilterChroms "~{FilterChroms}" \
@@ -184,10 +139,8 @@ task AnnotateMethylationSites {
 
 workflow MergeMethylation {
     input {
-        # TSV with sample_id and absolute paths to pb-CpG-tools .combined.bed.gz
-        # output files. The paths must be
-        # readable by each task container (for example, from a mounted shared
-        # filesystem); embedded file references are not localized by WDL.
+        # TSV with sample_id and file_path columns. The workflow parses each
+        # file_path into a typed File so Cromwell localizes gs:// objects.
         File SampleManifest
         String OutputPrefix
         File? AdditionalCovariates
@@ -195,7 +148,6 @@ workflow MergeMethylation {
         File CCREAnnotations
         File CpGIslandAnnotations
 
-        Int SamplesPerShard = 25
         Float MinCoverage = 10.0
         Float MinSampleFraction = 0.95
         Int MinSamples = 0
@@ -215,20 +167,19 @@ workflow MergeMethylation {
         Int NumThreads = 1
     }
 
-    call ShardMethylationManifest {
-        input:
-            SampleManifest = SampleManifest,
-            SamplesPerShard = SamplesPerShard
-    }
+    Array[Map[String, String]] manifest_rows = read_objects(SampleManifest)
 
-    scatter (shard_index in range(length(ShardMethylationManifest.ShardManifests))) {
-        File shard_manifest = ShardMethylationManifest.ShardManifests[shard_index]
-        String shard_output_prefix = "~{OutputPrefix}.shard.~{shard_index}"
+    scatter (sample_index in range(length(manifest_rows))) {
+        Map[String, String] manifest_row = manifest_rows[sample_index]
+        String sample_id = manifest_row["sample_id"]
+        File methylation_bed = manifest_row["file_path"]
+        String sample_output_prefix = "~{OutputPrefix}.sample.~{sample_index}"
 
         call FilterMethylationShard {
             input:
-                ShardManifest = shard_manifest,
-                OutputPrefix = shard_output_prefix,
+                SampleId = sample_id,
+                MethylationBed = methylation_bed,
+                OutputPrefix = sample_output_prefix,
                 MinCoverage = MinCoverage,
                 FilterChroms = FilterChroms,
                 FenceK = FenceK,
@@ -243,7 +194,7 @@ workflow MergeMethylation {
             FilteredCallShards = FilterMethylationShard.FilteredCalls,
             AllCallShards = FilterMethylationShard.AllCalls,
             SampleQcShards = FilterMethylationShard.SampleQC,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
+            TotalSamples = length(manifest_rows),
             OutputPrefix = OutputPrefix,
             MinSampleFraction = MinSampleFraction,
             MinSamples = MinSamples,

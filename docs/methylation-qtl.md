@@ -24,11 +24,11 @@ Supply a TSV with a header and one row per sample:
 
 ```text
 sample_id	file_path
-SAMPLE_001	/mnt/methylation/SAMPLE_001.combined.bed.gz
-SAMPLE_002	/mnt/methylation/SAMPLE_002.combined.bed.gz
+SAMPLE_001	gs://my-bucket/SAMPLE_001.combined.bed.gz
+SAMPLE_002	gs://my-bucket/SAMPLE_002.combined.bed.gz
 ```
 
-`file_path` must be an absolute path that is readable inside every WDL task container. WDL localizes the manifest itself, but does not localize file paths embedded within its contents.
+The columns must be named `sample_id` and `file_path`. The workflow parses each `file_path` cell into a WDL `File`, so Cromwell localizes `gs://` objects into the filtering tasks.
 
 The workflow also requires a GTF, an ENCODE cCRE reference, and a UCSC `cpgIslandExt` reference built on the same genome assembly. The cCRE reference is a headerless six-column file: chromosome, BED start, BED end, V4 ID, V5 ID, and cCRE type. The cCRE intervals are interpreted as BED coordinates. This is deliberately broader than an enhancer annotation: V6 may also identify CTCF-only or DNase-H3K4me3 elements.
 
@@ -36,7 +36,7 @@ The workflow also requires a GTF, an ENCODE cCRE reference, and a UCSC `cpgIslan
 
 ```mermaid
 flowchart LR
-    A["One .combined.bed.gz per sample"] --> B["Split manifest into sample shards"]
+    A["Manifest with one BED per sample"] --> B["Parse each BED as a localized WDL File"]
     B --> C["Per-sample QC\nchromosome, coverage, extreme coverage"]
     C --> D["Global cohort reduction\napply MinSampleFraction and MinSamples"]
     D --> E["Cohort MAD filter\nfeature-mean imputation"]
@@ -45,13 +45,13 @@ flowchart LR
     G --> H["Phenotype PCs\noptional covariate merge"]
 ```
 
-The cohort threshold is deliberately evaluated only after every shard has completed per-sample QC. This means the required number of samples is always:
+The cohort threshold is deliberately evaluated only after every parallel sample task has completed per-sample QC. This means the required number of samples is always:
 
 ```text
 max(ceiling(total_samples × MinSampleFraction), MinSamples)
 ```
 
-and never depends on shard size or shard boundaries.
+and never depends on parallel task boundaries.
 
 ## QC stages and run log
 
@@ -70,7 +70,6 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `SamplesPerShard` | `25` | Number of samples processed by each parallel per-sample-QC task. |
 | `MinCoverage` | `10` | Minimum `cov` required for a sample/site call. |
 | `MinSampleFraction` | `0.95` | Fraction of the complete cohort that must pass per-sample QC for a site to be retained. Remaining QTL-BED missing values are imputed with the feature mean. |
 | `MinSamples` | `0` | Optional additional minimum number of samples passing per-sample QC. |
@@ -83,7 +82,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `ValueColumn` | `mod_score` | Column used as methylation phenotype. |
 | `ValueMultiplier` | `0.01` | Converts pb-CpG `mod_score` percentages to 0–1 beta values. |
 | `AdditionalCovariates` | unset | Optional TSV containing `sample_id` plus genotype PCs or other covariates to merge with INT phenotype PCs. |
-| `ShardMemoryGB` / `ShardDiskGB` | `16` / `100` | Resources for each parallel shard. |
+| `ShardMemoryGB` / `ShardDiskGB` | `16` / `100` | Resources for each parallel sample-filtering task. |
 | `MergeMemoryGB` / `MergeDiskGB` | `64` / `200` | Resources for the final cohort-wide reduction. |
 
 ## Outputs
@@ -144,7 +143,7 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 
 ## Related files
 
-- [`scripts/FilterMethylationShard.R`](../scripts/FilterMethylationShard.R): per-shard chromosome and coverage QC.
+- [`scripts/FilterMethylationShard.R`](../scripts/FilterMethylationShard.R): per-sample chromosome and coverage QC.
 - [`scripts/MergeMethylationCohort.R`](../scripts/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
 - [`scripts/MethylationUtils.R`](../scripts/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
 - [`scripts/AnnotateMethylationSites.R`](../scripts/AnnotateMethylationSites.R): passing-site gene/TSS, GTF-subfeature, cCRE, and CpG-island annotation task.
