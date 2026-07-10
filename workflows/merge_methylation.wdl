@@ -70,13 +70,12 @@ task FilterMethylationShard {
     }
 
     command <<<
-        Rscript /tmp/MergeMethylationCalls.R \
+        Rscript /tmp/FilterMethylationShard.R \
             --InputManifest "~{ShardManifest}" \
             --OutputPrefix "~{OutputPrefix}" \
             --MinCoverage ~{MinCoverage} \
             --FilterChroms "~{FilterChroms}" \
-            --FenceK ~{FenceK} \
-            --PerSampleOnly
+            --FenceK ~{FenceK}
     >>>
 
     runtime {
@@ -116,7 +115,7 @@ task MergeMethylationShards {
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
         printf '%s\n' ~{sep=' ' SampleQcShards} > sample_qc_shards.list
 
-        Rscript /tmp/MergeMethylationCalls.R \
+        Rscript /tmp/MergeMethylationCohort.R \
             --FilteredCallList filtered_call_shards.list \
             --AllCallList all_call_shards.list \
             --FilteredSampleQcList sample_qc_shards.list \

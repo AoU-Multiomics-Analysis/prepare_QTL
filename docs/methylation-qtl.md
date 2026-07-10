@@ -121,7 +121,9 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 
 ## Related files
 
-- [`scripts/MergeMethylationCalls.R`](../scripts/MergeMethylationCalls.R): command-line implementation, including standalone and shard-intermediate modes.
+- [`scripts/FilterMethylationShard.R`](../scripts/FilterMethylationShard.R): per-shard chromosome and coverage QC.
+- [`scripts/MergeMethylationCohort.R`](../scripts/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
+- [`scripts/MethylationUtils.R`](../scripts/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
 - [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl): WDL wrapper for parallel execution.
 - [R script reference](scripts.md): reference for all project scripts.
 - [Molecular QTL workflow reference](molecular-qtl-workflows.md): reference for all molecular workflow wrappers.

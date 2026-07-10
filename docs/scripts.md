@@ -126,9 +126,12 @@ Prepares LeafCutter splice junction data for sQTL analysis.
 - `<OutputPrefix>.splicing.INT.connectivity_outliers.tsv`
 - `<OutputPrefix>.splicing.scaled.connectivity_outliers.tsv`
 
-## `scripts/MergeMethylationCalls.R`
+## Methylation scripts
 
-Prepares pb-CpG-tools `.combined.bed.gz` calls for QTL mapping. It supports a one-pass local run and the two-stage shard/reduce mode used by [`merge_methylation.wdl`](../workflows/merge_methylation.wdl).
+The pb-CpG-tools 5mC workflow is intentionally split into two executable stages, both of which source `scripts/MethylationUtils.R` for BED parsing, validation, QC metrics, transformations, and plotting helpers.
+
+- `scripts/FilterMethylationShard.R` applies chromosome, minimum-coverage, and extreme-coverage QC to one manifest shard. It writes the passing calls, all calls with QC flags, and one-row-per-sample QC summaries.
+- `scripts/MergeMethylationCohort.R` reduces all shard outputs, applies cohort sample-presence and MAD filters, creates metadata and QC plots, mean-imputes retained features, and writes raw and INT QTL phenotype BEDs.
 
 See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for the input schema, all command-line options, QC logic, outputs, and QTL phenotype format.
 
