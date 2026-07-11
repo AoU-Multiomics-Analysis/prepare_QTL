@@ -18,3 +18,5 @@ The image includes the following R packages used by the scripts and WDL tasks:
 - `PCAtools`, `RNOmni`, `edgeR`
 - `biomaRt`, `biomaRtr`, `rtracklayer`, `plyranges`
 - `patchwork`
+
+It also includes the Google Cloud SDK (`gsutil`), used by the methylation shard task to localize `gs://` BED files listed in a manifest.

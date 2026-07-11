@@ -57,7 +57,7 @@ Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 ## `workflows/merge_methylation.wdl`
 
 
-Parallel wrapper for pb-CpG-tools 5mC QTL preparation. It applies per-sample QC in parallel, then evaluates sample-presence and methylation-MAD filters once across the complete cohort. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
+Parallel wrapper for pb-CpG-tools 5mC QTL preparation. It applies per-sample QC in sample shards, writes autosome-split shard outputs, evaluates sample-presence and methylation-MAD filters in parallel per autosome using the complete cohort denominator, and then aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
 
 See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for the sample manifest input, configuration, parallel filtering behavior, QC logic, and outputs.
 

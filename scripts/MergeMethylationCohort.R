@@ -12,6 +12,8 @@ option_list <- list(
     make_option("--FilteredSampleQcList", type = "character", help = "One per-shard sample-QC file path per line [required]"),
     make_option("--TotalSamples", type = "integer", help = "Total input sample count [required]"),
     make_option("--OutputPrefix", type = "character", help = "Prefix for output files [required]"),
+    make_option("--Chromosome", type = "character", default = "",
+                help = "Optional chromosome name to merge from the input call files [default: all chromosomes]"),
     make_option("--MinSampleFraction", type = "double", default = 0.95,
                 help = "Minimum fraction of all samples passing per-site QC [default: %default]"),
     make_option("--MinSamples", type = "integer", default = 0,
@@ -21,7 +23,11 @@ option_list <- list(
     make_option("--ValueColumn", type = "character", default = "mod_score",
                 help = "pb-CpG-tools methylation column [default: %default]"),
     make_option("--ValueMultiplier", type = "double", default = 0.01,
-                help = "Multiplier applied to ValueColumn [default: %default]")
+                help = "Multiplier applied to ValueColumn [default: %default]"),
+    make_option("--SkipSampleQC", action = "store_true", default = FALSE,
+                help = "Do not write the merged sample-QC table"),
+    make_option("--SkipFilterPlots", action = "store_true", default = FALSE,
+                help = "Do not write filter summary/count/UpSet outputs")
 )
 opt <- parse_args(OptionParser(option_list = option_list))
 required_options <- c("FilteredCallList", "AllCallList", "FilteredSampleQcList", "OutputPrefix")
@@ -41,6 +47,10 @@ reference_columns <- filtered_call_data$reference_columns
 all_call_paths <- read_file_list(opt$AllCallList, "All-call")
 all_call_data <- read_call_tables(all_call_paths, "All-call", c("meets_min_coverage", "per_sample_qc_pass"))
 all_site_calls <- all_call_data$all_calls
+if (nzchar(opt$Chromosome)) {
+    all_calls <- all_calls[`#chrom` == opt$Chromosome]
+    all_site_calls <- all_site_calls[`#chrom` == opt$Chromosome]
+}
 all_site_calls[, `:=`(
     meets_min_coverage = as.logical(meets_min_coverage),
     per_sample_qc_pass = as.logical(per_sample_qc_pass)
@@ -59,8 +69,9 @@ if (length(missing_qc_samples) > 0) {
          paste(missing_qc_samples, collapse = ", "))
 }
 cohort_sample_ids <- sample_qc$sample_id
+chromosome_label <- if (nzchar(opt$Chromosome)) paste0(" for ", opt$Chromosome) else ""
 message("Reading per-sample-QC-passing calls and all-site metadata from ",
-        length(filtered_call_paths), " shard(s) for ", n_samples, " total samples")
+        length(filtered_call_paths), " shard(s)", chromosome_label, " for ", n_samples, " total samples")
 
 output_dir <- dirname(opt$OutputPrefix)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
@@ -154,10 +165,19 @@ int_bed_output <- paste0(opt$OutputPrefix, ".methylation.INT.bed.gz")
 site_metadata[, n_samples_imputed_in_qtl_bed := 0L]
 merged_calls[, methylation_value_for_qtl := suppressWarnings(as.numeric(get(opt$ValueColumn))) * opt$ValueMultiplier]
 matrix_formula <- as.formula("`#chrom` + begin + end + site_key ~ sample_id")
-raw_methylation_bed <- dcast(merged_calls, formula = matrix_formula, value.var = "methylation_value_for_qtl")
-setorder(raw_methylation_bed, `#chrom`, begin, end)
-setnames(raw_methylation_bed, c("#chrom", "begin", "end", "site_key"), c("#chr", "start", "end", "phenotype_id"))
 phenotype_columns <- c("#chr", "start", "end", "phenotype_id")
+if (nrow(merged_calls) == 0) {
+    raw_methylation_bed <- data.table(
+        `#chr` = character(),
+        start = integer(),
+        end = integer(),
+        phenotype_id = character()
+    )
+} else {
+    raw_methylation_bed <- dcast(merged_calls, formula = matrix_formula, value.var = "methylation_value_for_qtl")
+    setorder(raw_methylation_bed, `#chrom`, begin, end)
+    setnames(raw_methylation_bed, c("#chrom", "begin", "end", "site_key"), phenotype_columns)
+}
 missing_sample_columns <- setdiff(cohort_sample_ids, names(raw_methylation_bed))
 if (length(missing_sample_columns) > 0) raw_methylation_bed[, (missing_sample_columns) := NA_real_]
 setcolorder(raw_methylation_bed, c(phenotype_columns, cohort_sample_ids))
@@ -203,14 +223,14 @@ setorder(site_qc, `#chrom`, begin, end)
 fwrite(merged_calls, long_output, sep = "\t", na = "NA")
 fwrite(site_qc, site_qc_output, sep = "\t", na = "NA")
 fwrite(site_metadata, site_metadata_output, sep = "\t", na = "NA")
-fwrite(sample_qc, sample_qc_output, sep = "\t", na = "NA")
+if (!opt$SkipSampleQC) fwrite(sample_qc, sample_qc_output, sep = "\t", na = "NA")
 fwrite(raw_methylation_bed, raw_bed_output, sep = "\t", na = "NA")
 fwrite(int_methylation_bed, int_bed_output, sep = "\t", na = "NA")
-write_filter_plots(site_metadata, opt$OutputPrefix)
+if (!opt$SkipFilterPlots) write_filter_plots(site_metadata, opt$OutputPrefix)
 message("Kept ", length(kept_site_keys), " / ", nrow(site_qc), " sites after cohort-level QC")
 message("Wrote filtered long calls: ", long_output)
 message("Wrote site QC: ", site_qc_output)
 message("Wrote all-site metadata: ", site_metadata_output)
-message("Wrote sample QC: ", sample_qc_output)
+if (!opt$SkipSampleQC) message("Wrote sample QC: ", sample_qc_output)
 message("Wrote TensorQTL-compatible raw beta-value BED: ", raw_bed_output)
 message("Wrote TensorQTL-compatible inverse-normal BED: ", int_bed_output)

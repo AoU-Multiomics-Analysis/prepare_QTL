@@ -15,7 +15,9 @@ option_list <- list(
     make_option("--FilterChroms", type = "character", default = "X|Y|M|_",
                 help = "Regex for chromosomes/contigs to remove; use '' to keep all [default: %default]"),
     make_option("--FenceK", type = "double", default = 3,
-                help = "Tukey log10-coverage far-out fence multiplier [default: %default]")
+                help = "Tukey log10-coverage far-out fence multiplier [default: %default]"),
+    make_option("--AutosomePrefix", type = "character", default = "chr",
+                help = "Prefix used for autosome names, e.g. 'chr' for chr1 or '' for 1 [default: %default]")
 )
 opt <- parse_args(OptionParser(option_list = option_list))
 if (is.null(opt$InputManifest) || is.null(opt$OutputPrefix)) stop("--InputManifest and --OutputPrefix are required")
@@ -88,9 +90,22 @@ if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 filtered_output <- paste0(opt$OutputPrefix, ".methylation.per_sample_filtered.long.tsv.gz")
 all_calls_output <- paste0(opt$OutputPrefix, ".methylation.per_sample_qc.long.tsv.gz")
 sample_qc_output <- paste0(opt$OutputPrefix, ".methylation.sample_qc.tsv")
-fwrite(rbindlist(filtered_calls, use.names = TRUE), filtered_output, sep = "\t", na = "NA")
-fwrite(rbindlist(all_site_calls, use.names = TRUE), all_calls_output, sep = "\t", na = "NA")
+filtered_call_table <- rbindlist(filtered_calls, use.names = TRUE)
+all_site_call_table <- rbindlist(all_site_calls, use.names = TRUE)
+fwrite(filtered_call_table, filtered_output, sep = "\t", na = "NA")
+fwrite(all_site_call_table, all_calls_output, sep = "\t", na = "NA")
 fwrite(rbindlist(sample_qc_tables, use.names = TRUE), sample_qc_output, sep = "\t", na = "NA")
+
+autosomes <- paste0(opt$AutosomePrefix, seq_len(22))
+for (chrom_index in seq_along(autosomes)) {
+    chrom <- autosomes[[chrom_index]]
+    chrom_label <- sprintf("autosome%02d", chrom_index)
+    chrom_filtered_output <- paste0(opt$OutputPrefix, ".methylation.", chrom_label, ".per_sample_filtered.long.tsv.gz")
+    chrom_all_calls_output <- paste0(opt$OutputPrefix, ".methylation.", chrom_label, ".per_sample_qc.long.tsv.gz")
+    fwrite(filtered_call_table[`#chrom` == chrom], chrom_filtered_output, sep = "\t", na = "NA")
+    fwrite(all_site_call_table[`#chrom` == chrom], chrom_all_calls_output, sep = "\t", na = "NA")
+}
 message("Wrote per-sample-QC-passing shard calls: ", filtered_output)
 message("Wrote all per-sample-QC shard calls for site metadata: ", all_calls_output)
 message("Wrote sample QC: ", sample_qc_output)
+message("Wrote autosome-split shard call files for ", length(autosomes), " chromosome(s)")
