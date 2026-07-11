@@ -42,6 +42,7 @@ task ShardMethylationManifest {
                    sprintf("shards/methylation_manifest.shard.%05d.tsv", i - 1L), sep = "\t")
         }
         writeLines(as.character(nrow(manifest)), "total_samples.txt")
+        fwrite(manifest[, "sample_id", drop = FALSE], "cohort_samples.tsv", sep = "\t")
         '
     >>>
 
@@ -55,6 +56,7 @@ task ShardMethylationManifest {
     output {
         Array[File] ShardManifests = glob("shards/methylation_manifest.shard.*.tsv")
         Int TotalSamples = read_int("total_samples.txt")
+        File CohortSamples = "cohort_samples.tsv"
     }
 }
 
@@ -74,14 +76,29 @@ task FilterMethylationShard {
     command <<<
         set -euo pipefail
 
+        if [ ~{NumThreads} -lt 1 ]; then
+            echo "NumThreads must be at least 1" >&2
+            exit 1
+        fi
+
         mkdir -p input_beds
         printf 'sample_id\tfile_path\n' > localized_manifest.tsv
+        : > transfer_args.bin
 
         tail -n +2 "~{ShardManifest}" | while IFS=$'\t' read -r sample_id source_path; do
             [ -n "$sample_id" ] || continue
             local_path="input_beds/${sample_id}.combined.bed.gz"
+            printf '%s\t%s\n' "$sample_id" "$local_path" >> localized_manifest.tsv
+            printf '%s\0%s\0%s\0' "$sample_id" "$source_path" "$local_path" >> transfer_args.bin
+        done
+
+        # shellcheck disable=SC2016
+        xargs -0 -n 3 -P ~{NumThreads} bash -c '
+            sample_id="$1"
+            source_path="$2"
+            local_path="$3"
             if [[ "$source_path" == gs://* ]]; then
-                gsutil cp "$source_path" "$local_path"
+                gsutil -q cp "$source_path" "$local_path"
             else
                 if [ ! -f "$source_path" ]; then
                     echo "Input BED file for ${sample_id} is not accessible inside the task: ${source_path}" >&2
@@ -89,8 +106,7 @@ task FilterMethylationShard {
                 fi
                 cp "$source_path" "$local_path"
             fi
-            printf '%s\t%s\n' "$sample_id" "$local_path" >> localized_manifest.tsv
-        done
+        ' _ < transfer_args.bin
 
         Rscript /tmp/FilterMethylationShard.R \
             --InputManifest localized_manifest.tsv \
@@ -110,31 +126,7 @@ task FilterMethylationShard {
     }
 
     output {
-        File FilteredCalls = "~{OutputPrefix}.methylation.per_sample_filtered.long.tsv.gz"
-        File AllCalls = "~{OutputPrefix}.methylation.per_sample_qc.long.tsv.gz"
         File SampleQC = "~{OutputPrefix}.methylation.sample_qc.tsv"
-        File FilteredCallsAutosome01 = "~{OutputPrefix}.methylation.autosome01.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome02 = "~{OutputPrefix}.methylation.autosome02.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome03 = "~{OutputPrefix}.methylation.autosome03.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome04 = "~{OutputPrefix}.methylation.autosome04.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome05 = "~{OutputPrefix}.methylation.autosome05.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome06 = "~{OutputPrefix}.methylation.autosome06.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome07 = "~{OutputPrefix}.methylation.autosome07.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome08 = "~{OutputPrefix}.methylation.autosome08.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome09 = "~{OutputPrefix}.methylation.autosome09.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome10 = "~{OutputPrefix}.methylation.autosome10.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome11 = "~{OutputPrefix}.methylation.autosome11.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome12 = "~{OutputPrefix}.methylation.autosome12.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome13 = "~{OutputPrefix}.methylation.autosome13.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome14 = "~{OutputPrefix}.methylation.autosome14.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome15 = "~{OutputPrefix}.methylation.autosome15.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome16 = "~{OutputPrefix}.methylation.autosome16.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome17 = "~{OutputPrefix}.methylation.autosome17.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome18 = "~{OutputPrefix}.methylation.autosome18.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome19 = "~{OutputPrefix}.methylation.autosome19.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome20 = "~{OutputPrefix}.methylation.autosome20.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome21 = "~{OutputPrefix}.methylation.autosome21.per_sample_filtered.long.tsv.gz"
-        File FilteredCallsAutosome22 = "~{OutputPrefix}.methylation.autosome22.per_sample_filtered.long.tsv.gz"
         File AllCallsAutosome01 = "~{OutputPrefix}.methylation.autosome01.per_sample_qc.long.tsv.gz"
         File AllCallsAutosome02 = "~{OutputPrefix}.methylation.autosome02.per_sample_qc.long.tsv.gz"
         File AllCallsAutosome03 = "~{OutputPrefix}.methylation.autosome03.per_sample_qc.long.tsv.gz"
@@ -162,9 +154,8 @@ task FilterMethylationShard {
 
 task MergeMethylationChromosome {
     input {
-        Array[File] FilteredCallShards
         Array[File] AllCallShards
-        Array[File] SampleQcShards
+        File CohortSamples
         Int TotalSamples
         String Chromosome
         String OutputPrefix
@@ -180,14 +171,11 @@ task MergeMethylationChromosome {
 
     command <<<
         set -euo pipefail
-        printf '%s\n' ~{sep=' ' FilteredCallShards} > filtered_call_shards.list
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
-        printf '%s\n' ~{sep=' ' SampleQcShards} > sample_qc_shards.list
 
         Rscript /tmp/MergeMethylationCohort.R \
-            --FilteredCallList filtered_call_shards.list \
             --AllCallList all_call_shards.list \
-            --FilteredSampleQcList sample_qc_shards.list \
+            --CohortSamples "~{CohortSamples}" \
             --TotalSamples ~{TotalSamples} \
             --Chromosome "~{Chromosome}" \
             --OutputPrefix "~{OutputPrefix}" \
@@ -196,7 +184,6 @@ task MergeMethylationChromosome {
             --MinMethylationMAD ~{MinMethylationMAD} \
             --ValueColumn "~{ValueColumn}" \
             --ValueMultiplier ~{ValueMultiplier} \
-            --SkipSampleQC \
             --SkipFilterPlots
     >>>
 
@@ -240,12 +227,60 @@ task AggregateMethylationChromosomes {
         printf '%s\n' ~{sep=' ' IntMethylationBedByChromosome} > int_beds_by_chromosome.list
         printf '%s\n' ~{sep=' ' SampleQcShards} > sample_qc_shards.list
 
+        concat_chromosome_tables() {
+            local list_path="$1"
+            local output_path="$2"
+            local label="$3"
+            local expected_header=""
+            local input_path
+            local current_header
+
+            while IFS= read -r input_path; do
+                [ -n "$input_path" ] || continue
+                current_header=$(zgrep -m 1 '^' "$input_path")
+                if [ -z "$expected_header" ]; then
+                    expected_header="$current_header"
+                elif [ "$current_header" != "$expected_header" ]; then
+                    echo "${label} chromosome files do not have identical headers: ${input_path}" >&2
+                    exit 1
+                fi
+            done < "$list_path"
+
+            if [ -z "$expected_header" ]; then
+                echo "${label} chromosome file list is empty" >&2
+                exit 1
+            fi
+
+            {
+                local first_file=1
+                while IFS= read -r input_path; do
+                    [ -n "$input_path" ] || continue
+                    if [ "$first_file" -eq 1 ]; then
+                        bgzip -c -d -@ ~{NumThreads} "$input_path"
+                        first_file=0
+                    else
+                        bgzip -c -d -@ ~{NumThreads} "$input_path" | tail -n +2
+                    fi
+                done < "$list_path"
+            } | bgzip -c -@ ~{NumThreads} > "$output_path"
+        }
+
+        # Inputs are explicitly ordered autosome01 through autosome22, and each
+        # chromosome task sorts its own rows, so concatenation preserves the same
+        # genomic order without a second whole-cohort sort.
+        concat_chromosome_tables filtered_calls_by_chromosome.list \
+            "~{OutputPrefix}.methylation.filtered.long.tsv.gz" "Filtered-call"
+        concat_chromosome_tables site_qc_by_chromosome.list \
+            "~{OutputPrefix}.methylation.site_qc.tsv.gz" "Site-QC"
+        concat_chromosome_tables site_metadata_by_chromosome.list \
+            "~{OutputPrefix}.methylation.site_metadata.tsv.gz" "Site-metadata"
+        concat_chromosome_tables raw_beds_by_chromosome.list \
+            "~{OutputPrefix}.methylation.raw.bed.gz" "Raw BED"
+        concat_chromosome_tables int_beds_by_chromosome.list \
+            "~{OutputPrefix}.methylation.INT.bed.gz" "INT BED"
+
         Rscript /tmp/AggregateMethylationChromosomes.R \
-            --FilteredCallList filtered_calls_by_chromosome.list \
-            --SiteQcList site_qc_by_chromosome.list \
-            --SiteMetadataList site_metadata_by_chromosome.list \
-            --RawBedList raw_beds_by_chromosome.list \
-            --IntBedList int_beds_by_chromosome.list \
+            --SiteMetadata "~{OutputPrefix}.methylation.site_metadata.tsv.gz" \
             --SampleQcList sample_qc_shards.list \
             --TotalSamples ~{TotalSamples} \
             --OutputPrefix "~{OutputPrefix}"
@@ -364,9 +399,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome01 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome01,
             AllCallShards = FilterMethylationShard.AllCallsAutosome01,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "1",
             OutputPrefix = OutputPrefix + ".autosome01",
@@ -382,9 +416,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome02 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome02,
             AllCallShards = FilterMethylationShard.AllCallsAutosome02,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "2",
             OutputPrefix = OutputPrefix + ".autosome02",
@@ -400,9 +433,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome03 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome03,
             AllCallShards = FilterMethylationShard.AllCallsAutosome03,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "3",
             OutputPrefix = OutputPrefix + ".autosome03",
@@ -418,9 +450,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome04 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome04,
             AllCallShards = FilterMethylationShard.AllCallsAutosome04,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "4",
             OutputPrefix = OutputPrefix + ".autosome04",
@@ -436,9 +467,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome05 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome05,
             AllCallShards = FilterMethylationShard.AllCallsAutosome05,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "5",
             OutputPrefix = OutputPrefix + ".autosome05",
@@ -454,9 +484,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome06 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome06,
             AllCallShards = FilterMethylationShard.AllCallsAutosome06,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "6",
             OutputPrefix = OutputPrefix + ".autosome06",
@@ -472,9 +501,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome07 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome07,
             AllCallShards = FilterMethylationShard.AllCallsAutosome07,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "7",
             OutputPrefix = OutputPrefix + ".autosome07",
@@ -490,9 +518,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome08 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome08,
             AllCallShards = FilterMethylationShard.AllCallsAutosome08,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "8",
             OutputPrefix = OutputPrefix + ".autosome08",
@@ -508,9 +535,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome09 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome09,
             AllCallShards = FilterMethylationShard.AllCallsAutosome09,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "9",
             OutputPrefix = OutputPrefix + ".autosome09",
@@ -526,9 +552,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome10 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome10,
             AllCallShards = FilterMethylationShard.AllCallsAutosome10,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "10",
             OutputPrefix = OutputPrefix + ".autosome10",
@@ -544,9 +569,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome11 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome11,
             AllCallShards = FilterMethylationShard.AllCallsAutosome11,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "11",
             OutputPrefix = OutputPrefix + ".autosome11",
@@ -562,9 +586,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome12 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome12,
             AllCallShards = FilterMethylationShard.AllCallsAutosome12,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "12",
             OutputPrefix = OutputPrefix + ".autosome12",
@@ -580,9 +603,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome13 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome13,
             AllCallShards = FilterMethylationShard.AllCallsAutosome13,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "13",
             OutputPrefix = OutputPrefix + ".autosome13",
@@ -598,9 +620,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome14 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome14,
             AllCallShards = FilterMethylationShard.AllCallsAutosome14,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "14",
             OutputPrefix = OutputPrefix + ".autosome14",
@@ -616,9 +637,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome15 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome15,
             AllCallShards = FilterMethylationShard.AllCallsAutosome15,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "15",
             OutputPrefix = OutputPrefix + ".autosome15",
@@ -634,9 +654,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome16 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome16,
             AllCallShards = FilterMethylationShard.AllCallsAutosome16,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "16",
             OutputPrefix = OutputPrefix + ".autosome16",
@@ -652,9 +671,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome17 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome17,
             AllCallShards = FilterMethylationShard.AllCallsAutosome17,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "17",
             OutputPrefix = OutputPrefix + ".autosome17",
@@ -670,9 +688,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome18 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome18,
             AllCallShards = FilterMethylationShard.AllCallsAutosome18,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "18",
             OutputPrefix = OutputPrefix + ".autosome18",
@@ -688,9 +705,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome19 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome19,
             AllCallShards = FilterMethylationShard.AllCallsAutosome19,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "19",
             OutputPrefix = OutputPrefix + ".autosome19",
@@ -706,9 +722,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome20 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome20,
             AllCallShards = FilterMethylationShard.AllCallsAutosome20,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "20",
             OutputPrefix = OutputPrefix + ".autosome20",
@@ -724,9 +739,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome21 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome21,
             AllCallShards = FilterMethylationShard.AllCallsAutosome21,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "21",
             OutputPrefix = OutputPrefix + ".autosome21",
@@ -742,9 +756,8 @@ workflow MergeMethylation {
 
     call MergeMethylationChromosome as MergeMethylationAutosome22 {
         input:
-            FilteredCallShards = FilterMethylationShard.FilteredCallsAutosome22,
             AllCallShards = FilterMethylationShard.AllCallsAutosome22,
-            SampleQcShards = FilterMethylationShard.SampleQC,
+            CohortSamples = ShardMethylationManifest.CohortSamples,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             Chromosome = AutosomePrefix + "22",
             OutputPrefix = OutputPrefix + ".autosome22",

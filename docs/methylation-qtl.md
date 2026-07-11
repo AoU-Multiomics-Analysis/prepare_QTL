@@ -14,7 +14,7 @@ Use one pb-CpG-tools `.combined.bed.gz` file per sample. The workflow expects th
 | `mod_score` | Methylation value. It is multiplied by `0.01` by default to produce a 0–1 beta value. |
 | `type` | Must have one value per input file. Use the sample's `.combined.bed.gz` output for standard meQTL analysis. |
 | `cov` | Per-site coverage used for QC and site metadata. |
-| `est_mod_count`, `est_unmod_count`, `discretized_mod_score` | Retained in long-format outputs for auditability; not used as the QTL phenotype. |
+| `est_mod_count`, `est_unmod_count`, `discretized_mod_score` | Not loaded; these model-mode extras are not needed for QC or the QTL phenotype. |
 
 All input BEDs must use the same reference genome and contig naming convention as the genotype data. The workflow removes contigs matching `X|Y|M|_` by default; set `FilterChroms` to an empty string to retain them.
 
@@ -28,7 +28,7 @@ SAMPLE_001	gs://my-bucket/SAMPLE_001.combined.bed.gz
 SAMPLE_002	gs://my-bucket/SAMPLE_002.combined.bed.gz
 ```
 
-The columns must be named `sample_id` and `file_path`. The workflow partitions the manifest into `SamplesPerShard` rows per task, and each task uses `gsutil` to localize only the `gs://` BEDs assigned to that shard. Each shard then writes autosome-specific call tables so the cohort merge can run independently for chromosomes 1-22.
+The columns must be named `sample_id` and `file_path`. The workflow partitions the manifest into `SamplesPerShard` rows per task, and each task uses concurrent `gsutil` processes to localize only the `gs://` BEDs assigned to that shard. The Docker image includes compiled `crcmod`, allowing `gsutil` to use sliced downloads for large objects. Each shard writes one QC-flagged call table per autosome. Passing calls are derived from `per_sample_qc_pass` during the chromosome merge instead of uploading and localizing a duplicate filtered copy.
 
 The workflow also requires a GTF, an ENCODE cCRE reference, and a UCSC `cpgIslandExt` reference built on the same genome assembly. The cCRE reference is a headerless six-column file: chromosome, BED start, BED end, V4 ID, V5 ID, and cCRE type. The cCRE intervals are interpreted as BED coordinates. This is deliberately broader than an enhancer annotation: V6 may also identify CTCF-only or DNase-H3K4me3 elements.
 
@@ -40,7 +40,7 @@ flowchart LR
     B --> C["Per-sample QC\nchromosome, coverage, extreme coverage"]
     C --> D["Autosome-split shard outputs"]
     D --> E["Parallel per-autosome cohort reductions\napply MinSampleFraction, MinSamples, and MAD"]
-    E --> F["Aggregate site metadata, QC, and BEDs"]
+    E --> F["Header-aware streaming concatenation of metadata, QC, and BEDs"]
     F --> G["Gene/TSS, GTF subfeature, cCRE, and CpG-island\nannotation of passing sites"]
     G --> H["Phenotype PCs\noptional covariate merge"]
 ```
@@ -52,6 +52,8 @@ max(ceiling(total_samples × MinSampleFraction), MinSamples)
 ```
 
 and never depends on parallel task boundaries. The threshold is evaluated separately within each autosome merge task, but every task uses the same complete-cohort denominator.
+
+This chromosome-specific reduction also avoids the `data.table` limit of 2,147,483,647 rows that can be reached when all sample/site calls across the genome are combined into one long table. Each chromosome task localizes one call file per shard plus one small cohort-sample file; shard sample-QC files are localized only once by the final aggregation task.
 
 ## QC stages and run log
 
@@ -71,6 +73,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `SamplesPerShard` | `25` | Number of samples processed by each parallel filtering task. |
+| `ShardNumThreads` | `4` | Concurrent BED downloads per shard and threads available for shard parsing/decompression. |
 | `MinCoverage` | `10` | Minimum `cov` required for a sample/site call. |
 | `MinSampleFraction` | `0.95` | Fraction of the complete cohort that must pass per-sample QC for a site to be retained. Remaining QTL-BED missing values are imputed with the feature mean. |
 | `MinSamples` | `0` | Optional additional minimum number of samples passing per-sample QC. |
@@ -84,7 +87,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `ValueColumn` | `mod_score` | Column used as methylation phenotype. |
 | `ValueMultiplier` | `0.01` | Converts pb-CpG `mod_score` percentages to 0–1 beta values. |
 | `AdditionalCovariates` | unset | Optional TSV containing `sample_id` plus genotype PCs or other covariates to merge with INT phenotype PCs. |
-| `ShardMemoryGB` / `ShardDiskGB` | `16` / `100` | Resources for each parallel shard. Disk must accommodate the shard's input BEDs and outputs. |
+| `ShardMemoryGB` / `ShardDiskGB` | `16` / `100` | Resources for each parallel shard. Disk must accommodate the shard's input BEDs and chromosome-split outputs. |
 | `MergeMemoryGB` / `MergeDiskGB` | `64` / `200` | Resources for each per-autosome cohort reduction and the final aggregation task. |
 
 ## Outputs

@@ -31,8 +31,8 @@ setDTthreads(opt$NumThreads)
 manifest <- read_manifest(opt$InputManifest)
 n_samples <- nrow(manifest)
 message("Processing ", n_samples, " sample(s) in this shard")
-filtered_calls <- vector("list", n_samples)
-all_site_calls <- vector("list", n_samples)
+autosomes <- paste0(opt$AutosomePrefix, seq_len(22))
+all_site_calls_by_chrom <- lapply(autosomes, function(...) vector("list", n_samples))
 sample_qc_tables <- vector("list", n_samples)
 reference_columns <- NULL
 
@@ -64,7 +64,7 @@ for (i in seq_len(n_samples)) {
         meets_min_coverage = coverage_pass,
         per_sample_qc_pass = coverage_pass & extreme_pass
     )]
-    retained <- methylation_data[per_sample_qc_pass == TRUE]
+    n_retained <- sum(methylation_data$per_sample_qc_pass)
     sample_qc_tables[[i]] <- data.table(
         sample_id = sample_id,
         file_path = file_path,
@@ -77,39 +77,30 @@ for (i in seq_len(n_samples)) {
         n_below_min_coverage = n_below_min_coverage,
         n_extreme_coverage = n_extreme_coverage,
         n_extreme_coverage_after_min_coverage = n_extreme_after_min_coverage,
-        n_passing_per_sample_qc = nrow(retained)
+        n_passing_per_sample_qc = n_retained
     )
-    filtered_calls[[i]] <- retained
-    all_site_calls[[i]] <- methylation_data
+    for (chrom_index in seq_along(autosomes)) {
+        all_site_calls_by_chrom[[chrom_index]][[i]] <- methylation_data[`#chrom` == autosomes[[chrom_index]]]
+    }
     message("  Input sites: ", attr(methylation_data, "n_input_rows"),
             "; removed by chromosome filter: ", attr(methylation_data, "n_input_rows") - nrow(methylation_data),
             "; evaluated for coverage: ", nrow(methylation_data))
     message("  Per-sample thresholds: ", n_below_min_coverage,
             " fail MinCoverage (<", opt$MinCoverage, "); ", n_extreme_after_min_coverage,
-            " fail extreme coverage after MinCoverage; ", nrow(retained), " pass both thresholds")
+            " fail extreme coverage after MinCoverage; ", n_retained, " pass both thresholds")
 }
 
 output_dir <- dirname(opt$OutputPrefix)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
-filtered_output <- paste0(opt$OutputPrefix, ".methylation.per_sample_filtered.long.tsv.gz")
-all_calls_output <- paste0(opt$OutputPrefix, ".methylation.per_sample_qc.long.tsv.gz")
 sample_qc_output <- paste0(opt$OutputPrefix, ".methylation.sample_qc.tsv")
-filtered_call_table <- rbindlist(filtered_calls, use.names = TRUE)
-all_site_call_table <- rbindlist(all_site_calls, use.names = TRUE)
-fwrite(filtered_call_table, filtered_output, sep = "\t", na = "NA")
-fwrite(all_site_call_table, all_calls_output, sep = "\t", na = "NA")
 fwrite(rbindlist(sample_qc_tables, use.names = TRUE), sample_qc_output, sep = "\t", na = "NA")
 
-autosomes <- paste0(opt$AutosomePrefix, seq_len(22))
 for (chrom_index in seq_along(autosomes)) {
-    chrom <- autosomes[[chrom_index]]
     chrom_label <- sprintf("autosome%02d", chrom_index)
-    chrom_filtered_output <- paste0(opt$OutputPrefix, ".methylation.", chrom_label, ".per_sample_filtered.long.tsv.gz")
     chrom_all_calls_output <- paste0(opt$OutputPrefix, ".methylation.", chrom_label, ".per_sample_qc.long.tsv.gz")
-    fwrite(filtered_call_table[`#chrom` == chrom], chrom_filtered_output, sep = "\t", na = "NA")
-    fwrite(all_site_call_table[`#chrom` == chrom], chrom_all_calls_output, sep = "\t", na = "NA")
+    chrom_call_table <- rbindlist(all_site_calls_by_chrom[[chrom_index]], use.names = TRUE)
+    fwrite(chrom_call_table, chrom_all_calls_output, sep = "\t", na = "NA")
 }
-message("Wrote per-sample-QC-passing shard calls: ", filtered_output)
-message("Wrote all per-sample-QC shard calls for site metadata: ", all_calls_output)
 message("Wrote sample QC: ", sample_qc_output)
-message("Wrote autosome-split shard call files for ", length(autosomes), " chromosome(s)")
+message("Wrote autosome-split shard call files for ", length(autosomes),
+        " chromosome(s); passing calls are derived from per_sample_qc_pass during cohort merge")

@@ -12,6 +12,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::r-olinkanalyze \
     conda-forge::r-optparse \
     conda-forge::google-cloud-sdk \
+    conda-forge::crcmod \
     conda-forge::r-janitor \
     bioconda::bioconductor-pcatools \
     conda-forge::r-rnomni \
@@ -23,6 +24,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     bioconda::bioconductor-plyranges \
     conda-forge::r-patchwork \
     bioconda::htslib
+RUN gsutil version -l | grep -q 'compiled crcmod: True'
 COPY scripts/*  . 
 ## Default command to run when the container starts
 CMD ["bash"]
