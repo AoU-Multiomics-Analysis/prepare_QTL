@@ -149,6 +149,14 @@ task FilterMethylationShard {
         File AllCallsAutosome20 = "~{OutputPrefix}.methylation.autosome20.per_sample_qc.long.tsv.gz"
         File AllCallsAutosome21 = "~{OutputPrefix}.methylation.autosome21.per_sample_qc.long.tsv.gz"
         File AllCallsAutosome22 = "~{OutputPrefix}.methylation.autosome22.per_sample_qc.long.tsv.gz"
+        Array[File] AllCallsByAutosome = [
+            AllCallsAutosome01, AllCallsAutosome02, AllCallsAutosome03, AllCallsAutosome04,
+            AllCallsAutosome05, AllCallsAutosome06, AllCallsAutosome07, AllCallsAutosome08,
+            AllCallsAutosome09, AllCallsAutosome10, AllCallsAutosome11, AllCallsAutosome12,
+            AllCallsAutosome13, AllCallsAutosome14, AllCallsAutosome15, AllCallsAutosome16,
+            AllCallsAutosome17, AllCallsAutosome18, AllCallsAutosome19, AllCallsAutosome20,
+            AllCallsAutosome21, AllCallsAutosome22
+        ]
     }
 }
 
@@ -265,9 +273,9 @@ task AggregateMethylationChromosomes {
             } | bgzip -c -@ ~{NumThreads} > "$output_path"
         }
 
-        # Inputs are explicitly ordered autosome01 through autosome22, and each
-        # chromosome task sorts its own rows, so concatenation preserves the same
-        # genomic order without a second whole-cohort sort.
+        # Inputs follow the autosome scatter order, and each chromosome task sorts
+        # its own rows, so concatenation preserves genomic order without a second
+        # whole-cohort sort.
         concat_chromosome_tables filtered_calls_by_chromosome.list \
             "~{OutputPrefix}.methylation.filtered.long.tsv.gz" "Filtered-call"
         concat_chromosome_tables site_qc_by_chromosome.list \
@@ -399,387 +407,50 @@ workflow MergeMethylation {
         }
     }
 
-    call MergeMethylationChromosome as MergeMethylationAutosome01 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome01,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "1",
-            OutputPrefix = OutputPrefix + ".autosome01",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
+    Array[String] AutosomeNames = [
+        AutosomePrefix + "1", AutosomePrefix + "2", AutosomePrefix + "3", AutosomePrefix + "4",
+        AutosomePrefix + "5", AutosomePrefix + "6", AutosomePrefix + "7", AutosomePrefix + "8",
+        AutosomePrefix + "9", AutosomePrefix + "10", AutosomePrefix + "11", AutosomePrefix + "12",
+        AutosomePrefix + "13", AutosomePrefix + "14", AutosomePrefix + "15", AutosomePrefix + "16",
+        AutosomePrefix + "17", AutosomePrefix + "18", AutosomePrefix + "19", AutosomePrefix + "20",
+        AutosomePrefix + "21", AutosomePrefix + "22"
+    ]
+    Array[String] AutosomeOutputSuffixes = [
+        "autosome01", "autosome02", "autosome03", "autosome04",
+        "autosome05", "autosome06", "autosome07", "autosome08",
+        "autosome09", "autosome10", "autosome11", "autosome12",
+        "autosome13", "autosome14", "autosome15", "autosome16",
+        "autosome17", "autosome18", "autosome19", "autosome20",
+        "autosome21", "autosome22"
+    ]
+    Array[Array[File]] AllCallShardsByAutosome = transpose(FilterMethylationShard.AllCallsByAutosome)
 
-    call MergeMethylationChromosome as MergeMethylationAutosome02 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome02,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "2",
-            OutputPrefix = OutputPrefix + ".autosome02",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome03 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome03,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "3",
-            OutputPrefix = OutputPrefix + ".autosome03",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome04 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome04,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "4",
-            OutputPrefix = OutputPrefix + ".autosome04",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome05 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome05,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "5",
-            OutputPrefix = OutputPrefix + ".autosome05",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome06 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome06,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "6",
-            OutputPrefix = OutputPrefix + ".autosome06",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome07 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome07,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "7",
-            OutputPrefix = OutputPrefix + ".autosome07",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome08 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome08,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "8",
-            OutputPrefix = OutputPrefix + ".autosome08",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome09 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome09,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "9",
-            OutputPrefix = OutputPrefix + ".autosome09",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome10 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome10,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "10",
-            OutputPrefix = OutputPrefix + ".autosome10",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome11 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome11,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "11",
-            OutputPrefix = OutputPrefix + ".autosome11",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome12 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome12,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "12",
-            OutputPrefix = OutputPrefix + ".autosome12",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome13 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome13,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "13",
-            OutputPrefix = OutputPrefix + ".autosome13",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome14 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome14,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "14",
-            OutputPrefix = OutputPrefix + ".autosome14",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome15 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome15,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "15",
-            OutputPrefix = OutputPrefix + ".autosome15",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome16 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome16,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "16",
-            OutputPrefix = OutputPrefix + ".autosome16",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome17 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome17,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "17",
-            OutputPrefix = OutputPrefix + ".autosome17",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome18 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome18,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "18",
-            OutputPrefix = OutputPrefix + ".autosome18",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome19 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome19,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "19",
-            OutputPrefix = OutputPrefix + ".autosome19",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome20 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome20,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "20",
-            OutputPrefix = OutputPrefix + ".autosome20",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome21 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome21,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "21",
-            OutputPrefix = OutputPrefix + ".autosome21",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
-    }
-
-    call MergeMethylationChromosome as MergeMethylationAutosome22 {
-        input:
-            AllCallShards = FilterMethylationShard.AllCallsAutosome22,
-            CohortSamples = ShardMethylationManifest.CohortSamples,
-            TotalSamples = ShardMethylationManifest.TotalSamples,
-            Chromosome = AutosomePrefix + "22",
-            OutputPrefix = OutputPrefix + ".autosome22",
-            MinSampleFraction = MinSampleFraction,
-            MinSamples = MinSamples,
-            MinMethylationMAD = MinMethylationMAD,
-            ValueColumn = ValueColumn,
-            ValueMultiplier = ValueMultiplier,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
-            NumThreads = NumThreads
+    scatter (autosome_index in range(length(AutosomeNames))) {
+        call MergeMethylationChromosome as MergeMethylationAutosome {
+            input:
+                AllCallShards = AllCallShardsByAutosome[autosome_index],
+                CohortSamples = ShardMethylationManifest.CohortSamples,
+                TotalSamples = ShardMethylationManifest.TotalSamples,
+                Chromosome = AutosomeNames[autosome_index],
+                OutputPrefix = OutputPrefix + "." + AutosomeOutputSuffixes[autosome_index],
+                MinSampleFraction = MinSampleFraction,
+                MinSamples = MinSamples,
+                MinMethylationMAD = MinMethylationMAD,
+                ValueColumn = ValueColumn,
+                ValueMultiplier = ValueMultiplier,
+                MemoryGB = MergeMemoryGB,
+                DiskGB = MergeDiskGB,
+                NumThreads = NumThreads
+        }
     }
 
     call AggregateMethylationChromosomes {
         input:
-            FilteredCallsByChromosome = [MergeMethylationAutosome01.FilteredCalls, MergeMethylationAutosome02.FilteredCalls, MergeMethylationAutosome03.FilteredCalls, MergeMethylationAutosome04.FilteredCalls, MergeMethylationAutosome05.FilteredCalls, MergeMethylationAutosome06.FilteredCalls, MergeMethylationAutosome07.FilteredCalls, MergeMethylationAutosome08.FilteredCalls, MergeMethylationAutosome09.FilteredCalls, MergeMethylationAutosome10.FilteredCalls, MergeMethylationAutosome11.FilteredCalls, MergeMethylationAutosome12.FilteredCalls, MergeMethylationAutosome13.FilteredCalls, MergeMethylationAutosome14.FilteredCalls, MergeMethylationAutosome15.FilteredCalls, MergeMethylationAutosome16.FilteredCalls, MergeMethylationAutosome17.FilteredCalls, MergeMethylationAutosome18.FilteredCalls, MergeMethylationAutosome19.FilteredCalls, MergeMethylationAutosome20.FilteredCalls, MergeMethylationAutosome21.FilteredCalls, MergeMethylationAutosome22.FilteredCalls],
-            SiteQCByChromosome = [MergeMethylationAutosome01.SiteQC, MergeMethylationAutosome02.SiteQC, MergeMethylationAutosome03.SiteQC, MergeMethylationAutosome04.SiteQC, MergeMethylationAutosome05.SiteQC, MergeMethylationAutosome06.SiteQC, MergeMethylationAutosome07.SiteQC, MergeMethylationAutosome08.SiteQC, MergeMethylationAutosome09.SiteQC, MergeMethylationAutosome10.SiteQC, MergeMethylationAutosome11.SiteQC, MergeMethylationAutosome12.SiteQC, MergeMethylationAutosome13.SiteQC, MergeMethylationAutosome14.SiteQC, MergeMethylationAutosome15.SiteQC, MergeMethylationAutosome16.SiteQC, MergeMethylationAutosome17.SiteQC, MergeMethylationAutosome18.SiteQC, MergeMethylationAutosome19.SiteQC, MergeMethylationAutosome20.SiteQC, MergeMethylationAutosome21.SiteQC, MergeMethylationAutosome22.SiteQC],
-            SiteMetadataByChromosome = [MergeMethylationAutosome01.SiteMetadata, MergeMethylationAutosome02.SiteMetadata, MergeMethylationAutosome03.SiteMetadata, MergeMethylationAutosome04.SiteMetadata, MergeMethylationAutosome05.SiteMetadata, MergeMethylationAutosome06.SiteMetadata, MergeMethylationAutosome07.SiteMetadata, MergeMethylationAutosome08.SiteMetadata, MergeMethylationAutosome09.SiteMetadata, MergeMethylationAutosome10.SiteMetadata, MergeMethylationAutosome11.SiteMetadata, MergeMethylationAutosome12.SiteMetadata, MergeMethylationAutosome13.SiteMetadata, MergeMethylationAutosome14.SiteMetadata, MergeMethylationAutosome15.SiteMetadata, MergeMethylationAutosome16.SiteMetadata, MergeMethylationAutosome17.SiteMetadata, MergeMethylationAutosome18.SiteMetadata, MergeMethylationAutosome19.SiteMetadata, MergeMethylationAutosome20.SiteMetadata, MergeMethylationAutosome21.SiteMetadata, MergeMethylationAutosome22.SiteMetadata],
-            RawMethylationBedByChromosome = [MergeMethylationAutosome01.RawMethylationBed, MergeMethylationAutosome02.RawMethylationBed, MergeMethylationAutosome03.RawMethylationBed, MergeMethylationAutosome04.RawMethylationBed, MergeMethylationAutosome05.RawMethylationBed, MergeMethylationAutosome06.RawMethylationBed, MergeMethylationAutosome07.RawMethylationBed, MergeMethylationAutosome08.RawMethylationBed, MergeMethylationAutosome09.RawMethylationBed, MergeMethylationAutosome10.RawMethylationBed, MergeMethylationAutosome11.RawMethylationBed, MergeMethylationAutosome12.RawMethylationBed, MergeMethylationAutosome13.RawMethylationBed, MergeMethylationAutosome14.RawMethylationBed, MergeMethylationAutosome15.RawMethylationBed, MergeMethylationAutosome16.RawMethylationBed, MergeMethylationAutosome17.RawMethylationBed, MergeMethylationAutosome18.RawMethylationBed, MergeMethylationAutosome19.RawMethylationBed, MergeMethylationAutosome20.RawMethylationBed, MergeMethylationAutosome21.RawMethylationBed, MergeMethylationAutosome22.RawMethylationBed],
-            IntMethylationBedByChromosome = [MergeMethylationAutosome01.IntMethylationBed, MergeMethylationAutosome02.IntMethylationBed, MergeMethylationAutosome03.IntMethylationBed, MergeMethylationAutosome04.IntMethylationBed, MergeMethylationAutosome05.IntMethylationBed, MergeMethylationAutosome06.IntMethylationBed, MergeMethylationAutosome07.IntMethylationBed, MergeMethylationAutosome08.IntMethylationBed, MergeMethylationAutosome09.IntMethylationBed, MergeMethylationAutosome10.IntMethylationBed, MergeMethylationAutosome11.IntMethylationBed, MergeMethylationAutosome12.IntMethylationBed, MergeMethylationAutosome13.IntMethylationBed, MergeMethylationAutosome14.IntMethylationBed, MergeMethylationAutosome15.IntMethylationBed, MergeMethylationAutosome16.IntMethylationBed, MergeMethylationAutosome17.IntMethylationBed, MergeMethylationAutosome18.IntMethylationBed, MergeMethylationAutosome19.IntMethylationBed, MergeMethylationAutosome20.IntMethylationBed, MergeMethylationAutosome21.IntMethylationBed, MergeMethylationAutosome22.IntMethylationBed],
+            FilteredCallsByChromosome = MergeMethylationAutosome.FilteredCalls,
+            SiteQCByChromosome = MergeMethylationAutosome.SiteQC,
+            SiteMetadataByChromosome = MergeMethylationAutosome.SiteMetadata,
+            RawMethylationBedByChromosome = MergeMethylationAutosome.RawMethylationBed,
+            IntMethylationBedByChromosome = MergeMethylationAutosome.IntMethylationBed,
             SampleQcShards = FilterMethylationShard.SampleQC,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             OutputPrefix = OutputPrefix,
