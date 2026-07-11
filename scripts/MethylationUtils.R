@@ -2,8 +2,20 @@
 
 suppressPackageStartupMessages(library(data.table))
 
-load_methylation_data <- function(file_path, filter_chroms = "X|Y|M|_", fence_k = 3) {
-    loaded_data <- fread(file_path, skip = "#chrom")
+load_methylation_data <- function(file_path, filter_chroms = "X|Y|M|_", fence_k = 3, decomp_threads = 1L) {
+    # pb-CpG-tools BED columns are `#chrom begin end mod_score type cov
+    # est_mod_count est_unmod_count discretized_mod_score`; only the first six are
+    # used downstream, so select them and drop the model-mode extras. The file is
+    # bgzipped (BGZF), so decompress its blocks in parallel with bgzip and let fread
+    # parse the stream. bgzip -d also handles plain gzip (single-threaded), so a
+    # non-BGZF input still reads correctly. The leading `##key=value` metadata lines
+    # mean skip = "#chrom" must remain so fread locates the real column header.
+    keep_cols <- c("#chrom", "begin", "end", "mod_score", "type", "cov")
+    loaded_data <- fread(
+        cmd = sprintf("bgzip -c -d -@ %d %s", decomp_threads, shQuote(file_path)),
+        skip = "#chrom",
+        select = keep_cols
+    )
     n_input_rows <- nrow(loaded_data)
     required_columns <- c("#chrom", "begin", "end", "mod_score", "type", "cov")
     missing_columns <- setdiff(required_columns, names(loaded_data))

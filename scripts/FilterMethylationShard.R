@@ -17,12 +17,16 @@ option_list <- list(
     make_option("--FenceK", type = "double", default = 3,
                 help = "Tukey log10-coverage far-out fence multiplier [default: %default]"),
     make_option("--AutosomePrefix", type = "character", default = "chr",
-                help = "Prefix used for autosome names, e.g. 'chr' for chr1 or '' for 1 [default: %default]")
+                help = "Prefix used for autosome names, e.g. 'chr' for chr1 or '' for 1 [default: %default]"),
+    make_option("--NumThreads", type = "integer", default = 1,
+                help = "Threads for bgzip decompression and data.table parsing [default: %default]")
 )
 opt <- parse_args(OptionParser(option_list = option_list))
 if (is.null(opt$InputManifest) || is.null(opt$OutputPrefix)) stop("--InputManifest and --OutputPrefix are required")
 if (!is.finite(opt$MinCoverage) || opt$MinCoverage < 0) stop("--MinCoverage must be a non-negative number")
 if (!is.finite(opt$FenceK) || opt$FenceK < 0) stop("--FenceK must be a non-negative number")
+if (is.na(opt$NumThreads) || opt$NumThreads < 1) stop("--NumThreads must be at least 1")
+setDTthreads(opt$NumThreads)
 
 manifest <- read_manifest(opt$InputManifest)
 n_samples <- nrow(manifest)
@@ -36,7 +40,7 @@ for (i in seq_len(n_samples)) {
     sample_id <- manifest$sample_id[i]
     file_path <- manifest$file_path[i]
     message("[", i, "/", n_samples, "] Loading ", sample_id, ": ", file_path)
-    methylation_data <- load_methylation_data(file_path, opt$FilterChroms, opt$FenceK)
+    methylation_data <- load_methylation_data(file_path, opt$FilterChroms, opt$FenceK, decomp_threads = opt$NumThreads)
     input_columns <- names(methylation_data)
     if (is.null(reference_columns)) {
         reference_columns <- copy(input_columns)

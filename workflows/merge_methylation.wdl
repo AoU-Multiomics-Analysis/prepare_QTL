@@ -98,7 +98,8 @@ task FilterMethylationShard {
             --MinCoverage ~{MinCoverage} \
             --FilterChroms "~{FilterChroms}" \
             --FenceK ~{FenceK} \
-            --AutosomePrefix "~{AutosomePrefix}"
+            --AutosomePrefix "~{AutosomePrefix}" \
+            --NumThreads ~{NumThreads}
     >>>
 
     runtime {
@@ -329,6 +330,7 @@ workflow MergeMethylation {
 
         Int ShardMemoryGB = 16
         Int ShardDiskGB = 100
+        Int ShardNumThreads = 4
         Int MergeMemoryGB = 64
         Int MergeDiskGB = 200
         Int AnnotationMemoryGB = 16
@@ -356,7 +358,7 @@ workflow MergeMethylation {
                 AutosomePrefix = AutosomePrefix,
                 MemoryGB = ShardMemoryGB,
                 DiskGB = ShardDiskGB,
-                NumThreads = NumThreads
+                NumThreads = ShardNumThreads
         }
     }
 
