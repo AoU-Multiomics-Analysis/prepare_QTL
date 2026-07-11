@@ -87,8 +87,9 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `ValueColumn` | `mod_score` | Column used as methylation phenotype. |
 | `ValueMultiplier` | `0.01` | Converts pb-CpG `mod_score` percentages to 0–1 beta values. |
 | `AdditionalCovariates` | unset | Optional TSV containing `sample_id` plus genotype PCs or other covariates to merge with INT phenotype PCs. |
-| `ShardMemoryGB` / `ShardDiskGB` | `16` / `100` | Resources for each parallel shard. Disk must accommodate the shard's input BEDs and chromosome-split outputs. |
-| `MergeMemoryGB` / `MergeDiskGB` | `64` / `200` | Resources for each per-autosome cohort reduction and the final aggregation task. |
+| `ShardMemoryGB` / `ShardDiskGB` | `64` / `250` | Resources for each parallel shard. Disk must accommodate the 25 input BEDs and chromosome-split outputs; `SamplesPerShard` remains 25 by default. |
+| `MergeMemoryGB` / `MergeDiskGB` | `128` / `500` | Resources for each per-autosome cohort reduction and downstream phenotype-PC calculation. |
+| `AggregateMemoryGB` / `AggregateDiskGB` | `64` / `1000` | Resources for final streaming aggregation. The larger disk accommodates simultaneous localization of all chromosome-level output families. |
 
 ## Outputs
 

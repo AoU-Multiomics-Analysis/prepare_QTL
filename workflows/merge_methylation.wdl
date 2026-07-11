@@ -363,11 +363,13 @@ workflow MergeMethylation {
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
 
-        Int ShardMemoryGB = 16
-        Int ShardDiskGB = 100
+        Int ShardMemoryGB = 64
+        Int ShardDiskGB = 250
         Int ShardNumThreads = 4
-        Int MergeMemoryGB = 64
-        Int MergeDiskGB = 200
+        Int MergeMemoryGB = 128
+        Int MergeDiskGB = 500
+        Int AggregateMemoryGB = 64
+        Int AggregateDiskGB = 1000
         Int AnnotationMemoryGB = 16
         Int AnnotationDiskGB = 100
         Int NumThreads = 1
@@ -781,8 +783,8 @@ workflow MergeMethylation {
             SampleQcShards = FilterMethylationShard.SampleQC,
             TotalSamples = ShardMethylationManifest.TotalSamples,
             OutputPrefix = OutputPrefix,
-            MemoryGB = MergeMemoryGB,
-            DiskGB = MergeDiskGB,
+            MemoryGB = AggregateMemoryGB,
+            DiskGB = AggregateDiskGB,
             NumThreads = NumThreads
     }
 
