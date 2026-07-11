@@ -14,6 +14,7 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::google-cloud-sdk \
     conda-forge::crcmod \
     conda-forge::r-janitor \
+    conda-forge::r-ggupset \
     bioconda::bioconductor-pcatools \
     conda-forge::r-rnomni \
     bioconda::r-wgcna \

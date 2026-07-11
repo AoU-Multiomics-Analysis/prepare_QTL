@@ -176,6 +176,10 @@ write_filter_plots <- function(site_metadata, output_prefix) {
         ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 25, hjust = 1))
     ggplot2::ggsave(count_plot_output, count_plot, width = 10, height = 6, dpi = 200, bg = "white")
 
+    if (!requireNamespace("ggupset", quietly = TRUE)) {
+        stop("Package 'ggupset' is required to write the methylation filter UpSet plot.")
+    }
+
     upset_labels <- c("At least one missing/low-coverage call", "At least one extreme-coverage call", "Fails cohort sample-presence filter", "Fails methylation MAD filter")
     pattern_code <- as.integer(site_metadata$has_missing_or_low_coverage) +
         2L * as.integer(site_metadata$has_extreme_coverage_loss) +
@@ -183,27 +187,19 @@ write_filter_plots <- function(site_metadata, output_prefix) {
         8L * as.integer(!site_metadata$pass_methylation_mad_filter)
     intersection_counts <- data.table(pattern_code = pattern_code)[, .N, by = pattern_code]
     setorder(intersection_counts, -N, pattern_code)
+    intersection_counts[, filter_failures := lapply(
+        pattern_code,
+        function(code) upset_labels[bitwAnd(code, as.integer(2^(seq_along(upset_labels) - 1))) > 0]
+    )]
 
-    grDevices::png(upset_plot_output, width = 2400, height = 1600, res = 200)
-    graphics::layout(matrix(c(1, 2), ncol = 1), heights = c(2, 1.25))
-    graphics::par(mar = c(2.5, 4.5, 3, 1))
-    bar_positions <- graphics::barplot(intersection_counts$N, names.arg = rep("", nrow(intersection_counts)), col = "#2C7FB8", border = NA, ylab = "Number of sites", main = "Overlap of cohort-level filter failures")
-    graphics::text(bar_positions, intersection_counts$N, labels = intersection_counts$N, pos = 3, cex = 0.8)
-    graphics::par(mar = c(4.5, 19, 0.5, 1))
-    n_intersections <- nrow(intersection_counts)
-    graphics::plot(NA, xlim = c(0.5, n_intersections + 0.5), ylim = c(0.5, length(upset_labels) + 0.5), xaxt = "n", yaxt = "n", xlab = "Filter-failure intersections", ylab = "")
-    graphics::axis(2, at = rev(seq_along(upset_labels)), labels = upset_labels, las = 1, tick = FALSE, cex.axis = 0.75)
-    for (i in seq_len(n_intersections)) {
-        y_positions <- rev(seq_along(upset_labels))
-        graphics::points(rep(i, length(y_positions)), y_positions, pch = 16, col = "grey85", cex = 1.4)
-        included_indices <- which(bitwAnd(intersection_counts$pattern_code[i], as.integer(2^(seq_along(upset_labels) - 1))) > 0)
-        if (length(included_indices) > 1) {
-            included_y <- y_positions[included_indices]
-            graphics::segments(i, min(included_y), i, max(included_y), col = "#2C7FB8", lwd = 2)
-        }
-        if (length(included_indices) > 0) graphics::points(rep(i, length(included_indices)), y_positions[included_indices], pch = 16, col = "#2C7FB8", cex = 1.4)
-    }
-    grDevices::dev.off()
+    upset_plot <- ggplot2::ggplot(intersection_counts, ggplot2::aes(x = filter_failures, y = N)) +
+        ggplot2::geom_col(fill = "#2C7FB8", width = 0.75) +
+        ggplot2::geom_text(ggplot2::aes(label = N), vjust = -0.35, size = 3) +
+        ggupset::scale_x_upset(sets = upset_labels, intersections = intersection_counts$filter_failures) +
+        ggplot2::scale_y_continuous(expand = ggplot2::expansion(mult = c(0, 0.12))) +
+        ggplot2::labs(title = "Overlap of cohort-level filter failures", x = NULL, y = "Number of sites") +
+        ggplot2::theme_minimal(base_size = 12)
+    ggplot2::ggsave(upset_plot_output, upset_plot, width = 12, height = 8, dpi = 200, bg = "white")
     message("Wrote filter summary: ", summary_output)
     message("Wrote filter-count plot: ", count_plot_output)
     message("Wrote filter UpSet plot: ", upset_plot_output)
