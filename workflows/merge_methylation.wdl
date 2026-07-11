@@ -370,7 +370,7 @@ workflow MergeMethylation {
         Int MergeDiskGB = 500
         Int AggregateMemoryGB = 64
         Int AggregateDiskGB = 1000
-        Int AnnotationMemoryGB = 32
+        Int AnnotationMemoryGB = 64
         Int AnnotationDiskGB = 100
         Int NumThreads = 1
     }
