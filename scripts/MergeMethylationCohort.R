@@ -8,6 +8,7 @@ source(file.path(dirname(normalizePath(script_file)), "MethylationUtils.R"))
 
 option_list <- list(
     make_option("--AllCallList", type = "character", help = "One per-shard all-call file path per line [required]"),
+    make_option("--SampleQcList", type = "character", help = "One per-shard sample-QC file path per line [required]"),
     make_option("--CohortSamples", type = "character", help = "TSV containing one sample_id column for the complete cohort [required]"),
     make_option("--TotalSamples", type = "integer", help = "Total input sample count [required]"),
     make_option("--OutputPrefix", type = "character", help = "Prefix for output files [required]"),
@@ -27,9 +28,9 @@ option_list <- list(
                 help = "Do not write filter summary/count/UpSet outputs")
 )
 opt <- parse_args(OptionParser(option_list = option_list))
-required_options <- c("AllCallList", "CohortSamples", "OutputPrefix")
+required_options <- c("AllCallList", "SampleQcList", "CohortSamples", "OutputPrefix")
 if (any(vapply(required_options, function(name) is.null(opt[[name]]), logical(1)))) {
-    stop("--AllCallList, --CohortSamples, and --OutputPrefix are required")
+    stop("--AllCallList, --SampleQcList, --CohortSamples, and --OutputPrefix are required")
 }
 if (is.null(opt$TotalSamples) || opt$TotalSamples <= 0) stop("--TotalSamples must be positive")
 if (!is.finite(opt$MinSampleFraction) || opt$MinSampleFraction <= 0 || opt$MinSampleFraction > 1) stop("--MinSampleFraction must be in (0, 1]")
@@ -68,6 +69,23 @@ if (length(unknown_samples) > 0) {
          paste(unknown_samples, collapse = ", "))
 }
 cohort_sample_ids <- cohort_samples$sample_id
+sample_qc <- read_sample_qc(read_file_list(opt$SampleQcList, "Sample-QC"), n_samples)
+if (!setequal(sample_qc$sample_id, cohort_sample_ids)) {
+    stop("Sample-QC files do not contain exactly the cohort sample IDs")
+}
+sample_coverage_baseline <- sample_qc[, .(
+    sample_id,
+    sample_median_log_coverage = log1p(as.numeric(median_cov))
+)]
+if (any(!is.finite(sample_coverage_baseline$sample_median_log_coverage))) {
+    stop("Sample-QC files contain a missing or non-positive median_cov value")
+}
+all_site_calls[sample_coverage_baseline, on = "sample_id",
+               sample_median_log_coverage := i.sample_median_log_coverage]
+if (anyNA(all_site_calls$sample_median_log_coverage)) {
+    stop("All-call files contain sample(s) absent from the Sample-QC files")
+}
+all_site_calls[, sample_normalized_log_coverage := log1p(cov) - sample_median_log_coverage]
 chromosome_label <- if (nzchar(opt$Chromosome)) paste0(" for ", opt$Chromosome) else ""
 message("Reading per-sample-QC-passing calls and all-site metadata from ",
         length(all_call_paths), " shard(s)", chromosome_label, " for ", n_samples, " total samples")
@@ -112,7 +130,14 @@ site_metadata <- all_site_calls[, {
         mean_methylation_passing_per_sample_qc = safe_mean(methylation_value_for_metrics[per_sample_pass]),
         sd_methylation_passing_per_sample_qc = safe_sd(methylation_value_for_metrics[per_sample_pass]),
         cv_methylation_passing_per_sample_qc = safe_cv(methylation_value_for_metrics[per_sample_pass]),
-        methylation_mad_passing_per_sample_qc = safe_mad(methylation_value_for_metrics[per_sample_pass])
+        methylation_mad_passing_per_sample_qc = safe_mad(methylation_value_for_metrics[per_sample_pass]),
+        n_samples_coverage_methylation_correlation = sum(
+            per_sample_pass & is.finite(methylation_value_for_metrics) & is.finite(sample_normalized_log_coverage)
+        ),
+        coverage_methylation_spearman_rho = safe_spearman(
+            methylation_value_for_metrics[per_sample_pass],
+            sample_normalized_log_coverage[per_sample_pass]
+        )
     )
 }, by = .(`#chrom`, begin, end, site_key)]
 site_metadata[, `:=`(

@@ -163,6 +163,7 @@ task FilterMethylationShard {
 task MergeMethylationChromosome {
     input {
         Array[File] AllCallShards
+        Array[File] SampleQCShards
         File CohortSamples
         Int TotalSamples
         String Chromosome
@@ -180,9 +181,11 @@ task MergeMethylationChromosome {
     command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
+        printf '%s\n' ~{sep=' ' SampleQCShards} > sample_qc_shards.list
 
         Rscript /tmp/MergeMethylationCohort.R \
             --AllCallList all_call_shards.list \
+            --SampleQcList sample_qc_shards.list \
             --CohortSamples "~{CohortSamples}" \
             --TotalSamples ~{TotalSamples} \
             --Chromosome "~{Chromosome}" \
@@ -429,6 +432,7 @@ workflow MergeMethylation {
         call MergeMethylationChromosome as MergeMethylationAutosome {
             input:
                 AllCallShards = AllCallShardsByAutosome[autosome_index],
+                SampleQCShards = FilterMethylationShard.SampleQC,
                 CohortSamples = ShardMethylationManifest.CohortSamples,
                 TotalSamples = ShardMethylationManifest.TotalSamples,
                 Chromosome = AutosomeNames[autosome_index],

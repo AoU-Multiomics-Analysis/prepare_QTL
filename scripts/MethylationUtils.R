@@ -144,6 +144,14 @@ safe_median <- function(x) { x <- x[is.finite(x)]; if (length(x) == 0) NA_real_ 
 safe_min <- function(x) { x <- x[is.finite(x)]; if (length(x) == 0) NA_real_ else min(x) }
 safe_max <- function(x) { x <- x[is.finite(x)]; if (length(x) == 0) NA_real_ else max(x) }
 safe_mad <- function(x) { x <- x[is.finite(x)]; if (length(x) == 0) NA_real_ else median(abs(x - median(x))) }
+safe_spearman <- function(x, y) {
+    valid <- is.finite(x) & is.finite(y)
+    if (sum(valid) < 3) return(NA_real_)
+    x <- x[valid]
+    y <- y[valid]
+    if (uniqueN(x) < 2 || uniqueN(y) < 2) return(NA_real_)
+    suppressWarnings(cor(x, y, method = "spearman"))
+}
 
 inverse_normal_transform <- function(x) {
     transformed <- rep(NA_real_, length(x))

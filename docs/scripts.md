@@ -131,7 +131,7 @@ Prepares LeafCutter splice junction data for sQTL analysis.
 The pb-CpG-tools 5mC workflow is split into shard filtering, per-autosome cohort merging, and final aggregation stages. These scripts source `scripts/MethylationUtils.R` for BED parsing, validation, QC metrics, transformations, and plotting helpers.
 
 - `scripts/FilterMethylationShard.R` applies chromosome, minimum-coverage, and extreme-coverage QC to one manifest shard. It writes one QC-flagged call table per autosome plus one-row-per-sample QC summaries; it does not create a redundant filtered-call copy.
-- `scripts/MergeMethylationCohort.R` reduces one chromosome's shard outputs, derives passing calls from `per_sample_qc_pass`, applies cohort sample-presence and MAD filters, mean-imputes retained features, and writes chromosome-level raw and INT QTL phenotype BEDs.
+- `scripts/MergeMethylationCohort.R` reduces one chromosome's shard outputs, derives passing calls from `per_sample_qc_pass`, applies cohort sample-presence and MAD filters, records a sample-normalized methylation–coverage correlation diagnostic, mean-imputes retained features, and writes chromosome-level raw and INT QTL phenotype BEDs.
 - `scripts/AggregateMethylationChromosomes.R` writes the final sample-QC table and creates global filter summaries and plots after the WDL has concatenated chromosome-level tables as header-aware compressed streams.
 - `scripts/AnnotateMethylationSites.R` annotates retained sites with the nearest strand-aware TSS, promoter/gene-body/intergenic and exon/intron/CDS/UTR context, overlapping ENCODE cCREs, and UCSC CpG-island, shore, shelf, or open-sea context.
 

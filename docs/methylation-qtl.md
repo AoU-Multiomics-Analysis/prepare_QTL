@@ -2,7 +2,7 @@
 
 [Back to main README](../README.md)
 
-This guide describes how to prepare pb-CpG-tools site-level 5mC calls for molecular QTL mapping. The workflow applies coverage QC per sample, filters sites against the whole cohort, applies a cohort methylation-MAD filter, annotates retained sites with gene/TSS, GTF subfeature, cCRE, and CpG-island context, mean-imputes the limited remaining missing values per feature, produces raw beta-value and inverse-normal transformed phenotype BEDs, calculates phenotype PCs, and can merge those PCs with additional QTL covariates.
+This guide describes how to prepare pb-CpG-tools site-level 5mC calls for molecular QTL mapping. The workflow applies coverage QC per sample, filters sites against the whole cohort, applies a cohort methylation-MAD filter, reports a diagnostic methylation–coverage correlation, annotates retained sites with gene/TSS, GTF subfeature, cCRE, and CpG-island context, mean-imputes the limited remaining missing values per feature, produces raw beta-value and inverse-normal transformed phenotype BEDs, calculates phenotype PCs, and can merge those PCs with additional QTL covariates.
 
 ## What to provide
 
@@ -97,7 +97,7 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | --- | --- |
 | `<prefix>.methylation.filtered.long.tsv.gz` | Calls from sites passing the final cohort threshold. |
 | `<prefix>.methylation.site_qc.tsv.gz` | Compact all-site table with sample-presence counts and `keep_site`. |
-| `<prefix>.methylation.site_metadata.tsv.gz` | All observed sites, including coverage and methylation means, standard deviations, CVs, methylation MAD, coverage fractions, sample counts, filter flags, `n_samples_imputed_in_qtl_bed`, and `keep_site`. |
+| `<prefix>.methylation.site_metadata.tsv.gz` | All observed sites, including coverage and methylation means, standard deviations, CVs, methylation MAD, coverage fractions, sample counts, `coverage_methylation_spearman_rho`, filter flags, `n_samples_imputed_in_qtl_bed`, and `keep_site`. |
 | `<prefix>.methylation.sample_qc.tsv` | One row per sample with coverage filter counts, extreme-coverage cutoffs, and pass counts. |
 | `<prefix>.methylation.filter_summary.tsv` | Counts of sites at each mutually exclusive cohort-QC stage. |
 | `<prefix>.methylation.filter_counts.png` | Bar chart of the sequential cohort-QC counts. |
@@ -114,6 +114,8 @@ The site metadata has two metric families:
 - `*_passing_per_sample_qc`: only calls passing both the minimum- and extreme-coverage filters.
 
 `fraction_samples_min_coverage` uses the complete input cohort as its denominator. `fraction_samples_passing_per_sample_qc` additionally excludes extreme-coverage calls. `pass_sample_presence_filter` and `pass_methylation_mad_filter` show the two cohort filters separately; `keep_site` is their final combined decision.
+
+`coverage_methylation_spearman_rho` is a diagnostic only: it is the per-site Spearman correlation between methylation and `log1p(cov) - log1p(sample_median_cov)`, using calls that passed the per-sample coverage QC. `n_samples_coverage_methylation_correlation` gives the number of calls contributing to that statistic. Neither field changes site retention or QTL output.
 
 The filter-count chart and TSV use mutually exclusive stages so the counts add up to every observed site: insufficient minimum-coverage samples, loss of sufficient samples after extreme-coverage exclusions, low MAD after sample-presence QC, or passing all cohort filters. The ggupset UpSet plot is complementary: it retains overlapping conditions, including a site that still passes overall QC despite one or more missing or extreme-coverage calls.
 
