@@ -102,7 +102,7 @@ task FilterMethylationShard {
             fi
         ' _ < transfer_args.bin
 
-        Rscript /opt/prepare_qtl/scripts/methylation/FilterMethylationShard.R \
+        Rscript /tmp/FilterMethylationShard.R \
             --InputManifest localized_manifest.tsv \
             --OutputPrefix "~{OutputPrefix}" \
             --MinCoverage ~{MinCoverage} \

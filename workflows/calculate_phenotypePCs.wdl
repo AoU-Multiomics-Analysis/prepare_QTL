@@ -11,7 +11,7 @@ task ComputePCs{
     }
     command <<<
 
-    Rscript /opt/prepare_qtl/scripts/common/calculate_PCs.R \
+    Rscript /tmp/calculate_PCs.R \
         --bed_file ~{BedFile} \
         --output_prefix ~{OutputPrefix} \
         --output_suffix ~{OutputSuffix}

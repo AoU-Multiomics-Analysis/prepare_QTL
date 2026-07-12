@@ -14,7 +14,7 @@ task PrepareSpliceData {
         Int num_threads
     }
     command {
-        Rscript /opt/prepare_qtl/scripts/splicing/PrepareSpliceData.R \
+        Rscript /tmp/PrepareSpliceData.R \
             --SpliceData ${SpliceData} \
             --SampleList ${SampleList} \
             --OutputPrefix ${OutputPrefix}
