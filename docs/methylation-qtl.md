@@ -8,6 +8,16 @@ This guide describes how to prepare pb-CpG-tools site-level 5mC calls for molecu
 
 Use one pb-CpG-tools `.combined.bed.gz` file per sample. The workflow expects the `model` pileup output and uses `mod_score` as the methylation phenotype.
 
+## Workflow entry points
+
+Choose the entry point that matches how inputs are organized:
+
+- [`workflows/ProcessMethylationSample.wdl`](../workflows/ProcessMethylationSample.wdl) is the Terra-table sample workflow. Run it once per sample entity with `SampleID` and `MethylationBed` bound directly to table columns. It has no manifest input and writes one sample-QC file plus one QC-flagged call table for each autosome.
+- [`workflows/AggregateMethylationCohort.wdl`](../workflows/AggregateMethylationCohort.wdl) is the cohort workflow. Supply arrays of the corresponding per-sample outputs: `SampleQC` to `SampleQCFiles`, and `AllCallsAutosome01` through `AllCallsAutosome22` to inputs with the same names. It reconstructs the cohort sample list from the QC files, then runs the chromosome merges, final aggregation, annotation, and PC calculation. It has no manifest input.
+- [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl) remains the manifest/shard entry point. It uses concurrent `gsutil` localization for manifest paths, then delegates its cohort stage to `AggregateMethylationCohort.wdl`; this preserves the efficient shard strategy for large cohorts.
+
+For a Terra sample-set or cohort entity, bind each aggregation array to the matching sample-output column. The sample-QC files are consolidated once before the chromosome scatter, so the chromosome tasks do not each localize thousands of tiny QC files.
+
 | pb-CpG-tools column | Workflow use |
 | --- | --- |
 | `#chrom`, `begin`, `end` | Site coordinates; retained as BED coordinates. |
@@ -152,9 +162,10 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 ## Related files
 
 - [`scripts/FilterMethylationShard.R`](../scripts/FilterMethylationShard.R): per-sample chromosome and coverage QC.
+- [`scripts/BuildMethylationCohortSamples.R`](../scripts/BuildMethylationCohortSamples.R): builds the cohort sample order and one consolidated sample-QC table from sample or shard QC outputs.
 - [`scripts/MergeMethylationCohort.R`](../scripts/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
 - [`scripts/MethylationUtils.R`](../scripts/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
 - [`scripts/AnnotateMethylationSites.R`](../scripts/AnnotateMethylationSites.R): passing-site gene/TSS, GTF-subfeature, cCRE, and CpG-island annotation task.
-- [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl): WDL wrapper for parallel execution.
+- [`workflows/ProcessMethylationSample.wdl`](../workflows/ProcessMethylationSample.wdl), [`workflows/AggregateMethylationCohort.wdl`](../workflows/AggregateMethylationCohort.wdl), and [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl): sample-table, cohort, and manifest/shard WDL entry points.
 - [R script reference](scripts.md): reference for all project scripts.
 - [Molecular QTL workflow reference](molecular-qtl-workflows.md): reference for all molecular workflow wrappers.

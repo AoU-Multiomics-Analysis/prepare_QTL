@@ -16,6 +16,12 @@ workflows:
   - subclass: WDL
     primaryDescriptorPath: /workflows/merge_methylation.wdl
     name: merge_methylation
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/ProcessMethylationSample.wdl
+    name: process_methylation_sample
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/AggregateMethylationCohort.wdl
+    name: aggregate_methylation_cohort
   - subclass: WDL 
     primaryDescriptorPath: /workflows/calculate_phenotypePCs.wdl
     name: calculate_phenotypePCs

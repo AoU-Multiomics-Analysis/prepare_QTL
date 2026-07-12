@@ -54,12 +54,15 @@ Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 
 **Outputs:** Median-normalized Olink TSV and filtered long-format proteomics TSV. The filtered output can be passed directly to [`workflows/prepare_pQTL.wdl`](../workflows/prepare_pQTL.wdl) as `ProteomicData`.
 
-## `workflows/merge_methylation.wdl`
+## Methylation workflows
 
+`workflows/ProcessMethylationSample.wdl` runs per sample from direct Terra table fields (`SampleID` and `MethylationBed`), with no external manifest. It writes sample QC plus 22 autosome-specific QC-flagged call tables.
 
-Parallel wrapper for pb-CpG-tools 5mC QTL preparation. It applies per-sample QC in sample shards, writes autosome-split shard outputs, evaluates sample-presence and methylation-MAD filters in parallel per autosome using the complete cohort denominator, and then aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
+`workflows/AggregateMethylationCohort.wdl` consumes arrays of those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
 
-See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for the sample manifest input, configuration, parallel filtering behavior, QC logic, and outputs.
+`workflows/merge_methylation.wdl` is the manifest/shard wrapper for batch processing. It retains concurrent `gsutil` localization and delegates its cohort stage to `AggregateMethylationCohort.wdl`, so the two execution routes share identical cohort logic.
+
+See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for table bindings, manifest input, configuration, parallel filtering behavior, QC logic, and outputs.
 
 ## `workflows/prepare_sQTL.wdl`
 
