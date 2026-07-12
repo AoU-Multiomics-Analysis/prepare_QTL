@@ -34,7 +34,7 @@ task FilterMethylationSample {
         # task-local implementation detail only; users do not provide one.
         printf 'sample_id\tfile_path\n%s\t%s\n' "~{SampleID}" "~{MethylationBed}" > input_manifest.tsv
 
-        Rscript /tmp/FilterMethylationShard.R \
+        Rscript /opt/prepare_qtl/scripts/methylation/FilterMethylationShard.R \
             --InputManifest input_manifest.tsv \
             --OutputPrefix "~{OutputPrefix}" \
             --MinCoverage ~{MinCoverage} \

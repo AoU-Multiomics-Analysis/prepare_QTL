@@ -6,7 +6,7 @@ All scripts are written in R and are invoked from the command line with `Rscript
 
 ## Shared Dual-Output Behavior
 
-[`PrepareExpression.R`](../scripts/PrepareExpression.R), [`PrepareProteomics.R`](../scripts/PrepareProteomics.R), and [`PrepareSpliceData.R`](../scripts/PrepareSpliceData.R) each write three BED files:
+[`PrepareExpression.R`](../scripts/expression/PrepareExpression.R), [`PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R), and [`PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) each write three BED files:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
 - `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
@@ -26,7 +26,7 @@ If a transformed matrix has fewer than 3 samples, fewer than 2 features, or zero
 
 The scripts still accept `--RankNormalize` for backwards compatibility, but the option is deprecated and no longer selects a single output mode.
 
-## `scripts/PrepareExpression.R`
+## `scripts/expression/PrepareExpression.R`
 
 Prepares RNA-seq gene expression data for eQTL analysis.
 
@@ -53,7 +53,7 @@ Prepares RNA-seq gene expression data for eQTL analysis.
 - `<OutputPrefix>.expression.INT.connectivity_outliers.tsv`
 - `<OutputPrefix>.expression.scaled.connectivity_outliers.tsv`
 
-## `scripts/PrepareProteomics.R`
+## `scripts/proteomics/PrepareProteomics.R`
 
 Prepares Olink proteomics data for pQTL analysis.
 
@@ -80,7 +80,7 @@ Prepares Olink proteomics data for pQTL analysis.
 - `<OutputPrefix>.protein.INT.connectivity_outliers.tsv`
 - `<OutputPrefix>.protein.scaled.connectivity_outliers.tsv`
 
-## `scripts/NormalizeProteomics.R`
+## `scripts/proteomics/NormalizeProteomics.R`
 
 Median-normalizes Olink NPX parquet files and writes filtered long-format protein values for pQTL preparation.
 
@@ -102,7 +102,7 @@ Median-normalizes Olink NPX parquet files and writes filtered long-format protei
 - `<OutputPrefix>_median_normalized.tsv.gz`: Full median-normalized Olink table.
 - `<OutputPrefix>_npx_values.tsv.gz`: Filtered long-format table with `ResearchID`, `UniProt`, and `PCNormalizedNPX`. This file can be used as `--ProteomicData` for `PrepareProteomics.R` or as `ProteomicData` for [`workflows/prepare_pQTL.wdl`](../workflows/prepare_pQTL.wdl).
 
-## `scripts/PrepareSpliceData.R`
+## `scripts/splicing/PrepareSpliceData.R`
 
 Prepares LeafCutter splice junction data for sQTL analysis.
 
@@ -128,17 +128,18 @@ Prepares LeafCutter splice junction data for sQTL analysis.
 
 ## Methylation scripts
 
-The pb-CpG-tools 5mC workflow is split into shard filtering, per-autosome cohort merging, and final aggregation stages. These scripts source `scripts/MethylationUtils.R` for BED parsing, validation, QC metrics, transformations, and plotting helpers.
+The pb-CpG-tools 5mC workflow is split into shard filtering, per-autosome cohort merging, and final aggregation stages. These scripts source `scripts/methylation/MethylationUtils.R` for BED parsing, validation, QC metrics, transformations, and plotting helpers.
 
-- `scripts/FilterMethylationShard.R` applies chromosome, minimum-coverage, and extreme-coverage QC to one manifest shard (or a task-local one-sample manifest in the Terra table workflow). It writes one QC-flagged call table per autosome plus one-row-per-sample QC summaries; it does not create a redundant filtered-call copy.
-- `scripts/BuildMethylationCohortSamples.R` validates sample IDs, constructs the cohort sample order, and combines sample-QC files once before the per-chromosome cohort scatter.
-- `scripts/MergeMethylationCohort.R` reduces one chromosome's shard outputs, derives passing calls from `per_sample_qc_pass`, applies cohort sample-presence and MAD filters, records a sample-normalized methylation–coverage correlation diagnostic, mean-imputes retained features, and writes chromosome-level raw and INT QTL phenotype BEDs.
-- `scripts/AggregateMethylationChromosomes.R` writes the final sample-QC table and creates global filter summaries and plots after the WDL has concatenated chromosome-level tables as header-aware compressed streams.
-- `scripts/AnnotateMethylationSites.R` annotates retained sites with the nearest strand-aware TSS, promoter/gene-body/intergenic and exon/intron/CDS/UTR context, overlapping ENCODE cCREs, and UCSC CpG-island, shore, shelf, or open-sea context.
+- `scripts/methylation/FilterMethylationShard.R` applies chromosome, minimum-coverage, and extreme-coverage QC to one manifest shard (or a task-local one-sample manifest in the Terra table workflow). It writes one QC-flagged call table per autosome plus one-row-per-sample QC summaries; it does not create a redundant filtered-call copy.
+- `scripts/methylation/BuildMethylationCohortSamples.R` validates sample IDs, constructs the cohort sample order, and combines sample-QC files once before the per-chromosome cohort scatter.
+- `scripts/methylation/AnalyzeMethylationCpGCorrelation.R` streams a sorted cohort INT methylation BED and computes Pearson correlations only among CpGs within a configurable genomic window. It optionally residualizes CpGs using TensorQTL-format covariates and writes local-cluster summaries plus cluster-size and distance QC plots; it does not prune or alter any phenotype BED.
+- `scripts/methylation/MergeMethylationCohort.R` reduces one chromosome's shard outputs, derives passing calls from `per_sample_qc_pass`, applies cohort sample-presence and MAD filters, records a sample-normalized methylation–coverage correlation diagnostic, mean-imputes retained features, and writes chromosome-level raw and INT QTL phenotype BEDs.
+- `scripts/methylation/AggregateMethylationChromosomes.R` writes the final sample-QC table and creates global filter summaries and plots after the WDL has concatenated chromosome-level tables as header-aware compressed streams.
+- `scripts/methylation/AnnotateMethylationSites.R` annotates retained sites with the nearest strand-aware TSS, promoter/gene-body/intergenic and exon/intron/CDS/UTR context, overlapping ENCODE cCREs, and UCSC CpG-island, shore, shelf, or open-sea context.
 
 See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for the input schema, all command-line options, QC logic, outputs, and QTL phenotype format.
 
-## `scripts/calculate_PCs.R`
+## `scripts/common/calculate_PCs.R`
 
 Computes phenotype principal components (PCs) from a normalized BED file.
 
@@ -155,7 +156,7 @@ Computes phenotype principal components (PCs) from a normalized BED file.
 
 **Output:** `<output_prefix>_phenotype_PCs<output_suffix>.tsv`
 
-## `scripts/MergeCovariates.R`
+## `scripts/common/MergeCovariates.R`
 
 Merges additional covariates, such as genotype PCs, and molecular phenotype PCs into a single covariate file for QTL analysis.
 
@@ -173,7 +174,7 @@ Merges additional covariates, such as genotype PCs, and molecular phenotype PCs 
 
 **Output:** `<OutputPrefix>_QTL_covariates<OutputSuffix>.tsv`
 
-## `scripts/ResidualizePhenotypes.R`
+## `scripts/common/ResidualizePhenotypes.R`
 
 Residualizes a normalized molecular phenotype BED against merged covariates and then centers/scales each row of residuals.
 

@@ -33,7 +33,7 @@ task MergeCovariatesR {
     }
 
     command <<<
-        Rscript /tmp/MergeCovariates.R \
+        Rscript /opt/prepare_qtl/scripts/common/MergeCovariates.R \
             --GenotypePCs ~{GenotypePCs} \
             --MolecularPCs ~{MolecularPCs} \
             --OutputPrefix ~{OutputPrefix} \

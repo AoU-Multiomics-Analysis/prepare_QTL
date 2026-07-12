@@ -6,7 +6,12 @@ Pipeline for preparing molecular phenotype and genotype data for QTL (Quantitati
 
 ```
 prepare_QTL/
-├── scripts/        # R scripts for data processing and normalization
+├── scripts/
+│   ├── common/     # Shared phenotype-PC, covariate, and residualization utilities
+│   ├── expression/ # eQTL phenotype preparation
+│   ├── methylation/ # PacBio 5mC filtering, aggregation, annotation, and correlation QC
+│   ├── proteomics/ # Olink normalization and pQTL preparation
+│   └── splicing/   # sQTL phenotype preparation
 ├── workflows/      # WDL workflows for running analyses on a cloud platform
 ├── envs/           # Docker environments
 └── docs/           # Detailed documentation

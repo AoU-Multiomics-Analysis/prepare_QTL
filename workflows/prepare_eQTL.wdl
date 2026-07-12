@@ -20,7 +20,7 @@ task eqtl_prepare_expression {
 
         }
     command {
-        Rscript /tmp/PrepareExpression.R \
+        Rscript /opt/prepare_qtl/scripts/expression/PrepareExpression.R \
             --CountGCT ${CountGCT} \
             --AnnotationGTF ${AnnotationGTF} \
             --SampleList ${SampleList} \

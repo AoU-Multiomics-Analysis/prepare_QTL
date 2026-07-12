@@ -63,7 +63,22 @@ max(ceiling(total_samples × MinSampleFraction), MinSamples)
 
 and never depends on parallel task boundaries. The threshold is evaluated separately within each autosome merge task, but every task uses the same complete-cohort denominator.
 
-This chromosome-specific reduction also avoids the `data.table` limit of 2,147,483,647 rows that can be reached when all sample/site calls across the genome are combined into one long table. Each chromosome task localizes one call file per shard plus one small cohort-sample file; shard sample-QC files are localized only once by the final aggregation task.
+This chromosome-specific reduction also avoids the `data.table` limit of 2,147,483,647 rows that can be reached when all sample/site calls across the genome are combined into one long table. Each chromosome task localizes one call file per shard plus one consolidated cohort sample-QC table; the original shard sample-QC files are localized only once to build that consolidated table.
+
+## Local CpG-correlation QC
+
+[`scripts/methylation/AnalyzeMethylationCpGCorrelation.R`](../scripts/methylation/AnalyzeMethylationCpGCorrelation.R) characterizes local CpG correlation before phenotype pruning. It streams a sorted cohort INT methylation BED in blocks, optionally residualizes every CpG against the same TensorQTL-format covariates used for QTL mapping, and evaluates only CpG pairs within `WindowBP`.
+
+```bash
+Rscript AnalyzeMethylationCpGCorrelation.R \
+  --InputBed cohort.methylation.INT.bed.gz \
+  --Covariates cohort.methylation_QTL_covariates.INT.tsv \
+  --OutputPrefix cohort \
+  --WindowBP 1000 \
+  --MinAbsCorrelation 0.95
+```
+
+The default is a conservative `|r| >= 0.95` threshold. The script writes a cluster table containing the number of correlated CpGs, mean and maximum direct correlated-pair distances, cluster span, and correlation summaries. It also writes a run summary and four QC plots: cluster size, mean pair distance, maximum pair distance, and cluster span versus size. It does not modify the phenotype BED or prune CpGs.
 
 ## QC stages and run log
 
@@ -161,11 +176,12 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 
 ## Related files
 
-- [`scripts/FilterMethylationShard.R`](../scripts/FilterMethylationShard.R): per-sample chromosome and coverage QC.
-- [`scripts/BuildMethylationCohortSamples.R`](../scripts/BuildMethylationCohortSamples.R): builds the cohort sample order and one consolidated sample-QC table from sample or shard QC outputs.
-- [`scripts/MergeMethylationCohort.R`](../scripts/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
-- [`scripts/MethylationUtils.R`](../scripts/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
-- [`scripts/AnnotateMethylationSites.R`](../scripts/AnnotateMethylationSites.R): passing-site gene/TSS, GTF-subfeature, cCRE, and CpG-island annotation task.
+- [`scripts/methylation/FilterMethylationShard.R`](../scripts/methylation/FilterMethylationShard.R): per-sample chromosome and coverage QC.
+- [`scripts/methylation/BuildMethylationCohortSamples.R`](../scripts/methylation/BuildMethylationCohortSamples.R): builds the cohort sample order and one consolidated sample-QC table from sample or shard QC outputs.
+- [`scripts/methylation/AnalyzeMethylationCpGCorrelation.R`](../scripts/methylation/AnalyzeMethylationCpGCorrelation.R): streams a cohort INT methylation BED to summarize covariate-adjusted local CpG correlation clusters and QC plots.
+- [`scripts/methylation/MergeMethylationCohort.R`](../scripts/methylation/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
+- [`scripts/methylation/MethylationUtils.R`](../scripts/methylation/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
+- [`scripts/methylation/AnnotateMethylationSites.R`](../scripts/methylation/AnnotateMethylationSites.R): passing-site gene/TSS, GTF-subfeature, cCRE, and CpG-island annotation task.
 - [`workflows/ProcessMethylationSample.wdl`](../workflows/ProcessMethylationSample.wdl), [`workflows/AggregateMethylationCohort.wdl`](../workflows/AggregateMethylationCohort.wdl), and [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl): sample-table, cohort, and manifest/shard WDL entry points.
 - [R script reference](scripts.md): reference for all project scripts.
 - [Molecular QTL workflow reference](molecular-qtl-workflows.md): reference for all molecular workflow wrappers.

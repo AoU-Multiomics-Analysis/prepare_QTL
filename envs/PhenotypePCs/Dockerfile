@@ -26,6 +26,6 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::r-patchwork \
     bioconda::htslib
 RUN gsutil version -l | grep -q 'compiled crcmod: True'
-COPY scripts/*  . 
+COPY scripts/ /opt/prepare_qtl/scripts/
 ## Default command to run when the container starts
 CMD ["bash"]

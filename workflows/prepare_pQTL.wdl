@@ -18,7 +18,7 @@ task PrepareProteomicData {
         Int num_threads
     }
     command {
-        Rscript /tmp/PrepareProteomics.R \
+        Rscript /opt/prepare_qtl/scripts/proteomics/PrepareProteomics.R \
             --ProteomicData ${ProteomicData} \
             --AnnotationGTF ${AnnotationGTF} \
             --SampleList ${SampleList} \

@@ -17,7 +17,7 @@ task NormalizeProteomics {
             ln -s "${olink_file}" olink_data/
         done
 
-        Rscript /tmp/NormalizeProteomics.R \
+        Rscript /opt/prepare_qtl/scripts/proteomics/NormalizeProteomics.R \
             --OlinkDataDir olink_data \
             --OutputPrefix ~{OutputPrefix} \
             --OutputDir . \

@@ -25,7 +25,7 @@ The connectivity outlier TSV contains `SampleID` and `Z_score` columns. If a tra
 
 ## Expression
 
-Expression preparation is implemented in [`scripts/PrepareExpression.R`](../scripts/PrepareExpression.R) and wrapped by [`workflows/prepare_eQTL.wdl`](../workflows/prepare_eQTL.wdl).
+Expression preparation is implemented in [`scripts/expression/PrepareExpression.R`](../scripts/expression/PrepareExpression.R) and wrapped by [`workflows/prepare_eQTL.wdl`](../workflows/prepare_eQTL.wdl).
 
 **Input phenotype:** RNA-seq gene count GCT or TSV with `Name`, `Description`, and sample count columns.
 
@@ -47,11 +47,11 @@ Expression preparation is implemented in [`scripts/PrepareExpression.R`](../scri
 
 ## Proteomics
 
-Proteomics has an optional Olink preprocessing workflow in [`scripts/NormalizeProteomics.R`](../scripts/NormalizeProteomics.R), followed by pQTL BED preparation in [`scripts/PrepareProteomics.R`](../scripts/PrepareProteomics.R) and [`workflows/prepare_pQTL.wdl`](../workflows/prepare_pQTL.wdl).
+Proteomics has an optional Olink preprocessing workflow in [`scripts/proteomics/NormalizeProteomics.R`](../scripts/proteomics/NormalizeProteomics.R), followed by pQTL BED preparation in [`scripts/proteomics/PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R) and [`workflows/prepare_pQTL.wdl`](../workflows/prepare_pQTL.wdl).
 
 ### Olink NPX Preprocessing
 
-[`NormalizeProteomics.R`](../scripts/NormalizeProteomics.R) reads Olink NPX parquet files and writes a filtered long-format table that can be passed to `PrepareProteomics.R`.
+[`NormalizeProteomics.R`](../scripts/proteomics/NormalizeProteomics.R) reads Olink NPX parquet files and writes a filtered long-format table that can be passed to `PrepareProteomics.R`.
 
 **Filtering before normalization:**
 
@@ -100,7 +100,7 @@ Proteomics has an optional Olink preprocessing workflow in [`scripts/NormalizePr
 
 ## Splicing
 
-Splicing preparation is implemented in [`scripts/PrepareSpliceData.R`](../scripts/PrepareSpliceData.R) and wrapped by [`workflows/prepare_sQTL.wdl`](../workflows/prepare_sQTL.wdl).
+Splicing preparation is implemented in [`scripts/splicing/PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) and wrapped by [`workflows/prepare_sQTL.wdl`](../workflows/prepare_sQTL.wdl).
 
 **Input phenotype:** LeafCutter-style BED with the first four columns containing interval and phenotype identifiers, followed by sample columns.
 

@@ -12,7 +12,7 @@ task ResidualizePhenotypes {
     }
 
     command <<<
-        Rscript /tmp/ResidualizePhenotypes.R \
+        Rscript /opt/prepare_qtl/scripts/common/ResidualizePhenotypes.R \
             --InputBed ~{InputBed} \
             ~{if defined(Covariates) then "--Covariates " + select_first([Covariates]) else ""} \
             --OutputFile ~{OutputFileName}

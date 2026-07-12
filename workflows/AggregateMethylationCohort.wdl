@@ -15,7 +15,7 @@ task BuildMethylationCohortSamples {
     command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' SampleQCFiles} > sample_qc_files.list
-        Rscript /tmp/BuildMethylationCohortSamples.R \
+        Rscript /opt/prepare_qtl/scripts/methylation/BuildMethylationCohortSamples.R \
             --SampleQcList sample_qc_files.list \
             --OutputPrefix "~{OutputPrefix}"
     >>>
@@ -57,7 +57,7 @@ task MergeMethylationChromosome {
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
         printf '%s\n' "~{CohortSampleQC}" > sample_qc_files.list
 
-        Rscript /tmp/MergeMethylationCohort.R \
+        Rscript /opt/prepare_qtl/scripts/methylation/MergeMethylationCohort.R \
             --AllCallList all_call_shards.list \
             --SampleQcList sample_qc_files.list \
             --CohortSamples "~{CohortSamples}" \
@@ -161,7 +161,7 @@ task AggregateMethylationChromosomes {
         concat_chromosome_tables int_beds_by_chromosome.list \
             "~{OutputPrefix}.methylation.INT.bed.gz" "INT BED"
 
-        Rscript /tmp/AggregateMethylationChromosomes.R \
+        Rscript /opt/prepare_qtl/scripts/methylation/AggregateMethylationChromosomes.R \
             --SiteMetadata "~{OutputPrefix}.methylation.site_metadata.tsv.gz" \
             --SampleQcList sample_qc_files.list \
             --TotalSamples ~{TotalSamples} \
@@ -201,7 +201,7 @@ task AnnotateMethylationSites {
     }
 
     command <<<
-        Rscript /tmp/AnnotateMethylationSites.R \
+        Rscript /opt/prepare_qtl/scripts/methylation/AnnotateMethylationSites.R \
             --SiteMetadata "~{SiteMetadata}" \
             --AnnotationGTF "~{AnnotationGTF}" \
             --CCREAnnotations "~{CCREAnnotations}" \
