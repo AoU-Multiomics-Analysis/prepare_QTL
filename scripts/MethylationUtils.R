@@ -129,6 +129,13 @@ read_call_tables <- function(call_paths, label, additional_required_columns = ch
 read_sample_qc <- function(qc_paths, total_samples) {
     sample_qc <- rbindlist(lapply(qc_paths, fread), use.names = TRUE)
     if (!("sample_id" %in% names(sample_qc))) stop("Filtered sample-QC files must contain a sample_id column")
+    # fread infers numeric-looking IDs as integer, whereas methylation call
+    # tables intentionally normalize IDs to character. Keep the shared key
+    # type stable before duplicate checks and joins.
+    sample_qc[, sample_id := as.character(sample_id)]
+    if (anyNA(sample_qc$sample_id) || any(!nzchar(sample_qc$sample_id))) {
+        stop("Filtered sample-QC files contain an empty sample_id")
+    }
     if (anyDuplicated(sample_qc$sample_id)) stop("A sample appears in more than one filtered sample-QC file")
     if (nrow(sample_qc) != total_samples) {
         stop("Filtered sample-QC files contain ", nrow(sample_qc), " samples, but --TotalSamples is ",
