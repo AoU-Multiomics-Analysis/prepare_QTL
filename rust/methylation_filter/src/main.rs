@@ -240,7 +240,7 @@ fn write_sample(
     filter_chroms: Option<&Regex>,
     min_coverage: f64,
     autosomes: &[String],
-    writers: &mut [csv::Writer<GzEncoder<BufWriter<File>>>],
+    writers: &mut [csv::Writer<BufWriter<GzEncoder<File>>>],
 ) -> Result<(u64, u64, u64, u64)> {
     let (mut reader, columns) = reader_for_bed(file_path)?;
     let mut record = StringRecord::new();
@@ -377,11 +377,14 @@ fn main() -> Result<()> {
             &args.output_prefix,
             &format!(".methylation.autosome{chromosome:02}.per_sample_qc.long.tsv.gz"),
         );
-        let encoder = GzEncoder::new(BufWriter::new(File::create(path)?), Compression::default());
+        let encoder = GzEncoder::new(File::create(path)?, Compression::default());
+        // The CSV writer emits comparatively small buffers. Batch them before
+        // compression so zlib can find repeated patterns across many records.
+        let compressed_output = BufWriter::with_capacity(1024 * 1024, encoder);
         let mut writer = WriterBuilder::new()
             .delimiter(b'\t')
             .has_headers(false)
-            .from_writer(encoder);
+            .from_writer(compressed_output);
         writer.write_record(header)?;
         writers.push(writer);
     }

@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 csv = "1.3"
-flate2 = "1.0"
+# zlib-rs writes standard zlib/gzip streams without a system-library build.
+# It is faster and produces compact per-chromosome call tables.
+flate2 = { version = "1.0", default-features = false, features = ["zlib-rs"] }
 regex = "1.11"
 thiserror = "2.0"
