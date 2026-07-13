@@ -59,8 +59,10 @@ task BuildMethylationCohortSamples {
     command <<<
         set -euo pipefail
         mkdir -p input_sample_qc
-        gsutil -m cp -I input_sample_qc/ < "~{SampleQCManifest}"
-        awk -F/ '{print "input_sample_qc/" $NF}' "~{SampleQCManifest}" > sample_qc_files.list
+        # shellcheck disable=SC2016
+        sed 's/\r$//' "~{SampleQCManifest}" | awk 'NF' | \
+            xargs -r -n 50 -P 8 sh -c 'destination="$1"; shift; gsutil -q cp "$@" "$destination"' _ input_sample_qc/
+        sed 's/\r$//' "~{SampleQCManifest}" | awk -F/ 'NF {print "input_sample_qc/" $NF}' > sample_qc_files.list
         Rscript /tmp/BuildMethylationCohortSamples.R \
             --SampleQcList sample_qc_files.list \
             --OutputPrefix "~{OutputPrefix}"
@@ -101,8 +103,10 @@ task MergeMethylationChromosome {
     command <<<
         set -euo pipefail
         mkdir -p input_calls
-        gsutil -m cp -I input_calls/ < "~{AllCallManifest}"
-        awk -F/ '{print "input_calls/" $NF}' "~{AllCallManifest}" > all_call_shards.list
+        # shellcheck disable=SC2016
+        sed 's/\r$//' "~{AllCallManifest}" | awk 'NF' | \
+            xargs -r -n 50 -P 8 sh -c 'destination="$1"; shift; gsutil -q cp "$@" "$destination"' _ input_calls/
+        sed 's/\r$//' "~{AllCallManifest}" | awk -F/ 'NF {print "input_calls/" $NF}' > all_call_shards.list
         printf '%s\n' "~{CohortSampleQC}" > sample_qc_files.list
 
         Rscript /tmp/MergeMethylationCohort.R \
