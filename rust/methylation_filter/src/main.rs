@@ -6,11 +6,15 @@ use flate2::Compression;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter, Read};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{sync_channel, SyncSender};
+use std::thread::{self, JoinHandle};
 use thiserror::Error;
 
 const REQUIRED_COLUMNS: [&str; 6] = ["#chrom", "begin", "end", "mod_score", "type", "cov"];
+const OUTPUT_BATCH_ROWS: usize = 8192;
+const OUTPUT_QUEUE_CAPACITY: usize = 4;
 
 #[derive(Parser, Debug)]
 #[command(about = "Stream pb-CpG methylation calls through per-sample QC and autosome splitting")]
@@ -256,6 +260,137 @@ fn output_path(prefix: &str, suffix: &str) -> PathBuf {
     PathBuf::from(format!("{prefix}{suffix}"))
 }
 
+struct CompressionWorker {
+    sender: SyncSender<Option<(usize, Vec<u8>)>>,
+    join: JoinHandle<Result<()>>,
+}
+
+struct ParallelWriters {
+    buffers: Vec<csv::Writer<Vec<u8>>>,
+    buffered_rows: Vec<usize>,
+    workers: Vec<CompressionWorker>,
+}
+
+fn new_batch_writer() -> csv::Writer<Vec<u8>> {
+    WriterBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_writer(Vec::with_capacity(1024 * 1024))
+}
+
+impl ParallelWriters {
+    fn new(output_prefix: &str, header: [&str; 12], task_cpus: usize) -> Result<Self> {
+        // Reserve one task CPU for parsing and route each chromosome to one
+        // deterministic compressor, preserving record order within its file.
+        let worker_count = task_cpus.saturating_sub(1).clamp(1, 22);
+        let mut workers = Vec::with_capacity(worker_count);
+        for worker_index in 0..worker_count {
+            let (sender, receiver) =
+                sync_channel::<Option<(usize, Vec<u8>)>>(OUTPUT_QUEUE_CAPACITY);
+            let prefix = output_prefix.to_owned();
+            let join = thread::spawn(move || -> Result<()> {
+                let mut outputs: Vec<Option<BufWriter<GzEncoder<File>>>> =
+                    (0..22).map(|_| None).collect();
+                for chromosome_index in 0..22 {
+                    if chromosome_index % worker_count == worker_index {
+                        let path = output_path(
+                            &prefix,
+                            &format!(
+                                ".methylation.autosome{:02}.per_sample_qc.long.tsv.gz",
+                                chromosome_index + 1
+                            ),
+                        );
+                        let encoder = GzEncoder::new(File::create(path)?, Compression::new(3));
+                        outputs[chromosome_index] =
+                            Some(BufWriter::with_capacity(1024 * 1024, encoder));
+                    }
+                }
+                while let Some((chromosome_index, bytes)) = receiver.recv().map_err(|_| {
+                    FilterError::Message(
+                        "Parallel compression worker stopped unexpectedly".to_owned(),
+                    )
+                })? {
+                    let output = outputs
+                        .get_mut(chromosome_index)
+                        .and_then(|output| output.as_mut())
+                        .ok_or_else(|| {
+                            FilterError::Message("Invalid chromosome compression route".to_owned())
+                        })?;
+                    output.write_all(&bytes)?;
+                }
+                for output in outputs.into_iter().flatten() {
+                    output
+                        .into_inner()
+                        .map_err(|error| error.into_error())?
+                        .finish()?;
+                }
+                Ok(())
+            });
+            workers.push(CompressionWorker { sender, join });
+        }
+
+        let mut buffers = Vec::with_capacity(22);
+        for _ in 0..22 {
+            let mut buffer = new_batch_writer();
+            buffer.write_record(header)?;
+            buffers.push(buffer);
+        }
+        Ok(Self {
+            buffers,
+            buffered_rows: vec![0; 22],
+            workers,
+        })
+    }
+
+    fn flush_batch(&mut self, chromosome_index: usize) -> Result<()> {
+        let buffer = std::mem::replace(&mut self.buffers[chromosome_index], new_batch_writer());
+        let bytes = buffer.into_inner().map_err(|error| {
+            FilterError::Message(format!(
+                "Cannot finalize chromosome output batch: {}",
+                error.error()
+            ))
+        })?;
+        self.buffered_rows[chromosome_index] = 0;
+        if !bytes.is_empty() {
+            self.workers[chromosome_index % self.workers.len()]
+                .sender
+                .send(Some((chromosome_index, bytes)))
+                .map_err(|_| {
+                    FilterError::Message(
+                        "Parallel compression worker stopped unexpectedly".to_owned(),
+                    )
+                })?;
+        }
+        Ok(())
+    }
+
+    fn write_record(&mut self, chromosome_index: usize, record: [&str; 12]) -> Result<()> {
+        self.buffers[chromosome_index].write_record(record)?;
+        self.buffered_rows[chromosome_index] += 1;
+        if self.buffered_rows[chromosome_index] >= OUTPUT_BATCH_ROWS {
+            self.flush_batch(chromosome_index)?;
+        }
+        Ok(())
+    }
+
+    fn finish(mut self) -> Result<()> {
+        for chromosome_index in 0..self.buffers.len() {
+            self.flush_batch(chromosome_index)?;
+        }
+        for worker in &self.workers {
+            worker.sender.send(None).map_err(|_| {
+                FilterError::Message("Parallel compression worker stopped unexpectedly".to_owned())
+            })?;
+        }
+        for worker in self.workers {
+            worker.join.join().map_err(|_| {
+                FilterError::Message("Parallel compression worker panicked".to_owned())
+            })??;
+        }
+        Ok(())
+    }
+}
+
 fn write_sample(
     sample_id: &str,
     file_path: &Path,
@@ -263,7 +398,7 @@ fn write_sample(
     filter_chroms: Option<&Regex>,
     min_coverage: f64,
     autosome_indices: &HashMap<String, usize>,
-    writers: &mut [csv::Writer<BufWriter<GzEncoder<File>>>],
+    writers: &mut ParallelWriters,
 ) -> Result<(u64, u64, u64, u64)> {
     let (mut reader, columns) = reader_for_bed(file_path)?;
     let mut record = StringRecord::new();
@@ -305,20 +440,23 @@ fn write_sample(
             let site_key = format!("{chrom}*{begin}*{end}");
             let meets_min_coverage = if coverage_pass { "TRUE" } else { "FALSE" };
             let per_sample_qc_pass = if per_sample_pass { "TRUE" } else { "FALSE" };
-            writers[chromosome_index].write_record([
-                chrom,
-                begin,
-                end,
-                record.get(columns.mod_score).unwrap_or_default(),
-                record.get(columns.call_type).unwrap_or_default(),
-                &cov_text,
-                &implied_cn,
-                extreme_flag,
-                &site_key,
-                sample_id,
-                meets_min_coverage,
-                per_sample_qc_pass,
-            ])?;
+            writers.write_record(
+                chromosome_index,
+                [
+                    chrom,
+                    begin,
+                    end,
+                    record.get(columns.mod_score).unwrap_or_default(),
+                    record.get(columns.call_type).unwrap_or_default(),
+                    &cov_text,
+                    &implied_cn,
+                    extreme_flag,
+                    &site_key,
+                    sample_id,
+                    meets_min_coverage,
+                    per_sample_qc_pass,
+                ],
+            )?;
         }
     }
     Ok((below_minimum, extreme_total, extreme_after_minimum, passing))
@@ -398,23 +536,7 @@ fn main() -> Result<()> {
         "meets_min_coverage",
         "per_sample_qc_pass",
     ];
-    let mut writers = Vec::new();
-    for chromosome in 1..=22 {
-        let path = output_path(
-            &args.output_prefix,
-            &format!(".methylation.autosome{chromosome:02}.per_sample_qc.long.tsv.gz"),
-        );
-        let encoder = GzEncoder::new(File::create(path)?, Compression::new(3));
-        // The CSV writer emits comparatively small buffers. Batch them before
-        // compression so zlib can find repeated patterns across many records.
-        let compressed_output = BufWriter::with_capacity(1024 * 1024, encoder);
-        let mut writer = WriterBuilder::new()
-            .delimiter(b'\t')
-            .has_headers(false)
-            .from_writer(compressed_output);
-        writer.write_record(header)?;
-        writers.push(writer);
-    }
+    let mut writers = ParallelWriters::new(&args.output_prefix, header, args.num_threads)?;
     let mut qc_rows = Vec::new();
     let mut sample_ids = HashSet::new();
     let mut reference_columns: Option<[String; 6]> = None;
@@ -499,9 +621,7 @@ fn main() -> Result<()> {
             "Input manifest must contain at least one data row".to_owned(),
         ));
     }
-    for writer in writers.iter_mut() {
-        writer.flush()?;
-    }
+    writers.finish()?;
     let qc_path = output_path(&args.output_prefix, ".methylation.sample_qc.tsv");
     let mut qc_writer = WriterBuilder::new().delimiter(b'\t').from_path(qc_path)?;
     qc_writer.write_record([

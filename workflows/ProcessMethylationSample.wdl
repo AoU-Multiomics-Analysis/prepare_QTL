@@ -15,7 +15,6 @@ task FilterMethylationSample {
         String AutosomePrefix
         Int MemoryGB
         Int DiskGB
-        Int NumThreads
     }
 
     command <<<
@@ -25,11 +24,6 @@ task FilterMethylationSample {
             echo "SampleID must match [A-Za-z0-9._-]+" >&2
             exit 1
         fi
-        if [ ~{NumThreads} -lt 1 ]; then
-            echo "NumThreads must be at least 1" >&2
-            exit 1
-        fi
-
         # The supplied File is localized by Cromwell. This one-row manifest is
         # task-local implementation detail only; users do not provide one.
         printf 'sample_id\tfile_path\n%s\t%s\n' "~{SampleID}" "~{MethylationBed}" > input_manifest.tsv
@@ -41,14 +35,14 @@ task FilterMethylationSample {
             --filter-chroms "~{FilterChroms}" \
             --fence-k ~{FenceK} \
             --autosome-prefix "~{AutosomePrefix}" \
-            --num-threads ~{NumThreads}
+            --num-threads 4
     >>>
 
     runtime {
         docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust:main"
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
-        cpu: "~{NumThreads}"
+        cpu: 4
     }
 
     output {
@@ -88,7 +82,6 @@ workflow ProcessMethylationSample {
         Float FenceK = 3.0
         Int MemoryGB = 64
         Int DiskGB = 250
-        Int NumThreads = 4
     }
 
     call FilterMethylationSample {
@@ -101,8 +94,7 @@ workflow ProcessMethylationSample {
             FenceK = FenceK,
             AutosomePrefix = AutosomePrefix,
             MemoryGB = MemoryGB,
-            DiskGB = DiskGB,
-            NumThreads = NumThreads
+            DiskGB = DiskGB
     }
 
     output {
