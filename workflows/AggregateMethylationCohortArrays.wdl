@@ -2,65 +2,19 @@ version 1.0
 import "calculate_phenotypePCs.wdl" as ComputePCs
 import "MergeCovariates.wdl" as CovariateMerge
 
-# Cohort-level entry point for per-sample methylation outputs. Terra receives
-# one compact manifest File rather than 22 large Array[File] inputs.
-
-task PrepareMethylationCohortManifest {
-    input {
-        File CohortManifest
-    }
-
-    command <<<
-        Rscript /tmp/PrepareMethylationCohortManifest.R \
-            --CohortManifest "~{CohortManifest}" \
-            --OutputDir manifest_lists
-    >>>
-
-    runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        memory: "4G"
-        disks: "local-disk 20 HDD"
-        cpu: 1
-    }
-
-    output {
-        File SampleQCManifest = "manifest_lists/sample_qc_paths.list"
-        File AllCallsAutosome01Manifest = "manifest_lists/autosome01_paths.list"
-        File AllCallsAutosome02Manifest = "manifest_lists/autosome02_paths.list"
-        File AllCallsAutosome03Manifest = "manifest_lists/autosome03_paths.list"
-        File AllCallsAutosome04Manifest = "manifest_lists/autosome04_paths.list"
-        File AllCallsAutosome05Manifest = "manifest_lists/autosome05_paths.list"
-        File AllCallsAutosome06Manifest = "manifest_lists/autosome06_paths.list"
-        File AllCallsAutosome07Manifest = "manifest_lists/autosome07_paths.list"
-        File AllCallsAutosome08Manifest = "manifest_lists/autosome08_paths.list"
-        File AllCallsAutosome09Manifest = "manifest_lists/autosome09_paths.list"
-        File AllCallsAutosome10Manifest = "manifest_lists/autosome10_paths.list"
-        File AllCallsAutosome11Manifest = "manifest_lists/autosome11_paths.list"
-        File AllCallsAutosome12Manifest = "manifest_lists/autosome12_paths.list"
-        File AllCallsAutosome13Manifest = "manifest_lists/autosome13_paths.list"
-        File AllCallsAutosome14Manifest = "manifest_lists/autosome14_paths.list"
-        File AllCallsAutosome15Manifest = "manifest_lists/autosome15_paths.list"
-        File AllCallsAutosome16Manifest = "manifest_lists/autosome16_paths.list"
-        File AllCallsAutosome17Manifest = "manifest_lists/autosome17_paths.list"
-        File AllCallsAutosome18Manifest = "manifest_lists/autosome18_paths.list"
-        File AllCallsAutosome19Manifest = "manifest_lists/autosome19_paths.list"
-        File AllCallsAutosome20Manifest = "manifest_lists/autosome20_paths.list"
-        File AllCallsAutosome21Manifest = "manifest_lists/autosome21_paths.list"
-        File AllCallsAutosome22Manifest = "manifest_lists/autosome22_paths.list"
-    }
-}
+# Cohort-level entry point for per-sample methylation outputs. In Terra, bind
+# each Array[File] input to the corresponding output column over a sample-set
+# (or other cohort) table entity.
 
 task BuildMethylationCohortSamples {
     input {
-        File SampleQCManifest
+        Array[File] SampleQCFiles
         String OutputPrefix
     }
 
     command <<<
         set -euo pipefail
-        mkdir -p input_sample_qc
-        gsutil -m cp -I input_sample_qc/ < "~{SampleQCManifest}"
-        awk -F/ '{print "input_sample_qc/" $NF}' "~{SampleQCManifest}" > sample_qc_files.list
+        printf '%s\n' ~{sep=' ' SampleQCFiles} > sample_qc_files.list
         Rscript /tmp/BuildMethylationCohortSamples.R \
             --SampleQcList sample_qc_files.list \
             --OutputPrefix "~{OutputPrefix}"
@@ -82,7 +36,7 @@ task BuildMethylationCohortSamples {
 
 task MergeMethylationChromosome {
     input {
-        File AllCallManifest
+        Array[File] AllCallShards
         File CohortSampleQC
         File CohortSamples
         Int TotalSamples
@@ -100,9 +54,7 @@ task MergeMethylationChromosome {
 
     command <<<
         set -euo pipefail
-        mkdir -p input_calls
-        gsutil -m cp -I input_calls/ < "~{AllCallManifest}"
-        awk -F/ '{print "input_calls/" $NF}' "~{AllCallManifest}" > all_call_shards.list
+        printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
         printf '%s\n' "~{CohortSampleQC}" > sample_qc_files.list
 
         Rscript /tmp/MergeMethylationCohort.R \
@@ -390,7 +342,29 @@ task AnnotateMethylationSites {
 
 workflow AggregateMethylationCohort {
     input {
-        File CohortManifest
+        Array[File] AllCallsAutosome01
+        Array[File] AllCallsAutosome02
+        Array[File] AllCallsAutosome03
+        Array[File] AllCallsAutosome04
+        Array[File] AllCallsAutosome05
+        Array[File] AllCallsAutosome06
+        Array[File] AllCallsAutosome07
+        Array[File] AllCallsAutosome08
+        Array[File] AllCallsAutosome09
+        Array[File] AllCallsAutosome10
+        Array[File] AllCallsAutosome11
+        Array[File] AllCallsAutosome12
+        Array[File] AllCallsAutosome13
+        Array[File] AllCallsAutosome14
+        Array[File] AllCallsAutosome15
+        Array[File] AllCallsAutosome16
+        Array[File] AllCallsAutosome17
+        Array[File] AllCallsAutosome18
+        Array[File] AllCallsAutosome19
+        Array[File] AllCallsAutosome20
+        Array[File] AllCallsAutosome21
+        Array[File] AllCallsAutosome22
+        Array[File] SampleQCFiles
         String OutputPrefix
         File? AdditionalCovariates
         File AnnotationGTF
@@ -420,14 +394,9 @@ workflow AggregateMethylationCohort {
         Int NumThreads = 1
     }
 
-    call PrepareMethylationCohortManifest {
-        input:
-            CohortManifest = CohortManifest
-    }
-
     call BuildMethylationCohortSamples {
         input:
-            SampleQCManifest = PrepareMethylationCohortManifest.SampleQCManifest,
+            SampleQCFiles = SampleQCFiles,
             OutputPrefix = OutputPrefix
     }
 
@@ -447,24 +416,19 @@ workflow AggregateMethylationCohort {
         "autosome17", "autosome18", "autosome19", "autosome20",
         "autosome21", "autosome22"
     ]
-    Array[File] AllCallManifestsByAutosome = [
-        PrepareMethylationCohortManifest.AllCallsAutosome01Manifest, PrepareMethylationCohortManifest.AllCallsAutosome02Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome03Manifest, PrepareMethylationCohortManifest.AllCallsAutosome04Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome05Manifest, PrepareMethylationCohortManifest.AllCallsAutosome06Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome07Manifest, PrepareMethylationCohortManifest.AllCallsAutosome08Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome09Manifest, PrepareMethylationCohortManifest.AllCallsAutosome10Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome11Manifest, PrepareMethylationCohortManifest.AllCallsAutosome12Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome13Manifest, PrepareMethylationCohortManifest.AllCallsAutosome14Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome15Manifest, PrepareMethylationCohortManifest.AllCallsAutosome16Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome17Manifest, PrepareMethylationCohortManifest.AllCallsAutosome18Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome19Manifest, PrepareMethylationCohortManifest.AllCallsAutosome20Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome21Manifest, PrepareMethylationCohortManifest.AllCallsAutosome22Manifest
+    Array[Array[File]] AllCallFilesByAutosome = [
+        AllCallsAutosome01, AllCallsAutosome02, AllCallsAutosome03, AllCallsAutosome04,
+        AllCallsAutosome05, AllCallsAutosome06, AllCallsAutosome07, AllCallsAutosome08,
+        AllCallsAutosome09, AllCallsAutosome10, AllCallsAutosome11, AllCallsAutosome12,
+        AllCallsAutosome13, AllCallsAutosome14, AllCallsAutosome15, AllCallsAutosome16,
+        AllCallsAutosome17, AllCallsAutosome18, AllCallsAutosome19, AllCallsAutosome20,
+        AllCallsAutosome21, AllCallsAutosome22
     ]
 
     scatter (autosome_index in range(length(AutosomeNames))) {
         call MergeMethylationChromosome as MergeMethylationAutosome {
             input:
-                AllCallManifest = AllCallManifestsByAutosome[autosome_index],
+                AllCallShards = AllCallFilesByAutosome[autosome_index],
                 CohortSampleQC = BuildMethylationCohortSamples.CohortSampleQC,
                 CohortSamples = BuildMethylationCohortSamples.CohortSamples,
                 TotalSamples = BuildMethylationCohortSamples.TotalSamples,

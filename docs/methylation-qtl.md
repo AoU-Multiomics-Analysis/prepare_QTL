@@ -13,10 +13,17 @@ Use one pb-CpG-tools `.combined.bed.gz` file per sample. The workflow expects th
 Choose the entry point that matches how inputs are organized:
 
 - [`workflows/ProcessMethylationSample.wdl`](../workflows/ProcessMethylationSample.wdl) is the Terra-table sample workflow. Run it once per sample entity with `SampleID` and `MethylationBed` bound directly to table columns. It has no manifest input and writes one sample-QC file plus one QC-flagged call table for each autosome.
-- [`workflows/AggregateMethylationCohort.wdl`](../workflows/AggregateMethylationCohort.wdl) is the cohort workflow. Supply arrays of the corresponding per-sample outputs: `SampleQC` to `SampleQCFiles`, and `AllCallsAutosome01` through `AllCallsAutosome22` to inputs with the same names. It reconstructs the cohort sample list from the QC files, then runs the chromosome merges, final aggregation, annotation, and PC calculation. It has no manifest input.
-- [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl) remains the manifest/shard entry point. It uses concurrent `gsutil` localization for manifest paths, then delegates its cohort stage to `AggregateMethylationCohort.wdl`; this preserves the efficient shard strategy for large cohorts.
+- [`workflows/AggregateMethylationCohort.wdl`](../workflows/AggregateMethylationCohort.wdl) is the Terra cohort workflow. Supply one `CohortManifest` file containing the per-sample QC and 22 chromosome-output paths. This avoids placing 22 large file arrays into Terra's workflow-submission JSON.
+- [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl) remains the manifest/shard entry point. It retains its array-based internal aggregation implementation, which is safe because those file arrays are created inside Cromwell rather than submitted through Terra's API.
 
-For a Terra sample-set or cohort entity, bind each aggregation array to the matching sample-output column. The sample-QC files are consolidated once before the chromosome scatter, so the chromosome tasks do not each localize thousands of tiny QC files.
+The cohort manifest must be a tab-separated file with exactly these columns. Each path should be a durable `gs://` path from the corresponding `ProcessMethylationSample` output:
+
+```text
+sample_id	sample_qc	autosome01	autosome02	...	autosome22
+1000234	gs://.../1000234.methylation.sample_qc.tsv	gs://.../1000234.methylation.autosome01.per_sample_qc.long.tsv.gz	gs://.../1000234.methylation.autosome02.per_sample_qc.long.tsv.gz	...	gs://.../1000234.methylation.autosome22.per_sample_qc.long.tsv.gz
+```
+
+The workflow validates and splits this manifest internally, localizing only the chromosome call files needed by each chromosome merge. Sample-QC files are consolidated once before the chromosome scatter.
 
 | pb-CpG-tools column | Workflow use |
 | --- | --- |

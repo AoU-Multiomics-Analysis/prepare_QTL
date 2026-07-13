@@ -1,5 +1,5 @@
 version 1.0
-import "AggregateMethylationCohort.wdl" as CohortAggregation
+import "AggregateMethylationCohortArrays.wdl" as CohortAggregation
 
 # Manifest/shard entry point. The global cohort reduction is delegated to
 # AggregateMethylationCohort.wdl so it is shared with Terra-table processing.
