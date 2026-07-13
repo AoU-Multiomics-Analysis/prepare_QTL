@@ -4,7 +4,7 @@ use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read};
 use std::path::{Path, PathBuf};
@@ -145,7 +145,8 @@ fn scan_sample(path: &Path, filter_chroms: Option<&Regex>, fence_k: f64) -> Resu
     let mut coverages = Vec::<f64>::new();
     let mut log_coverages = Vec::<f64>::new();
     let mut call_types = HashSet::<String>::new();
-    let mut sites = HashSet::<(String, String, String)>::new();
+    let mut sites = HashSet::<(u32, u64, u64)>::new();
+    let mut chromosome_ids = HashMap::<String, u32>::new();
     while reader.read_record(&mut record)? {
         input_rows += 1;
         let chrom = record.get(columns.chrom).unwrap_or_default();
@@ -153,9 +154,31 @@ fn scan_sample(path: &Path, filter_chroms: Option<&Regex>, fence_k: f64) -> Resu
             continue;
         }
         retained_rows += 1;
-        let begin = record.get(columns.begin).unwrap_or_default();
-        let end = record.get(columns.end).unwrap_or_default();
-        if !sites.insert((chrom.to_owned(), begin.to_owned(), end.to_owned())) {
+        let begin = record
+            .get(columns.begin)
+            .unwrap_or_default()
+            .parse::<u64>()
+            .map_err(|_| {
+                FilterError::Message(format!(
+                    "Column 'begin' is not an unsigned integer in {}",
+                    path.display()
+                ))
+            })?;
+        let end = record
+            .get(columns.end)
+            .unwrap_or_default()
+            .parse::<u64>()
+            .map_err(|_| {
+                FilterError::Message(format!(
+                    "Column 'end' is not an unsigned integer in {}",
+                    path.display()
+                ))
+            })?;
+        let next_chromosome_id = chromosome_ids.len() as u32;
+        let chromosome_id = *chromosome_ids
+            .entry(chrom.to_owned())
+            .or_insert(next_chromosome_id);
+        if !sites.insert((chromosome_id, begin, end)) {
             return Err(FilterError::Message(format!(
                 "Found duplicated #chrom/begin/end site(s) in {}. Aggregate duplicate calls before merging so a site is counted once per sample.",
                 path.display()
@@ -239,7 +262,7 @@ fn write_sample(
     stats: &SampleStats,
     filter_chroms: Option<&Regex>,
     min_coverage: f64,
-    autosomes: &[String],
+    autosome_indices: &HashMap<String, usize>,
     writers: &mut [csv::Writer<BufWriter<GzEncoder<File>>>],
 ) -> Result<(u64, u64, u64, u64)> {
     let (mut reader, columns) = reader_for_bed(file_path)?;
@@ -269,7 +292,7 @@ fn write_sample(
         if per_sample_pass {
             passing += 1;
         }
-        if let Some(chromosome_index) = autosomes.iter().position(|autosome| autosome == chrom) {
+        if let Some(&chromosome_index) = autosome_indices.get(chrom) {
             let cov_text = coverage
                 .map(format_number)
                 .unwrap_or_else(|| "NA".to_owned());
@@ -277,26 +300,25 @@ fn write_sample(
                 .map(|value| format_number(2.0 * value / stats.median_coverage))
                 .unwrap_or_else(|| "NA".to_owned());
             let extreme_flag = if extreme_pass { "ok" } else { "extreme" };
-            let output = [
-                chrom.to_owned(),
-                record.get(columns.begin).unwrap_or_default().to_owned(),
-                record.get(columns.end).unwrap_or_default().to_owned(),
-                record.get(columns.mod_score).unwrap_or_default().to_owned(),
-                record.get(columns.call_type).unwrap_or_default().to_owned(),
-                cov_text,
-                implied_cn,
-                extreme_flag.to_owned(),
-                format!(
-                    "{}*{}*{}",
-                    chrom,
-                    record.get(columns.begin).unwrap_or_default(),
-                    record.get(columns.end).unwrap_or_default()
-                ),
-                sample_id.to_owned(),
-                coverage_pass.to_string().to_uppercase(),
-                per_sample_pass.to_string().to_uppercase(),
-            ];
-            writers[chromosome_index].write_record(output)?;
+            let begin = record.get(columns.begin).unwrap_or_default();
+            let end = record.get(columns.end).unwrap_or_default();
+            let site_key = format!("{chrom}*{begin}*{end}");
+            let meets_min_coverage = if coverage_pass { "TRUE" } else { "FALSE" };
+            let per_sample_qc_pass = if per_sample_pass { "TRUE" } else { "FALSE" };
+            writers[chromosome_index].write_record([
+                chrom,
+                begin,
+                end,
+                record.get(columns.mod_score).unwrap_or_default(),
+                record.get(columns.call_type).unwrap_or_default(),
+                &cov_text,
+                &implied_cn,
+                extreme_flag,
+                &site_key,
+                sample_id,
+                meets_min_coverage,
+                per_sample_qc_pass,
+            ])?;
         }
     }
     Ok((below_minimum, extreme_total, extreme_after_minimum, passing))
@@ -353,6 +375,11 @@ fn main() -> Result<()> {
     let autosomes: Vec<String> = (1..=22)
         .map(|index| format!("{}{}", args.autosome_prefix, index))
         .collect();
+    let autosome_indices: HashMap<String, usize> = autosomes
+        .iter()
+        .enumerate()
+        .map(|(index, chromosome)| (chromosome.clone(), index))
+        .collect();
     let output_parent = Path::new(&args.output_prefix)
         .parent()
         .unwrap_or_else(|| Path::new("."));
@@ -377,7 +404,7 @@ fn main() -> Result<()> {
             &args.output_prefix,
             &format!(".methylation.autosome{chromosome:02}.per_sample_qc.long.tsv.gz"),
         );
-        let encoder = GzEncoder::new(File::create(path)?, Compression::default());
+        let encoder = GzEncoder::new(File::create(path)?, Compression::new(3));
         // The CSV writer emits comparatively small buffers. Batch them before
         // compression so zlib can find repeated patterns across many records.
         let compressed_output = BufWriter::with_capacity(1024 * 1024, encoder);
@@ -442,7 +469,7 @@ fn main() -> Result<()> {
             &stats,
             filter_chroms.as_ref(),
             args.min_coverage,
-            &autosomes,
+            &autosome_indices,
             &mut writers,
         )?;
         eprintln!(
