@@ -100,7 +100,7 @@ Median-normalizes Olink NPX parquet files and writes filtered long-format protei
 
 **Outputs:**
 - `<OutputPrefix>_median_normalized.tsv.gz`: Full median-normalized Olink table.
-- `<OutputPrefix>_npx_values.tsv.gz`: Filtered long-format table with `ResearchID`, `UniProt`, and `PCNormalizedNPX`. This file can be used as `--ProteomicData` for `PrepareProteomics.R` or as `ProteomicData` for [`workflows/prepare_pQTL.wdl`](../workflows/prepare_pQTL.wdl).
+- `<OutputPrefix>_npx_values.tsv.gz`: Filtered long-format table with `ResearchID`, `UniProt`, and `PCNormalizedNPX`. This file can be used as `--ProteomicData` for `PrepareProteomics.R` or as `ProteomicData` for [`workflows/proteomics/prepare_pQTL.wdl`](../workflows/proteomics/prepare_pQTL.wdl).
 
 ## `scripts/splicing/PrepareSpliceData.R`
 

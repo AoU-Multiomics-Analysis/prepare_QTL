@@ -4,7 +4,7 @@
 
 These WDL workflows prepare or summarize genotype data for downstream QTL analysis.
 
-## `workflows/prepare_VCF.wdl`
+## `workflows/genotype/prepare_VCF.wdl`
 
 Comprehensive genotype preparation workflow for All of Us (AoU) data starting from a Hail MatrixTable.
 
@@ -17,7 +17,7 @@ Comprehensive genotype preparation workflow for All of Us (AoU) data starting fr
 
 **Outputs:** VCF file, PLINK2 files (`.pgen`, `.pvar`, `.psam`), genotype PCs TSV.
 
-## `workflows/convertVCF2Plink.wdl`
+## `workflows/genotype/convertVCF2Plink.wdl`
 
 Workflow that converts a VCF file to PLINK2 binary format.
 
@@ -28,7 +28,7 @@ Workflow that converts a VCF file to PLINK2 binary format.
 
 **Outputs:** PLINK2 files (`.pgen`, `.pvar`, `.psam`).
 
-## `workflows/calculateGenotypePCs.wdl`
+## `workflows/genotype/calculateGenotypePCs.wdl`
 
 Workflow that computes genotype principal components from a VCF file.
 
@@ -39,7 +39,7 @@ Workflow that computes genotype principal components from a VCF file.
 
 **Outputs:** Genotype PCs TSV (`<OutputPrefix>_genetic_PCs.tsv`).
 
-## `workflows/calculateAF.wdl`
+## `workflows/genotype/calculateAF.wdl`
 
 Workflow that calculates allele frequencies from PLINK2 genotype files for a specified set of samples.
 
@@ -51,7 +51,7 @@ Workflow that calculates allele frequencies from PLINK2 genotype files for a spe
 
 **Outputs:** Allele frequency file (`<prefix>.afreq`).
 
-## `workflows/calculateGenotypeDosage.wdl`
+## `workflows/genotype/calculateGenotypeDosage.wdl`
 
 Workflow that extracts genotype dosage values from a VCF file.
 

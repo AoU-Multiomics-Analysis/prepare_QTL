@@ -25,7 +25,7 @@ The connectivity outlier TSV contains `SampleID` and `Z_score` columns. If a tra
 
 ## Expression
 
-Expression preparation is implemented in [`scripts/expression/PrepareExpression.R`](../scripts/expression/PrepareExpression.R) and wrapped by [`workflows/prepare_eQTL.wdl`](../workflows/prepare_eQTL.wdl).
+Expression preparation is implemented in [`scripts/expression/PrepareExpression.R`](../scripts/expression/PrepareExpression.R) and wrapped by [`workflows/expression/prepare_eQTL.wdl`](../workflows/expression/prepare_eQTL.wdl).
 
 **Input phenotype:** RNA-seq gene count GCT or TSV with `Name`, `Description`, and sample count columns.
 
@@ -47,7 +47,7 @@ Expression preparation is implemented in [`scripts/expression/PrepareExpression.
 
 ## Proteomics
 
-Proteomics has an optional Olink preprocessing workflow in [`scripts/proteomics/NormalizeProteomics.R`](../scripts/proteomics/NormalizeProteomics.R), followed by pQTL BED preparation in [`scripts/proteomics/PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R) and [`workflows/prepare_pQTL.wdl`](../workflows/prepare_pQTL.wdl).
+Proteomics has an optional Olink preprocessing workflow in [`scripts/proteomics/NormalizeProteomics.R`](../scripts/proteomics/NormalizeProteomics.R), followed by pQTL BED preparation in [`scripts/proteomics/PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R) and [`workflows/proteomics/prepare_pQTL.wdl`](../workflows/proteomics/prepare_pQTL.wdl).
 
 ### Olink NPX Preprocessing
 
@@ -100,7 +100,7 @@ Proteomics has an optional Olink preprocessing workflow in [`scripts/proteomics/
 
 ## Splicing
 
-Splicing preparation is implemented in [`scripts/splicing/PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) and wrapped by [`workflows/prepare_sQTL.wdl`](../workflows/prepare_sQTL.wdl).
+Splicing preparation is implemented in [`scripts/splicing/PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) and wrapped by [`workflows/splicing/prepare_sQTL.wdl`](../workflows/splicing/prepare_sQTL.wdl).
 
 **Input phenotype:** LeafCutter-style BED with the first four columns containing interval and phenotype identifiers, followed by sample columns.
 

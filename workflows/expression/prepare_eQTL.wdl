@@ -1,23 +1,31 @@
 version 1.0
-import  "calculate_phenotypePCs.wdl" as ComputePCs
-import  "MergeCovariates.wdl" as CovariateMerge
-import  "ResidualizePhenotypes.wdl" as Residualize
 
-task PrepareSpliceData {
+import "../common/calculate_phenotypePCs.wdl" as ComputePCs
+import "../common/MergeCovariates.wdl" as CovariateMerge
+import "../common/ResidualizePhenotypes.wdl" as Residualize
+
+
+
+task eqtl_prepare_expression {
     input {
+        File CountGCT
+        File AnnotationGTF
         File SampleList
-        File SpliceData
         String OutputPrefix
+
 
         Int memory
         Int disk_space
         Int num_threads
-    }
+
+        }
     command {
-        Rscript /tmp/PrepareSpliceData.R \
-            --SpliceData ${SpliceData} \
+        Rscript /tmp/PrepareExpression.R \
+            --CountGCT ${CountGCT} \
+            --AnnotationGTF ${AnnotationGTF} \
             --SampleList ${SampleList} \
             --OutputPrefix ${OutputPrefix}
+
         }
 
     runtime {
@@ -28,41 +36,43 @@ task PrepareSpliceData {
     }
 
     output {
-        File IntSplicingBed="${OutputPrefix}.splicing.INT.bed.gz"
-        File ScaledSplicingBed="${OutputPrefix}.splicing.scaled.bed.gz"
-        File RawSplicingBed="${OutputPrefix}.splicing.raw.bed.gz"
-        File IntConnectivityOutliers="${OutputPrefix}.splicing.INT.connectivity_outliers.tsv"
-        File ScaledConnectivityOutliers="${OutputPrefix}.splicing.scaled.connectivity_outliers.tsv"
-        #File PhenotypeGroups = "${OutputPrefix}.phenotype_groups.tsv"
+        File IntExpressionBed="${OutputPrefix}.expression.INT.bed.gz"
+        File ScaledExpressionBed="${OutputPrefix}.expression.scaled.bed.gz"
+        File RawExpressionBed="${OutputPrefix}.expression.raw.bed.gz"
+        File IntConnectivityOutliers="${OutputPrefix}.expression.INT.connectivity_outliers.tsv"
+        File ScaledConnectivityOutliers="${OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
     }
- }
+}
 
-workflow sQTLPrepareData  {
+workflow eQTLPrepareData {
     input {
-        File SampleList
-        File SpliceData
         String OutputPrefix
+        File CountGCT
+        File AnnotationGTF
+        File SampleList
         File? AdditionalCovariates
         Boolean ResidualizeNormalizedInputs = false
 
         Int memory
         Int disk_space
         Int num_threads
-    }
-    call PrepareSpliceData {
+
+            }
+    call eqtl_prepare_expression {
         input:
+            OutputPrefix = OutputPrefix,
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
-            SampleList = SampleList,
-            SpliceData = SpliceData,
-            OutputPrefix = OutputPrefix
+            CountGCT  = CountGCT,
+            AnnotationGTF = AnnotationGTF,
+            SampleList = SampleList
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
-            BedFile = PrepareSpliceData.IntSplicingBed,
-            OutputPrefix = OutputPrefix + ".splicing",
+            BedFile = eqtl_prepare_expression.IntExpressionBed,
+            OutputPrefix = OutputPrefix + ".expression",
             OutputSuffix = ".INT",
             memory = memory,
             disk_space = disk_space,
@@ -71,19 +81,20 @@ workflow sQTLPrepareData  {
 
     call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
         input:
-            BedFile = PrepareSpliceData.ScaledSplicingBed,
-            OutputPrefix = OutputPrefix + ".splicing",
+            BedFile = eqtl_prepare_expression.ScaledExpressionBed,
+            OutputPrefix = OutputPrefix + ".expression",
             OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads
     }
+
     if (defined(AdditionalCovariates)) {
         call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
             input:
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
-                OutputPrefix = OutputPrefix + ".splicing",
+                OutputPrefix = OutputPrefix + ".expression",
                 OutputSuffix = ".INT"
         }
 
@@ -91,7 +102,7 @@ workflow sQTLPrepareData  {
             input:
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
-                OutputPrefix = OutputPrefix + ".splicing",
+                OutputPrefix = OutputPrefix + ".expression",
                 OutputSuffix = ".scaled"
         }
     }
@@ -99,9 +110,9 @@ workflow sQTLPrepareData  {
     if (ResidualizeNormalizedInputs) {
         call Residualize.ResidualizePhenotypes as ResidualizeIntPhenotypes {
             input:
-                InputBed = PrepareSpliceData.IntSplicingBed,
+                InputBed = eqtl_prepare_expression.IntExpressionBed,
                 Covariates = MergeIntAdditionalCovariates.QtlCovariates,
-                OutputFileName = OutputPrefix + ".splicing.INT.residualized.bed.gz",
+                OutputFileName = OutputPrefix + ".expression.INT.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads
@@ -109,9 +120,9 @@ workflow sQTLPrepareData  {
 
         call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
             input:
-                InputBed = PrepareSpliceData.ScaledSplicingBed,
+                InputBed = eqtl_prepare_expression.ScaledExpressionBed,
                 Covariates = MergeScaledAdditionalCovariates.QtlCovariates,
-                OutputFileName = OutputPrefix + ".splicing.scaled.residualized.bed.gz",
+                OutputFileName = OutputPrefix + ".expression.scaled.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads
@@ -119,18 +130,16 @@ workflow sQTLPrepareData  {
     }
 
     output {
-        File IntBedFile = PrepareSpliceData.IntSplicingBed
-        File ScaledBedFile = PrepareSpliceData.ScaledSplicingBed
-        File RawBedFile = PrepareSpliceData.RawSplicingBed
-        File IntConnectivityOutliers = PrepareSpliceData.IntConnectivityOutliers
-        File ScaledConnectivityOutliers = PrepareSpliceData.ScaledConnectivityOutliers
+        File IntBedFile = eqtl_prepare_expression.IntExpressionBed
+        File ScaledBedFile = eqtl_prepare_expression.ScaledExpressionBed
+        File RawBedFile = eqtl_prepare_expression.RawExpressionBed
+        File IntConnectivityOutliers = eqtl_prepare_expression.IntConnectivityOutliers
+        File ScaledConnectivityOutliers = eqtl_prepare_expression.ScaledConnectivityOutliers
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         File? ScaledQtlCovariates = MergeScaledAdditionalCovariates.QtlCovariates
         File? IntResidualizedBedFile = ResidualizeIntPhenotypes.ResidualizedBed
         File? ScaledResidualizedBedFile = ResidualizeScaledPhenotypes.ResidualizedBed
-        #File PhenotypeGroups = PrepareSpliceData.PhenotypeGroups
     }
-
 }

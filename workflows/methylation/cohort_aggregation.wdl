@@ -1,9 +1,6 @@
 version 1.0
-import "calculate_phenotypePCs.wdl" as ComputePCs
-import "MergeCovariates.wdl" as CovariateMerge
 
-# Cohort-level entry point for per-sample methylation outputs. Terra receives
-# one compact manifest File rather than 22 large Array[File] inputs.
+# Cohort ingestion, per-chromosome merging, and cohort-wide aggregation.
 
 task PrepareMethylationCohortManifest {
     input {
@@ -49,7 +46,6 @@ task PrepareMethylationCohortManifest {
         File AllCallsAutosome22Manifest = "manifest_lists/autosome22_paths.list"
     }
 }
-
 task BuildMethylationCohortSamples {
     input {
         Array[File] SampleQCFiles
@@ -130,70 +126,6 @@ task MergeMethylationChromosome {
     }
 }
 
-task BuildMethylationCorrelationCovariates {
-    input {
-        File PhenotypePCs
-        File? AdditionalCovariates
-        String OutputPrefix
-    }
-
-    command <<<
-        set -euo pipefail
-        Rscript /tmp/BuildMethylationCorrelationCovariates.R \
-            --PhenotypePCs "~{PhenotypePCs}" \
-            ~{if defined(AdditionalCovariates) then "--AdditionalCovariates '" + select_first([AdditionalCovariates]) + "'" else ""} \
-            --OutputFile "~{OutputPrefix}.methylation.correlation_covariates.tsv"
-    >>>
-
-    runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        memory: "16G"
-        disks: "local-disk 50 HDD"
-        cpu: 1
-    }
-
-    output {
-        File CorrelationCovariates = "~{OutputPrefix}.methylation.correlation_covariates.tsv"
-    }
-}
-
-task AnalyzeMethylationCpGCorrelation {
-    input {
-        File IntMethylationBed
-        File Covariates
-        String OutputPrefix
-        Int WindowBP
-        Float MinAbsCorrelation
-        Int MemoryGB
-        Int DiskGB
-    }
-
-    command <<<
-        Rscript /tmp/AnalyzeMethylationCpGCorrelation.R \
-            --InputBed "~{IntMethylationBed}" \
-            --Covariates "~{Covariates}" \
-            --OutputPrefix "~{OutputPrefix}" \
-            --WindowBP ~{WindowBP} \
-            --MinAbsCorrelation ~{MinAbsCorrelation}
-    >>>
-
-    runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        memory: "~{MemoryGB}G"
-        disks: "local-disk ~{DiskGB} HDD"
-        cpu: 1
-    }
-
-    output {
-        File CorrelationClusters = "~{OutputPrefix}.methylation.cpg_correlation_clusters.tsv.gz"
-        File RepresentativeCpGs = "~{OutputPrefix}.methylation.cpg_correlation_representatives.tsv.gz"
-        File CorrelationSummary = "~{OutputPrefix}.methylation.cpg_correlation_summary.tsv"
-        File ClusterSizePlot = "~{OutputPrefix}.methylation.cpg_correlation_cluster_sizes.png"
-        File MeanDistancePlot = "~{OutputPrefix}.methylation.cpg_correlation_mean_distances.png"
-        File MaxDistancePlot = "~{OutputPrefix}.methylation.cpg_correlation_max_distances.png"
-        File SpanPlot = "~{OutputPrefix}.methylation.cpg_correlation_span_vs_size.png"
-    }
-}
 
 task AggregateMethylationChromosomes {
     input {
@@ -329,121 +261,22 @@ task AggregateMethylationChromosomes {
     }
 }
 
-task FinalizeMethylationConnectivity {
-    input {
-        Array[File] RepresentativeCpGsByChromosome
-        File PreConnectivityFilteredCalls
-        File PreConnectivityRawMethylationBed
-        File PreConnectivityIntMethylationBed
-        File PreConnectivitySampleQC
-        String OutputPrefix
-        Int MaxConnectivityFeatures
-        Int ConnectivityLandmarks
-        Float ConnectivityZThreshold
-        Int MemoryGB
-        Int DiskGB
-    }
 
-    command <<<
-        set -euo pipefail
-        printf '%s\n' "~{PreConnectivityIntMethylationBed}" > int_beds_by_chromosome.list
-        printf '%s\n' ~{sep=' ' RepresentativeCpGsByChromosome} > representative_cpgs_by_chromosome.list
-
-        Rscript /tmp/FinalizeMethylationConnectivity.R \
-            --IntBedList int_beds_by_chromosome.list \
-            --RepresentativeList representative_cpgs_by_chromosome.list \
-            --FilteredCalls "~{PreConnectivityFilteredCalls}" \
-            --RawBed "~{PreConnectivityRawMethylationBed}" \
-            --IntBed "~{PreConnectivityIntMethylationBed}" \
-            --SampleQC "~{PreConnectivitySampleQC}" \
-            --OutputPrefix "~{OutputPrefix}" \
-            --MaxConnectivityFeatures ~{MaxConnectivityFeatures} \
-            --ConnectivityLandmarks ~{ConnectivityLandmarks} \
-            --ConnectivityZThreshold ~{ConnectivityZThreshold}
-    >>>
-
-    runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        memory: "~{MemoryGB}G"
-        disks: "local-disk ~{DiskGB} HDD"
-        cpu: 1
-    }
-
-    output {
-        File FilteredCalls = "~{OutputPrefix}.methylation.filtered.long.tsv.gz"
-        File SampleQC = "~{OutputPrefix}.methylation.sample_qc.tsv"
-        File RawMethylationBed = "~{OutputPrefix}.methylation.raw.bed.gz"
-        File IntMethylationBed = "~{OutputPrefix}.methylation.INT.bed.gz"
-        File ConnectivityOutliers = "~{OutputPrefix}.methylation.connectivity_outliers.tsv"
-        File ConnectivitySummary = "~{OutputPrefix}.methylation.connectivity_summary.tsv"
-        File ConnectivityRepresentativeCpGs = "~{OutputPrefix}.methylation.connectivity_representative_cpgs.tsv.gz"
-    }
-}
-
-task AnnotateMethylationSites {
-    input {
-        File PassingSiteMetadata
-        File AnnotationGTF
-        File CCREAnnotations
-        File CpGIslandAnnotations
-        String OutputPrefix
-        Int PromoterWindow
-        Int MemoryGB
-        Int DiskGB
-    }
-
-    command <<<
-        Rscript /tmp/AnnotateMethylationSites.R \
-            --PassingSiteMetadata "~{PassingSiteMetadata}" \
-            --AnnotationGTF "~{AnnotationGTF}" \
-            --CCREAnnotations "~{CCREAnnotations}" \
-            --CpGIslandAnnotations "~{CpGIslandAnnotations}" \
-            --OutputPrefix "~{OutputPrefix}" \
-            --PromoterWindow ~{PromoterWindow}
-    >>>
-
-    runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        memory: "~{MemoryGB}G"
-        disks: "local-disk ~{DiskGB} HDD"
-        cpu: 1
-    }
-
-    output {
-        File PassingSiteAnnotations = "~{OutputPrefix}.methylation.passing_site_annotations.tsv.gz"
-    }
-}
-
-workflow AggregateMethylationCohort {
+workflow AggregateMethylationData {
     input {
         File CohortManifest
         String OutputPrefix
-        File? AdditionalCovariates
-        File AnnotationGTF
-        File CCREAnnotations
-        File CpGIslandAnnotations
-
-        Float MinSampleFraction = 0.95
-        Int MinSamples = 0
-        Float MinMethylationMAD = 0.003
-        String AutosomePrefix = "chr"
-        Int PromoterWindow = 2000
-        String ValueColumn = "mod_score"
-        Float ValueMultiplier = 0.01
-        Int MergeMemoryGB = 128
-        Int MergeDiskGB = 500
-        Int AggregateMemoryGB = 64
-        Int AggregateDiskGB = 1000
-        Int AnnotationMemoryGB = 64
-        Int AnnotationDiskGB = 100
-        Int CorrelationWindowBP = 1000
-        Float CorrelationMinAbsCorrelation = 0.95
-        Int CorrelationMemoryGB = 64
-        Int CorrelationDiskGB = 250
-        Int MaxConnectivityFeatures = 0
-        Int ConnectivityLandmarks = 200
-        Float ConnectivityZThreshold = -3.0
-        Int NumThreads = 1
+        Float MinSampleFraction
+        Int MinSamples
+        Float MinMethylationMAD
+        String AutosomePrefix
+        String ValueColumn
+        Float ValueMultiplier
+        Int MergeMemoryGB
+        Int MergeDiskGB
+        Int AggregateMemoryGB
+        Int AggregateDiskGB
+        Int NumThreads
     }
 
     call PrepareMethylationCohortManifest {
@@ -488,6 +321,7 @@ workflow AggregateMethylationCohort {
         "autosome17", "autosome18", "autosome19", "autosome20",
         "autosome21", "autosome22"
     ]
+
     scatter (autosome_index in range(length(AutosomeNames))) {
         call MergeMethylationChromosome as MergeMethylationAutosome {
             input:
@@ -523,103 +357,20 @@ workflow AggregateMethylationCohort {
             NumThreads = NumThreads
     }
 
-    call ComputePCs.PhenotypePCs as PreliminaryIntPhenotypePCs {
-        input:
-            BedFile = AggregateMethylationChromosomes.PreConnectivityIntMethylationBed,
-            OutputPrefix = OutputPrefix + ".methylation.pre_connectivity",
-            OutputSuffix = ".INT",
-            memory = MergeMemoryGB,
-            disk_space = MergeDiskGB,
-            num_threads = NumThreads
-    }
-
-    call BuildMethylationCorrelationCovariates {
-        input:
-            PhenotypePCs = PreliminaryIntPhenotypePCs.OutPhenotypePCs,
-            AdditionalCovariates = AdditionalCovariates,
-            OutputPrefix = OutputPrefix
-    }
-
-    scatter (autosome_index in range(length(AutosomeNames))) {
-        call AnalyzeMethylationCpGCorrelation as AnalyzeMethylationAutosomeCorrelation {
-            input:
-                IntMethylationBed = MergeMethylationAutosome.IntMethylationBed[autosome_index],
-                Covariates = BuildMethylationCorrelationCovariates.CorrelationCovariates,
-                OutputPrefix = OutputPrefix + "." + AutosomeOutputSuffixes[autosome_index],
-                WindowBP = CorrelationWindowBP,
-                MinAbsCorrelation = CorrelationMinAbsCorrelation,
-                MemoryGB = CorrelationMemoryGB,
-                DiskGB = CorrelationDiskGB
-        }
-    }
-
-    call FinalizeMethylationConnectivity {
-        input:
-            RepresentativeCpGsByChromosome = AnalyzeMethylationAutosomeCorrelation.RepresentativeCpGs,
-            PreConnectivityFilteredCalls = AggregateMethylationChromosomes.PreConnectivityFilteredCalls,
-            PreConnectivityRawMethylationBed = AggregateMethylationChromosomes.PreConnectivityRawMethylationBed,
-            PreConnectivityIntMethylationBed = AggregateMethylationChromosomes.PreConnectivityIntMethylationBed,
-            PreConnectivitySampleQC = AggregateMethylationChromosomes.PreConnectivitySampleQC,
-            OutputPrefix = OutputPrefix,
-            MaxConnectivityFeatures = MaxConnectivityFeatures,
-            ConnectivityLandmarks = ConnectivityLandmarks,
-            ConnectivityZThreshold = ConnectivityZThreshold,
-            MemoryGB = AggregateMemoryGB,
-            DiskGB = AggregateDiskGB
-    }
-
-    call AnnotateMethylationSites {
-        input:
-            PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata,
-            AnnotationGTF = AnnotationGTF,
-            CCREAnnotations = CCREAnnotations,
-            CpGIslandAnnotations = CpGIslandAnnotations,
-            OutputPrefix = OutputPrefix,
-            PromoterWindow = PromoterWindow,
-            MemoryGB = AnnotationMemoryGB,
-            DiskGB = AnnotationDiskGB
-    }
-
-    call ComputePCs.PhenotypePCs as IntPhenotypePCs {
-        input:
-            BedFile = FinalizeMethylationConnectivity.IntMethylationBed,
-            OutputPrefix = OutputPrefix + ".methylation",
-            OutputSuffix = ".INT",
-            memory = MergeMemoryGB,
-            disk_space = MergeDiskGB,
-            num_threads = NumThreads
-    }
-
-    if (defined(AdditionalCovariates)) {
-        call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
-            input:
-                GenotypePCs = select_first([AdditionalCovariates]),
-                MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
-                OutputPrefix = OutputPrefix + ".methylation",
-                OutputSuffix = ".INT"
-        }
-    }
-
     output {
-        File FilteredCalls = FinalizeMethylationConnectivity.FilteredCalls
+        File CohortSamples = BuildMethylationCohortSamples.CohortSamples
+        Int TotalSamples = BuildMethylationCohortSamples.TotalSamples
+        Array[String] ChromosomeOutputSuffixes = AutosomeOutputSuffixes
+        Array[File] IntMethylationBedsByChromosome = MergeMethylationAutosome.IntMethylationBed
+        File PreConnectivityFilteredCalls = AggregateMethylationChromosomes.PreConnectivityFilteredCalls
         File SiteQC = AggregateMethylationChromosomes.SiteQC
         File SiteMetadata = AggregateMethylationChromosomes.SiteMetadata
         File PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata
-        File SampleQC = FinalizeMethylationConnectivity.SampleQC
+        File PreConnectivitySampleQC = AggregateMethylationChromosomes.PreConnectivitySampleQC
         File FilterSummary = AggregateMethylationChromosomes.FilterSummary
         File FilterCountsPlot = AggregateMethylationChromosomes.FilterCountsPlot
         File FilterUpsetPlot = AggregateMethylationChromosomes.FilterUpsetPlot
-        File RawMethylationBed = FinalizeMethylationConnectivity.RawMethylationBed
-        File IntMethylationBed = FinalizeMethylationConnectivity.IntMethylationBed
-        File ConnectivityOutliers = FinalizeMethylationConnectivity.ConnectivityOutliers
-        File ConnectivitySummary = FinalizeMethylationConnectivity.ConnectivitySummary
-        File ConnectivityRepresentativeCpGs = FinalizeMethylationConnectivity.ConnectivityRepresentativeCpGs
-        Array[File] CorrelationClustersByChromosome = AnalyzeMethylationAutosomeCorrelation.CorrelationClusters
-        Array[File] CorrelationSummariesByChromosome = AnalyzeMethylationAutosomeCorrelation.CorrelationSummary
-        File PassingSiteAnnotations = AnnotateMethylationSites.PassingSiteAnnotations
-        File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
-        File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
-        File CohortSamples = BuildMethylationCohortSamples.CohortSamples
-        Int TotalSamples = BuildMethylationCohortSamples.TotalSamples
+        File PreConnectivityRawMethylationBed = AggregateMethylationChromosomes.PreConnectivityRawMethylationBed
+        File PreConnectivityIntMethylationBed = AggregateMethylationChromosomes.PreConnectivityIntMethylationBed
     }
 }

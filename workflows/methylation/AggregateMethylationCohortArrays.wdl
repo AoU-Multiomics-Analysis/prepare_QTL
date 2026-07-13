@@ -1,6 +1,6 @@
 version 1.0
-import "calculate_phenotypePCs.wdl" as ComputePCs
-import "MergeCovariates.wdl" as CovariateMerge
+import "../common/calculate_phenotypePCs.wdl" as ComputePCs
+import "../common/MergeCovariates.wdl" as CovariateMerge
 
 # Cohort-level entry point for per-sample methylation outputs. In Terra, bind
 # each Array[File] input to the corresponding output column over a sample-set

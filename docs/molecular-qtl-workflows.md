@@ -12,73 +12,73 @@ The eQTL, pQTL, and sQTL prepare workflows now compute both molecular phenotype 
 - `.scaled`: Centered and scaled molecular phenotypes. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
-Each workflow computes phenotype PCs separately for the `.INT` and `.scaled` outputs only. Raw BED files are emitted as workflow outputs but are not used for phenotype PCs, covariate merging, or residualization. `AdditionalCovariates` is an optional TSV of covariates with a `sample_id` column. When provided, the workflow runs [`MergeCovariates.wdl`](../workflows/MergeCovariates.wdl) twice to merge those covariates with the `.INT` and `.scaled` phenotype PCs.
+Each workflow computes phenotype PCs separately for the `.INT` and `.scaled` outputs only. Raw BED files are emitted as workflow outputs but are not used for phenotype PCs, covariate merging, or residualization. `AdditionalCovariates` is an optional TSV of covariates with a `sample_id` column. When provided, the workflow runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) twice to merge those covariates with the `.INT` and `.scaled` phenotype PCs.
 
 The prepare scripts remove WGCNA sample connectivity outliers from `.INT` and `.scaled` matrices before those BED files are emitted. For each transformed branch, the scripts compute a sample-sample biweight midcorrelation matrix with `WGCNA::bicor(..., use = "pairwise.complete.obs")`, transform it to adjacency with `0.5 + 0.5 * correlation`, calculate sample connectivity with `WGCNA::fundamentalNetworkConcepts()`, and remove samples with connectivity `Z_score < -3`. Removed samples are written as `connectivity_outliers.tsv` outputs with `SampleID` and `Z_score` columns. If there are fewer than 3 samples, fewer than 2 features, or zero/undefined connectivity variance, the scripts keep all samples and write an empty outlier TSV. Raw BED files keep all samples after the initial sample-list filter.
 
-Set `ResidualizeNormalizedInputs` to `true` to run [`ResidualizePhenotypes.wdl`](../workflows/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files. When merged covariates are available, the residualization task regresses each phenotype row on the corresponding merged covariates and then centers/scales the residuals. Without merged covariates, the task only centers/scales the input phenotype rows.
+Set `ResidualizeNormalizedInputs` to `true` to run [`ResidualizePhenotypes.wdl`](../workflows/common/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files. When merged covariates are available, the residualization task regresses each phenotype row on the corresponding merged covariates and then centers/scales the residuals. Without merged covariates, the task only centers/scales the input phenotype rows.
 
-## `workflows/prepare_eQTL.wdl`
+## `workflows/expression/prepare_eQTL.wdl`
 
 End-to-end workflow for preparing gene expression data for eQTL analysis.
 
 **Steps:**
 1. Runs `PrepareExpression.R` to produce `.INT`, `.scaled`, and `.raw` expression BED files. The `.scaled` expression branch applies `log2(CPM + 1)` before centering/scaling; the `.INT` branch rank-normalizes unlogged CPMs.
-2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` expression BED files.
-3. Optionally runs [`MergeCovariates.wdl`](../workflows/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
-4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
+2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/common/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` expression BED files.
+3. Optionally runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
+4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/common/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
 
 **Inputs:** Raw count GCT file, GENCODE GTF, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
 
 **Outputs:** `.expression.INT.bed.gz`, `.expression.scaled.bed.gz`, `.expression.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv`, and optionally residualized BEDs ending in `.residualized.bed.gz`.
 
-## `workflows/prepare_pQTL.wdl`
+## `workflows/proteomics/prepare_pQTL.wdl`
 
 End-to-end workflow for preparing Olink proteomics data for pQTL analysis.
 
 **Steps:**
 1. Runs `PrepareProteomics.R` to produce `.INT`, `.scaled`, and `.raw` protein BED files.
-2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` protein BED files.
-3. Optionally runs [`MergeCovariates.wdl`](../workflows/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
-4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
+2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/common/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` protein BED files.
+3. Optionally runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
+4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/common/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
 
 **Inputs:** Olink proteomics data file, GENCODE GTF, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
 
 **Outputs:** `.protein.INT.bed.gz`, `.protein.scaled.bed.gz`, `.protein.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv`, and optionally residualized BEDs ending in `.residualized.bed.gz`.
 
-## `workflows/normalize_pQTL.wdl`
+## `workflows/proteomics/normalize_pQTL.wdl`
 
 Workflow that median-normalizes Olink NPX parquet files before pQTL preparation. This workflow is registered in `.dockstore.yml` as `normalize_pQTL`.
 
 **Inputs:** `Array[File] OlinkData` containing Olink NPX parquet files, output prefix, reference plate ID, resource parameters.
 
-**Outputs:** Median-normalized Olink TSV and filtered long-format proteomics TSV. The filtered output can be passed directly to [`workflows/prepare_pQTL.wdl`](../workflows/prepare_pQTL.wdl) as `ProteomicData`.
+**Outputs:** Median-normalized Olink TSV and filtered long-format proteomics TSV. The filtered output can be passed directly to [`workflows/proteomics/prepare_pQTL.wdl`](../workflows/proteomics/prepare_pQTL.wdl) as `ProteomicData`.
 
 ## Methylation workflows
 
-`workflows/ProcessMethylationSample.wdl` runs per sample from direct Terra table fields (`SampleID` and `MethylationBed`), with no external manifest. It writes sample QC plus 22 autosome-specific QC-flagged call tables.
+`workflows/methylation/ProcessMethylationSample.wdl` runs per sample from direct Terra table fields (`SampleID` and `MethylationBed`), with no external manifest. It writes sample QC plus 22 autosome-specific QC-flagged call tables.
 
-`workflows/AggregateMethylationCohort.wdl` consumes one compact cohort manifest containing those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
+`workflows/methylation/AggregateMethylationCohort.wdl` consumes one compact cohort manifest containing those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
 
-`workflows/merge_methylation.wdl` is the source-BED manifest/shard wrapper for batch processing. It retains concurrent `gsutil` localization and uses an internal array-based cohort implementation, avoiding Terra's external workflow-input size limit.
+`workflows/methylation/merge_methylation.wdl` is the source-BED manifest/shard wrapper for batch processing. It retains concurrent `gsutil` localization and uses an internal array-based cohort implementation, avoiding Terra's external workflow-input size limit.
 
 See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for table bindings, manifest input, configuration, parallel filtering behavior, QC logic, and outputs.
 
-## `workflows/prepare_sQTL.wdl`
+## `workflows/splicing/prepare_sQTL.wdl`
 
 End-to-end workflow for preparing splice junction data for sQTL analysis.
 
 **Steps:**
 1. Runs `PrepareSpliceData.R` to produce `.INT`, `.scaled`, and `.raw` splice BED files.
-2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` splice BED files.
-3. Optionally runs [`MergeCovariates.wdl`](../workflows/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
-4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
+2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/common/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` splice BED files.
+3. Optionally runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
+4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/common/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
 
 **Inputs:** LeafCutter BED file, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
 
 **Outputs:** `.splicing.INT.bed.gz`, `.splicing.scaled.bed.gz`, `.splicing.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv`, and optionally residualized BEDs ending in `.residualized.bed.gz`.
 
-## `workflows/calculate_phenotypePCs.wdl`
+## `workflows/common/calculate_phenotypePCs.wdl`
 
 Workflow that computes phenotype PCs from any normalized molecular phenotype BED file.
 
@@ -89,7 +89,7 @@ Workflow that computes phenotype PCs from any normalized molecular phenotype BED
 
 **Outputs:** Phenotype PCs TSV (`<OutputPrefix>_phenotype_PCs<OutputSuffix>.tsv`).
 
-## `workflows/MergeCovariates.wdl`
+## `workflows/common/MergeCovariates.wdl`
 
 Workflow that merges additional covariates, such as genotype PCs, and molecular phenotype PCs into a single covariate file ready for tensorQTL.
 
@@ -100,7 +100,7 @@ Workflow that merges additional covariates, such as genotype PCs, and molecular 
 
 **Outputs:** Combined QTL covariate file (`<OutputPrefix>_QTL_covariates<OutputSuffix>.tsv`).
 
-## `workflows/ResidualizePhenotypes.wdl`
+## `workflows/common/ResidualizePhenotypes.wdl`
 
 One-task workflow component that residualizes a molecular phenotype BED and scales the residuals.
 

@@ -28,12 +28,12 @@ prepare_QTL/
 
 ## Main Workflows
 
-- [`workflows/prepare_eQTL.wdl`](workflows/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
-- [`workflows/prepare_sQTL.wdl`](workflows/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
-- [`workflows/prepare_pQTL.wdl`](workflows/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
-- [`workflows/normalize_pQTL.wdl`](workflows/normalize_pQTL.wdl): Median-normalizes Olink NPX parquet files before pQTL preparation.
-- [`workflows/ProcessMethylationSample.wdl`](workflows/ProcessMethylationSample.wdl) and [`workflows/AggregateMethylationCohort.wdl`](workflows/AggregateMethylationCohort.wdl): Terra-table sample and cohort entry points for pb-CpG-tools 5mC QTL preparation. Cohort aggregation accepts one compact output manifest rather than 22 Terra file arrays. [`workflows/merge_methylation.wdl`](workflows/merge_methylation.wdl) remains the source-BED manifest/shard wrapper.
-- [`workflows/prepare_VCF.wdl`](workflows/prepare_VCF.wdl): Prepares genotype data from an All of Us Hail MatrixTable.
+- [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
+- [`workflows/splicing/prepare_sQTL.wdl`](workflows/splicing/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
+- [`workflows/proteomics/prepare_pQTL.wdl`](workflows/proteomics/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
+- [`workflows/proteomics/normalize_pQTL.wdl`](workflows/proteomics/normalize_pQTL.wdl): Median-normalizes Olink NPX parquet files before pQTL preparation.
+- [`workflows/methylation/ProcessMethylationSample.wdl`](workflows/methylation/ProcessMethylationSample.wdl) and [`workflows/methylation/AggregateMethylationCohort.wdl`](workflows/methylation/AggregateMethylationCohort.wdl): Terra-table sample and cohort entry points for pb-CpG-tools 5mC QTL preparation. Cohort aggregation accepts one compact output manifest rather than 22 Terra file arrays. [`workflows/methylation/merge_methylation.wdl`](workflows/methylation/merge_methylation.wdl) remains the source-BED manifest/shard wrapper.
+- [`workflows/genotype/prepare_VCF.wdl`](workflows/genotype/prepare_VCF.wdl): Prepares genotype data from an All of Us Hail MatrixTable.
 
 See the [workflow catalog](workflows/README.md) for public entry points, internal building blocks, and maintenance conventions.
 
@@ -45,7 +45,7 @@ The prepare scripts and workflows for eQTL, pQTL, and sQTL share this output pat
 - `.scaled`: Centered and scaled molecular phenotypes. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting. Raw BEDs are emitted as workflow outputs but are not used for phenotype PCs or covariate merging.
 - Connectivity outliers: `.INT` and `.scaled` BEDs have WGCNA sample connectivity outliers removed before downstream PC, covariate, or residualization steps. Removed samples are written to `*.connectivity_outliers.tsv`; raw BEDs keep all samples after the initial sample-list filter.
-- `AdditionalCovariates`: Optional WDL input for eQTL, pQTL, and sQTL prepare workflows. When provided, the workflow runs `MergeCovariates.wdl` for both `.INT` and `.scaled` phenotype PCs.
+- `AdditionalCovariates`: Optional WDL input for eQTL, pQTL, and sQTL prepare workflows. When provided, the workflow runs [`workflows/common/MergeCovariates.wdl`](workflows/common/MergeCovariates.wdl) for both `.INT` and `.scaled` phenotype PCs.
 - `ResidualizeNormalizedInputs`: Optional WDL toggle for eQTL, pQTL, and sQTL prepare workflows. When `true`, the workflow writes residualized BEDs for `.INT` and `.scaled` inputs; raw BEDs are not residualized.
 
 See the linked docs above for full input and output details.

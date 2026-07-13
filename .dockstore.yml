@@ -2,44 +2,44 @@
 version: 1.2
 workflows:
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/prepare_eQTL.wdl
+    primaryDescriptorPath: /workflows/expression/prepare_eQTL.wdl
     name: prepare_eQTL
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/prepare_pQTL.wdl
+    primaryDescriptorPath: /workflows/proteomics/prepare_pQTL.wdl
     name: prepare_pQTL
   - subclass: WDL
-    primaryDescriptorPath: /workflows/normalize_pQTL.wdl
+    primaryDescriptorPath: /workflows/proteomics/normalize_pQTL.wdl
     name: normalize_pQTL
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/prepare_sQTL.wdl
+    primaryDescriptorPath: /workflows/splicing/prepare_sQTL.wdl
     name: prepare_sQTL
   - subclass: WDL
-    primaryDescriptorPath: /workflows/merge_methylation.wdl
+    primaryDescriptorPath: /workflows/methylation/merge_methylation.wdl
     name: merge_methylation
   - subclass: WDL
-    primaryDescriptorPath: /workflows/ProcessMethylationSample.wdl
+    primaryDescriptorPath: /workflows/methylation/ProcessMethylationSample.wdl
     name: process_methylation_sample
   - subclass: WDL
-    primaryDescriptorPath: /workflows/AggregateMethylationCohort.wdl
+    primaryDescriptorPath: /workflows/methylation/AggregateMethylationCohort.wdl
     name: aggregate_methylation_cohort
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/calculate_phenotypePCs.wdl
+    primaryDescriptorPath: /workflows/common/calculate_phenotypePCs.wdl
     name: calculate_phenotypePCs
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/prepare_VCF.wdl
+    primaryDescriptorPath: /workflows/genotype/prepare_VCF.wdl
     name: prepare_VCF
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/calculateGenotypePCs.wdl
+    primaryDescriptorPath: /workflows/genotype/calculateGenotypePCs.wdl
     name: calculateGenotypePCs
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/convertVCF2Plink.wdl    
+    primaryDescriptorPath: /workflows/genotype/convertVCF2Plink.wdl
     name: convertVCF2plink
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/MergeCovariates.wdl    
+    primaryDescriptorPath: /workflows/common/MergeCovariates.wdl
     name: MergeCovariates 
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/calculateGenotypeDosage.wdl    
+    primaryDescriptorPath: /workflows/genotype/calculateGenotypeDosage.wdl
     name: calculateGenotypeDosage
   - subclass: WDL 
-    primaryDescriptorPath: /workflows/calculateAF.wdl    
+    primaryDescriptorPath: /workflows/genotype/calculateAF.wdl
     name: calculateAF 

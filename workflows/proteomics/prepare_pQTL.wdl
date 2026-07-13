@@ -1,31 +1,28 @@
 version 1.0
-
-import  "calculate_phenotypePCs.wdl" as ComputePCs
-import  "MergeCovariates.wdl" as CovariateMerge
-import  "ResidualizePhenotypes.wdl" as Residualize
-
+import "../common/calculate_phenotypePCs.wdl" as ComputePCs
+import "../common/MergeCovariates.wdl" as CovariateMerge
+import "../common/ResidualizePhenotypes.wdl" as Residualize
 
 
-task eqtl_prepare_expression {
+
+
+task PrepareProteomicData {
     input {
-        File CountGCT
         File AnnotationGTF
         File SampleList
+        File ProteomicData
         String OutputPrefix
-
 
         Int memory
         Int disk_space
         Int num_threads
-
-        }
+    }
     command {
-        Rscript /tmp/PrepareExpression.R \
-            --CountGCT ${CountGCT} \
+        Rscript /tmp/PrepareProteomics.R \
+            --ProteomicData ${ProteomicData} \
             --AnnotationGTF ${AnnotationGTF} \
             --SampleList ${SampleList} \
             --OutputPrefix ${OutputPrefix}
-
         }
 
     runtime {
@@ -36,43 +33,46 @@ task eqtl_prepare_expression {
     }
 
     output {
-        File IntExpressionBed="${OutputPrefix}.expression.INT.bed.gz"
-        File ScaledExpressionBed="${OutputPrefix}.expression.scaled.bed.gz"
-        File RawExpressionBed="${OutputPrefix}.expression.raw.bed.gz"
-        File IntConnectivityOutliers="${OutputPrefix}.expression.INT.connectivity_outliers.tsv"
-        File ScaledConnectivityOutliers="${OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
+        File IntProteomicBed="${OutputPrefix}.protein.INT.bed.gz"
+        File ScaledProteomicBed="${OutputPrefix}.protein.scaled.bed.gz"
+        File RawProteomicBed="${OutputPrefix}.protein.raw.bed.gz"
+        File IntConnectivityOutliers="${OutputPrefix}.protein.INT.connectivity_outliers.tsv"
+        File ScaledConnectivityOutliers="${OutputPrefix}.protein.scaled.connectivity_outliers.tsv"
+    }
+
+    meta {
+        author: "Francois Aguet"
     }
 }
 
-workflow eQTLPrepareData {
+workflow pQTLPrepareData {
     input {
-        String OutputPrefix
-        File CountGCT
-        File AnnotationGTF
-        File SampleList
-        File? AdditionalCovariates
-        Boolean ResidualizeNormalizedInputs = false
-
         Int memory
         Int disk_space
         Int num_threads
-
-            }
-    call eqtl_prepare_expression {
+        File AnnotationGTF
+        File SampleList
+        File ProteomicData
+        String OutputPrefix
+        File? AdditionalCovariates
+        Boolean ResidualizeNormalizedInputs = false
+    }
+    call PrepareProteomicData {
         input:
-            OutputPrefix = OutputPrefix,
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
-            CountGCT  = CountGCT,
             AnnotationGTF = AnnotationGTF,
-            SampleList = SampleList
+            SampleList = SampleList,
+            OutputPrefix = OutputPrefix,
+            ProteomicData = ProteomicData
+
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
-            BedFile = eqtl_prepare_expression.IntExpressionBed,
-            OutputPrefix = OutputPrefix + ".expression",
+            BedFile = PrepareProteomicData.IntProteomicBed,
+            OutputPrefix = OutputPrefix + ".protein",
             OutputSuffix = ".INT",
             memory = memory,
             disk_space = disk_space,
@@ -81,20 +81,19 @@ workflow eQTLPrepareData {
 
     call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
         input:
-            BedFile = eqtl_prepare_expression.ScaledExpressionBed,
-            OutputPrefix = OutputPrefix + ".expression",
+            BedFile = PrepareProteomicData.ScaledProteomicBed,
+            OutputPrefix = OutputPrefix + ".protein",
             OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads
     }
-
     if (defined(AdditionalCovariates)) {
         call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
             input:
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
-                OutputPrefix = OutputPrefix + ".expression",
+                OutputPrefix = OutputPrefix + ".protein",
                 OutputSuffix = ".INT"
         }
 
@@ -102,7 +101,7 @@ workflow eQTLPrepareData {
             input:
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
-                OutputPrefix = OutputPrefix + ".expression",
+                OutputPrefix = OutputPrefix + ".protein",
                 OutputSuffix = ".scaled"
         }
     }
@@ -110,9 +109,9 @@ workflow eQTLPrepareData {
     if (ResidualizeNormalizedInputs) {
         call Residualize.ResidualizePhenotypes as ResidualizeIntPhenotypes {
             input:
-                InputBed = eqtl_prepare_expression.IntExpressionBed,
+                InputBed = PrepareProteomicData.IntProteomicBed,
                 Covariates = MergeIntAdditionalCovariates.QtlCovariates,
-                OutputFileName = OutputPrefix + ".expression.INT.residualized.bed.gz",
+                OutputFileName = OutputPrefix + ".protein.INT.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads
@@ -120,9 +119,9 @@ workflow eQTLPrepareData {
 
         call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
             input:
-                InputBed = eqtl_prepare_expression.ScaledExpressionBed,
+                InputBed = PrepareProteomicData.ScaledProteomicBed,
                 Covariates = MergeScaledAdditionalCovariates.QtlCovariates,
-                OutputFileName = OutputPrefix + ".expression.scaled.residualized.bed.gz",
+                OutputFileName = OutputPrefix + ".protein.scaled.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads
@@ -130,11 +129,11 @@ workflow eQTLPrepareData {
     }
 
     output {
-        File IntBedFile = eqtl_prepare_expression.IntExpressionBed
-        File ScaledBedFile = eqtl_prepare_expression.ScaledExpressionBed
-        File RawBedFile = eqtl_prepare_expression.RawExpressionBed
-        File IntConnectivityOutliers = eqtl_prepare_expression.IntConnectivityOutliers
-        File ScaledConnectivityOutliers = eqtl_prepare_expression.ScaledConnectivityOutliers
+        File IntBedFile = PrepareProteomicData.IntProteomicBed
+        File ScaledBedFile = PrepareProteomicData.ScaledProteomicBed
+        File RawBedFile = PrepareProteomicData.RawProteomicBed
+        File IntConnectivityOutliers = PrepareProteomicData.IntConnectivityOutliers
+        File ScaledConnectivityOutliers = PrepareProteomicData.ScaledConnectivityOutliers
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
