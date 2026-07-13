@@ -4,7 +4,7 @@ use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap};
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read};
 use std::path::{Path, PathBuf};
@@ -69,20 +69,12 @@ struct Schema {
 
 #[derive(Clone, Eq, PartialEq)]
 struct SortKey {
-    chrom: String,
     begin: i64,
     end: i64,
-    site_key: String,
-    sample_id: String,
 }
 impl Ord for SortKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.chrom
-            .cmp(&other.chrom)
-            .then(self.begin.cmp(&other.begin))
-            .then(self.end.cmp(&other.end))
-            .then(self.site_key.cmp(&other.site_key))
-            .then(self.sample_id.cmp(&other.sample_id))
+        self.begin.cmp(&other.begin).then(self.end.cmp(&other.end))
     }
 }
 impl PartialOrd for SortKey {
@@ -180,11 +172,8 @@ fn key(record: &StringRecord, schema: &Schema, path: &Path) -> Result<SortKey> {
             .map_err(|_| MergeError::Message(format!("Invalid {label} in {}", path.display())))
     };
     Ok(SortKey {
-        chrom: record.get(schema.chrom).unwrap_or_default().to_owned(),
         begin: parse(schema.begin, "begin")?,
         end: parse(schema.end, "end")?,
-        site_key: record.get(schema.site_key).unwrap_or_default().to_owned(),
-        sample_id: record.get(schema.sample_id).unwrap_or_default().to_owned(),
     })
 }
 impl CallStream {
@@ -215,7 +204,7 @@ impl CallStream {
         let current = key(&record, &self.schema, &self.path)?;
         if let Some(previous) = &self.previous {
             if current < *previous {
-                return Err(MergeError::Message(format!("{} is not sorted by #chrom, begin, end, site_key, sample_id. The Rust cohort merger requires one coordinate-sorted file per sample.", self.path.display())));
+                return Err(MergeError::Message(format!("{} is not sorted by begin and end. The Rust cohort merger requires one coordinate-sorted file per sample.", self.path.display())));
             }
         }
         self.previous = Some(current.clone());
@@ -370,19 +359,29 @@ fn mean(values: &[f64]) -> Option<f64> {
         Some(values.iter().sum::<f64>() / values.len() as f64)
     }
 }
-fn sd(values: &[f64]) -> Option<f64> {
-    if values.len() < 2 {
-        return None;
-    }
-    let avg = mean(values)?;
-    Some((values.iter().map(|x| (x - avg).powi(2)).sum::<f64>() / (values.len() - 1) as f64).sqrt())
+struct NumericSummary {
+    mean: Option<f64>,
+    sd: Option<f64>,
+    cv: Option<f64>,
 }
-fn cv(values: &[f64]) -> Option<f64> {
-    let avg = mean(values)?;
-    if avg == 0.0 {
+fn summarize(values: &[f64]) -> NumericSummary {
+    let average = mean(values);
+    let standard_deviation = if values.len() < 2 {
         None
     } else {
-        Some(sd(values)? / avg)
+        average.map(|avg| {
+            (values.iter().map(|x| (x - avg).powi(2)).sum::<f64>() / (values.len() - 1) as f64)
+                .sqrt()
+        })
+    };
+    let coefficient_of_variation = match (average, standard_deviation) {
+        (Some(avg), Some(std)) if avg != 0.0 => Some(std / avg),
+        _ => None,
+    };
+    NumericSummary {
+        mean: average,
+        sd: standard_deviation,
+        cv: coefficient_of_variation,
     }
 }
 fn quantile(values: &mut [f64], probability: f64) -> Option<f64> {
@@ -564,6 +563,53 @@ struct Outputs {
     raw: Writer<BufWriter<GzEncoder<File>>>,
     int: Writer<BufWriter<GzEncoder<File>>>,
 }
+struct SiteScratch {
+    seen_epoch: Vec<u32>,
+    epoch: u32,
+}
+impl SiteScratch {
+    fn new(total_samples: usize) -> Self {
+        Self {
+            seen_epoch: vec![0; total_samples],
+            epoch: 0,
+        }
+    }
+    fn begin_site(&mut self) -> u32 {
+        self.epoch = self.epoch.wrapping_add(1);
+        if self.epoch == 0 {
+            self.seen_epoch.fill(0);
+            self.epoch = 1;
+        }
+        self.epoch
+    }
+    fn mark_seen(&mut self, sample_index: usize, epoch: u32) -> bool {
+        if self.seen_epoch[sample_index] == epoch {
+            false
+        } else {
+            self.seen_epoch[sample_index] = epoch;
+            true
+        }
+    }
+}
+fn write_bed_row(
+    writer: &mut Writer<BufWriter<GzEncoder<File>>>,
+    chrom: &str,
+    key: &SortKey,
+    site_key: &str,
+    values: &[f64],
+) -> Result<()> {
+    let begin = key.begin.to_string();
+    let end = key.end.to_string();
+    writer.write_field(chrom)?;
+    writer.write_field(&begin)?;
+    writer.write_field(&end)?;
+    writer.write_field(site_key)?;
+    for value in values {
+        writer.write_field(number(Some(*value)))?;
+    }
+    writer.write_record(None::<&[u8]>)?;
+    Ok(())
+}
 fn outputs(prefix: &str, schema: &Schema, samples: &[String]) -> Result<Outputs> {
     let parent = Path::new(prefix).parent().unwrap_or_else(|| Path::new("."));
     fs::create_dir_all(parent)?;
@@ -667,8 +713,15 @@ fn process_site(
     required: usize,
     min_mad: f64,
     outputs: &mut Outputs,
+    scratch: &mut SiteScratch,
 ) -> Result<bool> {
-    let mut seen = HashSet::new();
+    let first = calls.first().ok_or_else(|| {
+        MergeError::Message("Cannot summarize an empty methylation site".to_owned())
+    })?;
+    let site_chrom = first.record.get(schema.chrom).unwrap_or_default();
+    let site_key = first.record.get(schema.site_key).unwrap_or_default();
+    let epoch = scratch.begin_site();
+    let mut n_observed = 0usize;
     let mut raw_values = vec![None; total];
     let mut cov_all = Vec::new();
     let mut methyl_all = Vec::new();
@@ -680,12 +733,13 @@ fn process_site(
     let mut n_pass = 0usize;
     for call in calls {
         let id = call.record.get(schema.sample_id).unwrap_or_default();
-        if !seen.insert(id.to_owned()) {
+        if !scratch.mark_seen(call.sample_index, epoch) {
             return Err(MergeError::Message(format!(
                 "Found duplicated sample/site calls for {id} at {}",
-                key.site_key
+                site_key
             )));
         }
+        n_observed += 1;
         if let Some(x) = call.cov.filter(|x| x.is_finite()) {
             cov_all.push(x);
         }
@@ -715,6 +769,11 @@ fn process_site(
     }
     let pass_min = n_min >= required;
     let pass_presence = n_pass >= required;
+    let cov_all_summary = summarize(&cov_all);
+    let methyl_all_summary = summarize(&methyl_all);
+    let cov_pass_summary = summarize(&cov_pass);
+    let methyl_pass_summary = summarize(&methyl_pass);
+    let median_cov_pass = median(&cov_pass);
     let methyl_mad = mad(&methyl_pass);
     let pass_mad = methyl_mad.is_some_and(|x| x >= min_mad);
     let keep = pass_presence && pass_mad;
@@ -733,7 +792,7 @@ fn process_site(
         let average = mean(&observed).ok_or_else(|| {
             MergeError::Message(format!(
                 "Cannot impute retained QTL feature with no observed methylation values: {}",
-                key.site_key
+                site_key
             ))
         })?;
         for value in &mut raw_values {
@@ -743,79 +802,61 @@ fn process_site(
             }
         }
         for call in calls.iter().filter(|call| call.pass) {
-            let mut long_record = vec![call
-                .record
-                .get(schema.sample_id)
-                .unwrap_or_default()
-                .to_owned()];
-            long_record.extend(
-                call.record
-                    .iter()
-                    .enumerate()
-                    .filter(|(index, _)| *index != schema.sample_id)
-                    .map(|(_, value)| value.to_owned()),
-            );
-            long_record.push(number(call.value));
-            outputs.long.write_record(long_record)?;
+            outputs
+                .long
+                .write_field(call.record.get(schema.sample_id).unwrap_or_default())?;
+            for (index, value) in call.record.iter().enumerate() {
+                if index != schema.sample_id {
+                    outputs.long.write_field(value)?;
+                }
+            }
+            outputs.long.write_field(number(call.value))?;
+            outputs.long.write_record(None::<&[u8]>)?;
         }
         let values: Vec<f64> = raw_values.iter().map(|x| x.unwrap()).collect();
         let ints = inverse_normal(&values);
-        let mut raw_row = vec![
-            key.chrom.clone(),
-            key.begin.to_string(),
-            key.end.to_string(),
-            key.site_key.clone(),
-        ];
-        raw_row.extend(values.iter().map(|x| number(Some(*x))));
-        outputs.raw.write_record(raw_row)?;
-        let mut int_row = vec![
-            key.chrom.clone(),
-            key.begin.to_string(),
-            key.end.to_string(),
-            key.site_key.clone(),
-        ];
-        int_row.extend(ints.iter().map(|x| number(Some(*x))));
-        outputs.int.write_record(int_row)?;
+        write_bed_row(&mut outputs.raw, site_chrom, key, site_key, &values)?;
+        write_bed_row(&mut outputs.int, site_chrom, key, site_key, &ints)?;
     }
     outputs.qc.write_record([
-        key.chrom.clone(),
+        site_chrom.to_owned(),
         key.begin.to_string(),
         key.end.to_string(),
-        key.site_key.clone(),
+        site_key.to_owned(),
         n_pass.to_string(),
         (n_pass as f64 / total as f64).to_string(),
-        number(median(&cov_pass)),
+        number(median_cov_pass),
         number(cov_pass.iter().copied().reduce(f64::min)),
         number(cov_pass.iter().copied().reduce(f64::max)),
         required.to_string(),
         bool_text(keep).to_owned(),
     ])?;
     outputs.metadata.write_record([
-        key.chrom.clone(),
+        site_chrom.to_owned(),
         key.begin.to_string(),
         key.end.to_string(),
-        key.site_key.clone(),
-        seen.len().to_string(),
-        (seen.len() as f64 / total as f64).to_string(),
-        number(mean(&cov_all)),
-        number(sd(&cov_all)),
-        number(cv(&cov_all)),
-        number(mean(&methyl_all)),
-        number(sd(&methyl_all)),
-        number(cv(&methyl_all)),
+        site_key.to_owned(),
+        n_observed.to_string(),
+        (n_observed as f64 / total as f64).to_string(),
+        number(cov_all_summary.mean),
+        number(cov_all_summary.sd),
+        number(cov_all_summary.cv),
+        number(methyl_all_summary.mean),
+        number(methyl_all_summary.sd),
+        number(methyl_all_summary.cv),
         n_min.to_string(),
         (n_min as f64 / total as f64).to_string(),
         n_pass.to_string(),
         (n_pass as f64 / total as f64).to_string(),
-        number(mean(&cov_pass)),
-        number(sd(&cov_pass)),
-        number(cv(&cov_pass)),
-        number(median(&cov_pass)),
+        number(cov_pass_summary.mean),
+        number(cov_pass_summary.sd),
+        number(cov_pass_summary.cv),
+        number(median_cov_pass),
         number(cov_pass.iter().copied().reduce(f64::min)),
         number(cov_pass.iter().copied().reduce(f64::max)),
-        number(mean(&methyl_pass)),
-        number(sd(&methyl_pass)),
-        number(cv(&methyl_pass)),
+        number(methyl_pass_summary.mean),
+        number(methyl_pass_summary.sd),
+        number(methyl_pass_summary.cv),
         number(methyl_mad),
         corr_methyl.len().to_string(),
         number(spearman(&corr_methyl, &corr_cov)),
@@ -859,20 +900,18 @@ fn main() -> Result<()> {
     let mut merge = KWayMerge::new(&paths, &schema)?;
     let mut outputs = outputs(&args.output_prefix, &schema, &samples)?;
     let mut current: Vec<Call> = Vec::new();
+    let mut scratch = SiteScratch::new(args.total_samples);
     let mut current_site: Option<SortKey> = None;
     let mut processed = 0usize;
     let mut kept = 0usize;
     while let Some((sort_key, record)) = merge.next()? {
-        if sort_key.chrom != args.chromosome {
-            continue;
+        if record.get(schema.chrom).unwrap_or_default() != args.chromosome {
+            return Err(MergeError::Message(format!(
+                "All-call files contain a chromosome other than {}",
+                args.chromosome
+            )));
         }
-        let site = SortKey {
-            chrom: sort_key.chrom.clone(),
-            begin: sort_key.begin,
-            end: sort_key.end,
-            site_key: sort_key.site_key.clone(),
-            sample_id: String::new(),
-        };
+        let site = sort_key;
         if current_site.as_ref().is_some_and(|x| x != &site) {
             if process_site(
                 &current,
@@ -882,6 +921,7 @@ fn main() -> Result<()> {
                 required,
                 args.min_methylation_mad,
                 &mut outputs,
+                &mut scratch,
             )? {
                 kept += 1;
             }
@@ -937,6 +977,7 @@ fn main() -> Result<()> {
             required,
             args.min_methylation_mad,
             &mut outputs,
+            &mut scratch,
         )? {
             kept += 1;
         }
