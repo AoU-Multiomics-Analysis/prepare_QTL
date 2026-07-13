@@ -50,9 +50,23 @@ phenotype_pcs <- read_sample_covariates(phenotype_pcs, "Phenotype-PC file")
 
 if (!is.null(opt$AdditionalCovariates)) {
     additional <- read_sample_covariates(opt$AdditionalCovariates, "Additional-covariates file")
-    if (!setequal(phenotype_pcs$sample_id, additional$sample_id)) {
-        stop("Additional-covariates sample IDs must exactly match phenotype-PC sample IDs")
+    missing_additional_ids <- setdiff(phenotype_pcs$sample_id, additional$sample_id)
+    if (length(missing_additional_ids) > 0L) {
+        stop(
+            "Additional-covariates file is missing ", length(missing_additional_ids),
+            " phenotype-PC sample ID(s): ",
+            paste(head(missing_additional_ids, 10L), collapse = ", "),
+            if (length(missing_additional_ids) > 10L) " ..." else ""
+        )
     }
+    n_extra_additional_ids <- sum(!additional$sample_id %chin% phenotype_pcs$sample_id)
+    if (n_extra_additional_ids > 0L) {
+        message(
+            "Discarding ", n_extra_additional_ids,
+            " additional-covariate sample(s) absent from the phenotype-PC cohort"
+        )
+    }
+    additional <- additional[sample_id %chin% phenotype_pcs$sample_id]
     setorder(phenotype_pcs, sample_id)
     setorder(additional, sample_id)
     duplicate_columns <- intersect(setdiff(names(phenotype_pcs), "sample_id"), setdiff(names(additional), "sample_id"))

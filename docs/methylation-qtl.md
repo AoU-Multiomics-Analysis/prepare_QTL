@@ -184,7 +184,7 @@ chr1	10469	10470	chr1*10469*10470	0.73	0.68	...
 
 The raw BED contains beta values (`mod_score / 100`). For every retained feature, samples missing after per-sample QC are filled with that feature's mean beta value among observed QC-passing samples. The metadata field `n_samples_imputed_in_qtl_bed` records exactly how many cells were imputed for that feature. The INT BED then rank-transforms each imputed CpG row across samples and is used for phenotype-PC calculation. The workflow calculates PCs only for the INT BED, following the existing molecular-QTL prepare workflows.
 
-Set `AdditionalCovariates` to a TSV with a `sample_id` column to merge genotype PCs or other covariates with the INT phenotype PCs. The resulting covariate file has covariates as rows and sample IDs as columns, ready for TensorQTL.
+Set `AdditionalCovariates` to a TSV with a `sample_id` column to merge genotype PCs or other covariates with the INT phenotype PCs. The file may contain samples outside the methylation cohort; the workflow discards those rows automatically. Every methylation sample must have a matching row in `AdditionalCovariates`. The resulting covariate file has covariates as rows and sample IDs as columns, ready for TensorQTL.
 
 The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. This retains sites present in at least 95% of samples and produces a complete matrix through feature-mean imputation before PCA and QTL mapping.
 
