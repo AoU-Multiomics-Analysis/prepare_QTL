@@ -32,8 +32,10 @@ prepare_QTL/
 - [`workflows/prepare_sQTL.wdl`](workflows/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/prepare_pQTL.wdl`](workflows/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/normalize_pQTL.wdl`](workflows/normalize_pQTL.wdl): Median-normalizes Olink NPX parquet files before pQTL preparation.
-- [`workflows/ProcessMethylationSample.wdl`](workflows/ProcessMethylationSample.wdl) and [`workflows/AggregateMethylationCohort.wdl`](workflows/AggregateMethylationCohort.wdl): Terra-table sample and cohort entry points for pb-CpG-tools 5mC QTL preparation. The existing [`workflows/merge_methylation.wdl`](workflows/merge_methylation.wdl) remains the manifest/shard wrapper and reuses the cohort workflow.
+- [`workflows/ProcessMethylationSample.wdl`](workflows/ProcessMethylationSample.wdl) and [`workflows/AggregateMethylationCohort.wdl`](workflows/AggregateMethylationCohort.wdl): Terra-table sample and cohort entry points for pb-CpG-tools 5mC QTL preparation. Cohort aggregation accepts one compact output manifest rather than 22 Terra file arrays. [`workflows/merge_methylation.wdl`](workflows/merge_methylation.wdl) remains the source-BED manifest/shard wrapper.
 - [`workflows/prepare_VCF.wdl`](workflows/prepare_VCF.wdl): Prepares genotype data from an All of Us Hail MatrixTable.
+
+See the [workflow catalog](workflows/README.md) for public entry points, internal building blocks, and maintenance conventions.
 
 ## Common Options
 

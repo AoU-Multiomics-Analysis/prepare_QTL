@@ -58,9 +58,9 @@ Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 
 `workflows/ProcessMethylationSample.wdl` runs per sample from direct Terra table fields (`SampleID` and `MethylationBed`), with no external manifest. It writes sample QC plus 22 autosome-specific QC-flagged call tables.
 
-`workflows/AggregateMethylationCohort.wdl` consumes arrays of those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
+`workflows/AggregateMethylationCohort.wdl` consumes one compact cohort manifest containing those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
 
-`workflows/merge_methylation.wdl` is the manifest/shard wrapper for batch processing. It retains concurrent `gsutil` localization and delegates its cohort stage to `AggregateMethylationCohort.wdl`, so the two execution routes share identical cohort logic.
+`workflows/merge_methylation.wdl` is the source-BED manifest/shard wrapper for batch processing. It retains concurrent `gsutil` localization and uses an internal array-based cohort implementation, avoiding Terra's external workflow-input size limit.
 
 See the [PacBio 5mC QTL workflow guide](methylation-qtl.md) for table bindings, manifest input, configuration, parallel filtering behavior, QC logic, and outputs.
 

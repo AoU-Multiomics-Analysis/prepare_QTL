@@ -1,0 +1,27 @@
+name: Validate Workflow Descriptors
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install miniwdl
+        run: python -m pip install --disable-pip-version-check miniwdl
+
+      - name: Validate Dockstore registration
+        run: python scripts/validate_dockstore.py
+
+      - name: Parse Dockstore WDLs
+        run: python scripts/validate_dockstore.py | tail -n +2 | xargs -n 1 miniwdl check
