@@ -1,2 +1,2 @@
 # Local Rust build artifacts
-rust/methylation_filter/target/
+rust/*/target/

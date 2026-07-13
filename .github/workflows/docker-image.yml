@@ -39,3 +39,35 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.tags }}
+
+  build_methylation_rust:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{github.repository_owner}}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-methylation-rust
+
+      - name: Build and push slim methylation image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: envs/MethylationRust/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.tags }}

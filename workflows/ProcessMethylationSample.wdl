@@ -45,7 +45,7 @@ task FilterMethylationSample {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust:main"
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: "~{NumThreads}"

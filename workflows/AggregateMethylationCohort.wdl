@@ -99,25 +99,23 @@ task MergeMethylationChromosome {
     command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
-        printf '%s\n' "~{CohortSampleQC}" > sample_qc_files.list
-
-        Rscript /tmp/MergeMethylationCohort.R \
-            --AllCallList all_call_shards.list \
-            --SampleQcList sample_qc_files.list \
-            --CohortSamples "~{CohortSamples}" \
-            --TotalSamples ~{TotalSamples} \
-            --Chromosome "~{Chromosome}" \
-            --OutputPrefix "~{OutputPrefix}" \
-            --MinSampleFraction ~{MinSampleFraction} \
-            --MinSamples ~{MinSamples} \
-            --MinMethylationMAD ~{MinMethylationMAD} \
-            --ValueColumn "~{ValueColumn}" \
-            --ValueMultiplier ~{ValueMultiplier} \
-            --SkipFilterPlots
+        methylation-chromosome-merge \
+            --all-call-list all_call_shards.list \
+            --sample-qc "~{CohortSampleQC}" \
+            --cohort-samples "~{CohortSamples}" \
+            --total-samples ~{TotalSamples} \
+            --chromosome "~{Chromosome}" \
+            --output-prefix "~{OutputPrefix}" \
+            --min-sample-fraction ~{MinSampleFraction} \
+            --min-samples ~{MinSamples} \
+            --min-methylation-mad ~{MinMethylationMAD} \
+            --value-column "~{ValueColumn}" \
+            --value-multiplier ~{ValueMultiplier} \
+            --progress-every-sites 1000
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust:main"
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: "~{NumThreads}"

@@ -1,11 +1,3 @@
-## Build the streaming per-sample methylation filter as a compiled workflow tool.
-## Bullseye keeps the resulting binary compatible with the micromamba runtime.
-FROM rust:1.85-slim-bullseye AS methylation_filter_builder
-WORKDIR /build/rust/methylation_filter
-COPY rust/methylation_filter/Cargo.toml ./
-COPY rust/methylation_filter/src ./src
-RUN cargo test --release && cargo build --release
-
 ## Use micromamba as the base image
 FROM mambaorg/micromamba:1.5.3
 
@@ -34,7 +26,6 @@ RUN micromamba install -y -n base -c conda-forge -c bioconda \
     conda-forge::r-patchwork \
     bioconda::htslib
 RUN gsutil version -l | grep -q 'compiled crcmod: True'
-COPY --from=methylation_filter_builder /build/rust/methylation_filter/target/release/methylation-filter /usr/local/bin/methylation-filter
 COPY scripts/ /opt/prepare_qtl/scripts/
 # Keep the legacy flat location while Terra workflows transition between the
 # mutable :main image tag and a newly published image. Source files remain
