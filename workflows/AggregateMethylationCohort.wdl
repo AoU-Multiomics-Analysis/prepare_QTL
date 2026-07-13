@@ -52,17 +52,13 @@ task PrepareMethylationCohortManifest {
 
 task BuildMethylationCohortSamples {
     input {
-        File SampleQCManifest
+        Array[File] SampleQCFiles
         String OutputPrefix
     }
 
     command <<<
         set -euo pipefail
-        mkdir -p input_sample_qc
-        # shellcheck disable=SC2016
-        sed 's/\r$//' "~{SampleQCManifest}" | awk 'NF' | \
-            xargs -r -n 50 -P 8 sh -c 'destination="$1"; shift; gsutil -q cp "$@" "$destination"' _ input_sample_qc/
-        sed 's/\r$//' "~{SampleQCManifest}" | awk -F/ 'NF {print "input_sample_qc/" $NF}' > sample_qc_files.list
+        printf '%s\n' ~{sep=' ' SampleQCFiles} > sample_qc_files.list
         Rscript /tmp/BuildMethylationCohortSamples.R \
             --SampleQcList sample_qc_files.list \
             --OutputPrefix "~{OutputPrefix}"
@@ -84,7 +80,7 @@ task BuildMethylationCohortSamples {
 
 task MergeMethylationChromosome {
     input {
-        File AllCallManifest
+        Array[File] AllCallShards
         File CohortSampleQC
         File CohortSamples
         Int TotalSamples
@@ -102,11 +98,7 @@ task MergeMethylationChromosome {
 
     command <<<
         set -euo pipefail
-        mkdir -p input_calls
-        # shellcheck disable=SC2016
-        sed 's/\r$//' "~{AllCallManifest}" | awk 'NF' | \
-            xargs -r -n 50 -P 8 sh -c 'destination="$1"; shift; gsutil -q cp "$@" "$destination"' _ input_calls/
-        sed 's/\r$//' "~{AllCallManifest}" | awk -F/ 'NF {print "input_calls/" $NF}' > all_call_shards.list
+        printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
         printf '%s\n' "~{CohortSampleQC}" > sample_qc_files.list
 
         Rscript /tmp/MergeMethylationCohort.R \
@@ -429,9 +421,24 @@ workflow AggregateMethylationCohort {
             CohortManifest = CohortManifest
     }
 
+    Array[File] SampleQCFiles = read_lines(PrepareMethylationCohortManifest.SampleQCManifest)
+    Array[Array[File]] AllCallFilesByAutosome = [
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome01Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome02Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome03Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome04Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome05Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome06Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome07Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome08Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome09Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome10Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome11Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome12Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome13Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome14Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome15Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome16Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome17Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome18Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome19Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome20Manifest),
+        read_lines(PrepareMethylationCohortManifest.AllCallsAutosome21Manifest), read_lines(PrepareMethylationCohortManifest.AllCallsAutosome22Manifest)
+    ]
+
     call BuildMethylationCohortSamples {
         input:
-            SampleQCManifest = PrepareMethylationCohortManifest.SampleQCManifest,
+            SampleQCFiles = SampleQCFiles,
             OutputPrefix = OutputPrefix
     }
 
@@ -451,24 +458,10 @@ workflow AggregateMethylationCohort {
         "autosome17", "autosome18", "autosome19", "autosome20",
         "autosome21", "autosome22"
     ]
-    Array[File] AllCallManifestsByAutosome = [
-        PrepareMethylationCohortManifest.AllCallsAutosome01Manifest, PrepareMethylationCohortManifest.AllCallsAutosome02Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome03Manifest, PrepareMethylationCohortManifest.AllCallsAutosome04Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome05Manifest, PrepareMethylationCohortManifest.AllCallsAutosome06Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome07Manifest, PrepareMethylationCohortManifest.AllCallsAutosome08Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome09Manifest, PrepareMethylationCohortManifest.AllCallsAutosome10Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome11Manifest, PrepareMethylationCohortManifest.AllCallsAutosome12Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome13Manifest, PrepareMethylationCohortManifest.AllCallsAutosome14Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome15Manifest, PrepareMethylationCohortManifest.AllCallsAutosome16Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome17Manifest, PrepareMethylationCohortManifest.AllCallsAutosome18Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome19Manifest, PrepareMethylationCohortManifest.AllCallsAutosome20Manifest,
-        PrepareMethylationCohortManifest.AllCallsAutosome21Manifest, PrepareMethylationCohortManifest.AllCallsAutosome22Manifest
-    ]
-
     scatter (autosome_index in range(length(AutosomeNames))) {
         call MergeMethylationChromosome as MergeMethylationAutosome {
             input:
-                AllCallManifest = AllCallManifestsByAutosome[autosome_index],
+                AllCallShards = AllCallFilesByAutosome[autosome_index],
                 CohortSampleQC = BuildMethylationCohortSamples.CohortSampleQC,
                 CohortSamples = BuildMethylationCohortSamples.CohortSamples,
                 TotalSamples = BuildMethylationCohortSamples.TotalSamples,
