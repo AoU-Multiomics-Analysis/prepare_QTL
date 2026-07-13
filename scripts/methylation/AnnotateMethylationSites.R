@@ -11,7 +11,7 @@ suppressPackageStartupMessages({
 })
 
 option_list <- list(
-    make_option("--SiteMetadata", type = "character", help = "All-site methylation metadata TSV(.gz) [required]"),
+    make_option("--PassingSiteMetadata", type = "character", help = "Passing-only methylation metadata TSV(.gz) [required]"),
     make_option("--AnnotationGTF", type = "character", help = "Gene annotation GTF(.gz) [required]"),
     make_option("--CCREAnnotations", type = "character", help = "Six-column ENCODE cCRE BED-like file [required]"),
     make_option("--CpGIslandAnnotations", type = "character", help = "UCSC cpgIslandExt table [required]"),
@@ -20,9 +20,9 @@ option_list <- list(
                 help = "Bases on either side of a TSS defining a promoter [default: %default]")
 )
 opt <- parse_args(OptionParser(option_list = option_list))
-required_options <- c("SiteMetadata", "AnnotationGTF", "CCREAnnotations", "CpGIslandAnnotations", "OutputPrefix")
+required_options <- c("PassingSiteMetadata", "AnnotationGTF", "CCREAnnotations", "CpGIslandAnnotations", "OutputPrefix")
 if (any(vapply(required_options, function(name) is.null(opt[[name]]), logical(1)))) {
-    stop("--SiteMetadata, --AnnotationGTF, --CCREAnnotations, --CpGIslandAnnotations, and --OutputPrefix are required")
+    stop("--PassingSiteMetadata, --AnnotationGTF, --CCREAnnotations, --CpGIslandAnnotations, and --OutputPrefix are required")
 }
 for (path in unlist(opt[required_options[required_options != "OutputPrefix"]])) {
     if (!file.exists(path)) stop("Input file does not exist: ", path)
@@ -135,11 +135,14 @@ overlaps_any <- function(query_gr, subject_gr) {
     present
 }
 
-metadata <- fread(opt$SiteMetadata)
+metadata <- fread(opt$PassingSiteMetadata)
 required_site_columns <- c("#chrom", "begin", "end", "site_key", "keep_site")
 missing_site_columns <- setdiff(required_site_columns, names(metadata))
 if (length(missing_site_columns) > 0) stop("Site metadata is missing: ", paste(missing_site_columns, collapse = ", "))
-sites <- metadata[keep_site == TRUE]
+if (anyNA(metadata$keep_site) || any(metadata$keep_site != TRUE)) {
+    stop("--PassingSiteMetadata must contain only rows with keep_site == TRUE")
+}
+sites <- metadata
 if (anyNA(sites$begin) || anyNA(sites$end) || any(sites$begin < 0) || any(sites$end <= sites$begin)) {
     stop("Passing site metadata must contain valid BED start/end coordinates")
 }

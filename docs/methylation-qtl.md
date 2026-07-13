@@ -134,6 +134,7 @@ During each chromosome merge, the cohort-metric reduction reports progress every
 | `<prefix>.methylation.filtered.long.tsv.gz` | Calls from sites passing cohort QC and the sample connectivity filter. |
 | `<prefix>.methylation.site_qc.tsv.gz` | Compact all-site table with sample-presence counts and `keep_site`. |
 | `<prefix>.methylation.site_metadata.tsv.gz` | All observed sites, including coverage and methylation means, standard deviations, CVs, methylation MAD, coverage fractions, sample counts, `coverage_methylation_spearman_rho`, filter flags, `n_samples_imputed_in_qtl_bed`, and `keep_site`. |
+| `<prefix>.methylation.passing_site_metadata.tsv.gz` | Streamed subset of the site metadata containing only `keep_site == TRUE`; consumed by the annotation task. |
 | `<prefix>.methylation.sample_qc.tsv` | One row per sample with coverage QC plus connectivity score, Z-score, and pass flag. |
 | `<prefix>.methylation.filter_summary.tsv` | Counts of sites at each mutually exclusive cohort-QC stage. |
 | `<prefix>.methylation.filter_counts.png` | Bar chart of the sequential cohort-QC counts. |

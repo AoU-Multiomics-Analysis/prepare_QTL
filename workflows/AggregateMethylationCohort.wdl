@@ -268,6 +268,37 @@ task AggregateMethylationChromosomes {
         concat_chromosome_tables int_beds_by_chromosome.list \
             "~{OutputPrefix}.methylation.INT.pre_connectivity.bed.gz" "INT BED"
 
+        extract_passing_site_metadata() {
+            local input_path="$1"
+            local output_path="$2"
+
+            bgzip -c -d -@ ~{NumThreads} "$input_path" | \
+                awk 'BEGIN { FS = OFS = "\t" }
+                    NR == 1 {
+                        for (i = 1; i <= NF; i++) {
+                            column_name = $i
+                            gsub(/^"|"$/, "", column_name)
+                            if (column_name == "keep_site") keep_column = i
+                        }
+                        if (!keep_column) {
+                            print "Site-metadata table is missing keep_site" > "/dev/stderr"
+                            exit 1
+                        }
+                        print
+                        next
+                    }
+                    {
+                        keep_value = $keep_column
+                        gsub(/^"|"$/, "", keep_value)
+                        if (keep_value == "TRUE") print
+                    }' | \
+                bgzip -c -@ ~{NumThreads} > "$output_path"
+        }
+
+        extract_passing_site_metadata \
+            "~{OutputPrefix}.methylation.site_metadata.tsv.gz" \
+            "~{OutputPrefix}.methylation.passing_site_metadata.tsv.gz"
+
         Rscript /tmp/AggregateMethylationChromosomes.R \
             --SiteMetadata "~{OutputPrefix}.methylation.site_metadata.tsv.gz" \
             --SampleQcList sample_qc_files.list \
@@ -288,6 +319,7 @@ task AggregateMethylationChromosomes {
         File PreConnectivityFilteredCalls = "~{OutputPrefix}.methylation.filtered.long.pre_connectivity.tsv.gz"
         File SiteQC = "~{OutputPrefix}.methylation.site_qc.tsv.gz"
         File SiteMetadata = "~{OutputPrefix}.methylation.site_metadata.tsv.gz"
+        File PassingSiteMetadata = "~{OutputPrefix}.methylation.passing_site_metadata.tsv.gz"
         File PreConnectivitySampleQC = "~{OutputPrefix}.methylation.sample_qc.pre_connectivity.tsv"
         File FilterSummary = "~{OutputPrefix}.methylation.filter_summary.tsv"
         File FilterCountsPlot = "~{OutputPrefix}.methylation.filter_counts.png"
@@ -350,7 +382,7 @@ task FinalizeMethylationConnectivity {
 
 task AnnotateMethylationSites {
     input {
-        File SiteMetadata
+        File PassingSiteMetadata
         File AnnotationGTF
         File CCREAnnotations
         File CpGIslandAnnotations
@@ -362,7 +394,7 @@ task AnnotateMethylationSites {
 
     command <<<
         Rscript /tmp/AnnotateMethylationSites.R \
-            --SiteMetadata "~{SiteMetadata}" \
+            --PassingSiteMetadata "~{PassingSiteMetadata}" \
             --AnnotationGTF "~{AnnotationGTF}" \
             --CCREAnnotations "~{CCREAnnotations}" \
             --CpGIslandAnnotations "~{CpGIslandAnnotations}" \
@@ -538,7 +570,7 @@ workflow AggregateMethylationCohort {
 
     call AnnotateMethylationSites {
         input:
-            SiteMetadata = AggregateMethylationChromosomes.SiteMetadata,
+            PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata,
             AnnotationGTF = AnnotationGTF,
             CCREAnnotations = CCREAnnotations,
             CpGIslandAnnotations = CpGIslandAnnotations,
@@ -572,6 +604,7 @@ workflow AggregateMethylationCohort {
         File FilteredCalls = FinalizeMethylationConnectivity.FilteredCalls
         File SiteQC = AggregateMethylationChromosomes.SiteQC
         File SiteMetadata = AggregateMethylationChromosomes.SiteMetadata
+        File PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata
         File SampleQC = FinalizeMethylationConnectivity.SampleQC
         File FilterSummary = AggregateMethylationChromosomes.FilterSummary
         File FilterCountsPlot = AggregateMethylationChromosomes.FilterCountsPlot
