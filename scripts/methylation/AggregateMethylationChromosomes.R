@@ -11,7 +11,9 @@ option_list <- list(
     make_option("--SiteMetadata", type = "character", help = "Aggregated site-metadata table [required]"),
     make_option("--SampleQcList", type = "character", help = "One per-shard sample-QC file path per line [required]"),
     make_option("--TotalSamples", type = "integer", help = "Total input sample count [required]"),
-    make_option("--OutputPrefix", type = "character", help = "Prefix for output files [required]")
+    make_option("--OutputPrefix", type = "character", help = "Prefix for output files [required]"),
+    make_option("--SampleQcOutput", type = "character", default = NULL,
+                help = "Optional sample-QC output path [default: <OutputPrefix>.methylation.sample_qc.tsv]")
 )
 opt <- parse_args(OptionParser(option_list = option_list))
 required_options <- c("SiteMetadata", "SampleQcList", "OutputPrefix")
@@ -24,7 +26,11 @@ output_dir <- dirname(opt$OutputPrefix)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
 sample_qc <- read_sample_qc(read_file_list(opt$SampleQcList, "Sample-QC"), opt$TotalSamples)
-sample_qc_output <- paste0(opt$OutputPrefix, ".methylation.sample_qc.tsv")
+sample_qc_output <- if (is.null(opt$SampleQcOutput)) {
+    paste0(opt$OutputPrefix, ".methylation.sample_qc.tsv")
+} else {
+    opt$SampleQcOutput
+}
 fwrite(sample_qc, sample_qc_output, sep = "\t", na = "NA")
 
 plot_columns <- c(

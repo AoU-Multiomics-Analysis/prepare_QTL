@@ -183,6 +183,13 @@ workflow MergeMethylation {
         Int AggregateDiskGB = 1000
         Int AnnotationMemoryGB = 64
         Int AnnotationDiskGB = 100
+        Int CorrelationWindowBP = 1000
+        Float CorrelationMinAbsCorrelation = 0.95
+        Int CorrelationMemoryGB = 64
+        Int CorrelationDiskGB = 250
+        Int MaxConnectivityFeatures = 0
+        Int ConnectivityLandmarks = 200
+        Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
     }
 
@@ -255,6 +262,13 @@ workflow MergeMethylation {
             AggregateDiskGB = AggregateDiskGB,
             AnnotationMemoryGB = AnnotationMemoryGB,
             AnnotationDiskGB = AnnotationDiskGB,
+            CorrelationWindowBP = CorrelationWindowBP,
+            CorrelationMinAbsCorrelation = CorrelationMinAbsCorrelation,
+            CorrelationMemoryGB = CorrelationMemoryGB,
+            CorrelationDiskGB = CorrelationDiskGB,
+            MaxConnectivityFeatures = MaxConnectivityFeatures,
+            ConnectivityLandmarks = ConnectivityLandmarks,
+            ConnectivityZThreshold = ConnectivityZThreshold,
             NumThreads = NumThreads
     }
 
@@ -268,6 +282,11 @@ workflow MergeMethylation {
         File FilterUpsetPlot = CohortMerge.FilterUpsetPlot
         File RawMethylationBed = CohortMerge.RawMethylationBed
         File IntMethylationBed = CohortMerge.IntMethylationBed
+        File ConnectivityOutliers = CohortMerge.ConnectivityOutliers
+        File ConnectivitySummary = CohortMerge.ConnectivitySummary
+        File ConnectivityRepresentativeCpGs = CohortMerge.ConnectivityRepresentativeCpGs
+        Array[File] CorrelationClustersByChromosome = CohortMerge.CorrelationClustersByChromosome
+        Array[File] CorrelationSummariesByChromosome = CohortMerge.CorrelationSummariesByChromosome
         File PassingSiteAnnotations = CohortMerge.PassingSiteAnnotations
         File IntPhenotypePCsOut = CohortMerge.IntPhenotypePCsOut
         File? IntQtlCovariates = CohortMerge.IntQtlCovariates

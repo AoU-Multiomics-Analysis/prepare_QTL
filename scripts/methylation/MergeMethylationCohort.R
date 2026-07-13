@@ -24,6 +24,8 @@ option_list <- list(
                 help = "pb-CpG-tools methylation column [default: %default]"),
     make_option("--ValueMultiplier", type = "double", default = 0.01,
                 help = "Multiplier applied to ValueColumn [default: %default]"),
+    make_option("--ProgressEverySites", type = "integer", default = 1000,
+                help = "Write a cohort-metric progress message after this many sites [default: %default]"),
     make_option("--SkipFilterPlots", action = "store_true", default = FALSE,
                 help = "Do not write filter summary/count/UpSet outputs")
 )
@@ -37,6 +39,7 @@ if (!is.finite(opt$MinSampleFraction) || opt$MinSampleFraction <= 0 || opt$MinSa
 if (is.na(opt$MinSamples) || opt$MinSamples < 0) stop("--MinSamples must be a non-negative integer")
 if (!is.finite(opt$MinMethylationMAD) || opt$MinMethylationMAD < 0) stop("--MinMethylationMAD must be a non-negative number")
 if (!is.finite(opt$ValueMultiplier) || opt$ValueMultiplier <= 0) stop("--ValueMultiplier must be a positive number")
+if (is.na(opt$ProgressEverySites) || opt$ProgressEverySites < 1) stop("--ProgressEverySites must be at least 1")
 
 all_call_paths <- read_file_list(opt$AllCallList, "All-call")
 all_call_data <- read_call_tables(all_call_paths, "All-call", c("meets_min_coverage", "per_sample_qc_pass"))
@@ -106,9 +109,13 @@ if (all(is.na(methylation_values)) && any(!is.na(all_site_calls[[opt$ValueColumn
 }
 all_site_calls[, methylation_value_for_metrics := methylation_values * opt$ValueMultiplier]
 
+total_sites_for_metrics <- uniqueN(all_site_calls$site_key)
+processed_sites_for_metrics <- 0L
+message("Computing cohort metrics for ", total_sites_for_metrics, " site(s)", chromosome_label,
+        "; reporting progress every ", opt$ProgressEverySites, " site(s)")
 site_metadata <- all_site_calls[, {
     per_sample_pass <- per_sample_qc_pass == TRUE
-    list(
+    metrics <- list(
         n_samples_observed = uniqueN(sample_id),
         fraction_samples_observed = uniqueN(sample_id) / n_samples,
         mean_cov_all_calls = safe_mean(cov),
@@ -139,6 +146,13 @@ site_metadata <- all_site_calls[, {
             sample_normalized_log_coverage[per_sample_pass]
         )
     )
+    processed_sites_for_metrics <<- processed_sites_for_metrics + 1L
+    if (processed_sites_for_metrics %% opt$ProgressEverySites == 0L ||
+        processed_sites_for_metrics == total_sites_for_metrics) {
+        message("Cohort metric progress", chromosome_label, ": ",
+                processed_sites_for_metrics, "/", total_sites_for_metrics, " sites processed")
+    }
+    metrics
 }, by = .(`#chrom`, begin, end, site_key)]
 site_metadata[, `:=`(
     n_samples_required = required_samples,
@@ -232,7 +246,6 @@ if (nrow(int_methylation_bed) > 0 && length(sample_columns) > 0) {
         set(int_methylation_bed, j = sample_columns[[column_index]], value = int_values[, column_index])
     }
 }
-
 site_qc <- site_metadata[, .(
     `#chrom`, begin, end, site_key,
     n_samples_passing = n_samples_passing_per_sample_qc,

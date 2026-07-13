@@ -18,7 +18,17 @@ make_empty_clusters <- function() {
         cluster_id = integer(), `#chr` = character(), cluster_start = integer(), cluster_end = integer(),
         cluster_span_bp = integer(), n_correlated_cpgs = integer(), n_correlated_pairs = integer(),
         mean_pair_distance_bp = numeric(), max_pair_distance_bp = integer(),
-        mean_abs_correlation = numeric(), max_abs_correlation = numeric()
+        mean_abs_correlation = numeric(), max_abs_correlation = numeric(),
+        representative_cpg = character(), representative_start = integer(),
+        representative_end = integer(), representative_local_connectivity = numeric()
+    )
+}
+
+make_empty_representatives <- function() {
+    data.table(
+        `#chr` = character(), start = integer(), end = integer(), phenotype_id = character(),
+        cluster_id = integer(), cluster_size = integer(), local_connectivity = numeric(),
+        selection_type = character()
     )
 }
 
@@ -123,13 +133,15 @@ output_dir <- dirname(opt$OutputPrefix)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 cluster_table_path <- paste0(opt$OutputPrefix, ".methylation.cpg_correlation_clusters.tsv")
 cluster_output_path <- paste0(cluster_table_path, ".gz")
+representative_table_path <- paste0(opt$OutputPrefix, ".methylation.cpg_correlation_representatives.tsv")
+representative_output_path <- paste0(representative_table_path, ".gz")
 summary_output_path <- paste0(opt$OutputPrefix, ".methylation.cpg_correlation_summary.tsv")
 cluster_size_plot_path <- paste0(opt$OutputPrefix, ".methylation.cpg_correlation_cluster_sizes.png")
 mean_distance_plot_path <- paste0(opt$OutputPrefix, ".methylation.cpg_correlation_mean_distances.png")
 max_distance_plot_path <- paste0(opt$OutputPrefix, ".methylation.cpg_correlation_max_distances.png")
 span_plot_path <- paste0(opt$OutputPrefix, ".methylation.cpg_correlation_span_vs_size.png")
-if (file.exists(cluster_table_path) || file.exists(cluster_output_path)) {
-    stop("Correlation-cluster output already exists for this prefix: ", cluster_output_path)
+if (any(file.exists(c(cluster_table_path, cluster_output_path, representative_table_path, representative_output_path)))) {
+    stop("Correlation-cluster or representative output already exists for this prefix")
 }
 
 con <- open_bed_connection(opt$InputBed)
@@ -160,8 +172,10 @@ state <- new.env(parent = emptyenv())
 state$current_chromosome <- NULL
 state$last_start <- -Inf
 state$active_start <- numeric()
+state$active_end <- integer()
 state$active_site <- character()
 state$active_component <- integer()
+state$active_connectivity <- numeric()
 state$active_values <- list()
 state$active_head <- 1L
 state$components <- new.env(parent = emptyenv())
@@ -169,6 +183,8 @@ state$next_component_id <- 1L
 state$next_cluster_id <- 1L
 state$cluster_buffer <- list()
 state$clusters_written <- FALSE
+state$representative_buffer <- list()
+state$representatives_written <- FALSE
 state$n_cpgs <- 0L
 state$n_zero_variance_cpgs <- 0L
 state$n_correlated_pairs <- 0L
@@ -183,7 +199,9 @@ new_component <- function(chromosome) {
     state$next_component_id <- state$next_component_id + 1L
     set_component(component_id, list(
         chromosome = chromosome, start = Inf, end = -Inf, n_cpgs = 0L, active_members = 0L,
-        n_pairs = 0L, sum_distance = 0, max_distance = 0, sum_abs_correlation = 0, max_abs_correlation = 0
+        n_pairs = 0L, sum_distance = 0, max_distance = 0, sum_abs_correlation = 0, max_abs_correlation = 0,
+        representative_site = NA_character_, representative_start = NA_integer_, representative_end = NA_integer_,
+        representative_connectivity = -Inf
     ))
     component_id
 }
@@ -194,6 +212,51 @@ flush_cluster_buffer <- function() {
     fwrite(cluster_table, cluster_table_path, sep = "\t", append = state$clusters_written)
     state$clusters_written <- TRUE
     state$cluster_buffer <- list()
+    invisible(NULL)
+}
+
+flush_representative_buffer <- function() {
+    if (length(state$representative_buffer) == 0L) return(invisible(NULL))
+    representative_table <- rbindlist(state$representative_buffer, use.names = TRUE)
+    fwrite(representative_table, representative_table_path, sep = "\t", append = state$representatives_written)
+    state$representatives_written <- TRUE
+    state$representative_buffer <- list()
+    invisible(NULL)
+}
+
+is_better_representative <- function(site, start, connectivity, component) {
+    if (is.na(site)) return(FALSE)
+    if (is.na(component$representative_site)) return(TRUE)
+    if (connectivity != component$representative_connectivity) return(connectivity > component$representative_connectivity)
+    if (start != component$representative_start) return(start < component$representative_start)
+    site < component$representative_site
+}
+
+consider_representative <- function(component_id, active_index) {
+    component <- get_component(component_id)
+    site <- state$active_site[[active_index]]
+    start <- state$active_start[[active_index]]
+    connectivity <- state$active_connectivity[[active_index]]
+    if (is_better_representative(site, start, connectivity, component)) {
+        component$representative_site <- site
+        component$representative_start <- as.integer(start)
+        component$representative_end <- as.integer(state$active_end[[active_index]])
+        component$representative_connectivity <- connectivity
+        set_component(component_id, component)
+    }
+    invisible(NULL)
+}
+
+append_singleton_representative <- function(active_index) {
+    state$representative_buffer[[length(state$representative_buffer) + 1L]] <- data.table(
+        `#chr` = state$current_chromosome,
+        start = as.integer(state$active_start[[active_index]]),
+        end = as.integer(state$active_end[[active_index]]),
+        phenotype_id = state$active_site[[active_index]],
+        cluster_id = NA_integer_, cluster_size = 1L, local_connectivity = 0,
+        selection_type = "singleton"
+    )
+    if (length(state$representative_buffer) >= 1000L) flush_representative_buffer()
     invisible(NULL)
 }
 
@@ -212,10 +275,25 @@ finalize_component <- function(component_id) {
             mean_pair_distance_bp = component$sum_distance / component$n_pairs,
             max_pair_distance_bp = as.integer(component$max_distance),
             mean_abs_correlation = component$sum_abs_correlation / component$n_pairs,
-            max_abs_correlation = component$max_abs_correlation
+            max_abs_correlation = component$max_abs_correlation,
+            representative_cpg = component$representative_site,
+            representative_start = component$representative_start,
+            representative_end = component$representative_end,
+            representative_local_connectivity = component$representative_connectivity
+        )
+        state$representative_buffer[[length(state$representative_buffer) + 1L]] <- data.table(
+            `#chr` = component$chromosome,
+            start = component$representative_start,
+            end = component$representative_end,
+            phenotype_id = component$representative_site,
+            cluster_id = state$next_cluster_id,
+            cluster_size = as.integer(component$n_cpgs),
+            local_connectivity = component$representative_connectivity,
+            selection_type = "correlated_cluster"
         )
         state$next_cluster_id <- state$next_cluster_id + 1L
         if (length(state$cluster_buffer) >= 1000L) flush_cluster_buffer()
+        if (length(state$representative_buffer) >= 1000L) flush_representative_buffer()
     }
     rm(list = component_key(component_id), envir = state$components)
     invisible(NULL)
@@ -235,6 +313,13 @@ merge_components <- function(target_id, source_id) {
     target$max_distance <- max(target$max_distance, source$max_distance)
     target$sum_abs_correlation <- target$sum_abs_correlation + source$sum_abs_correlation
     target$max_abs_correlation <- max(target$max_abs_correlation, source$max_abs_correlation)
+    if (is_better_representative(source$representative_site, source$representative_start,
+                                 source$representative_connectivity, target)) {
+        target$representative_site <- source$representative_site
+        target$representative_start <- source$representative_start
+        target$representative_end <- source$representative_end
+        target$representative_connectivity <- source$representative_connectivity
+    }
     set_component(target_id, target)
     state$active_component[state$active_component == source_id] <- target_id
     rm(list = component_key(source_id), envir = state$components)
@@ -270,29 +355,41 @@ add_edges <- function(component_id, distances, correlations) {
     set_component(component_id, component)
 }
 
+expire_active_entry <- function(active_index) {
+    component_id <- state$active_component[[active_index]]
+    if (component_id > 0L) {
+        consider_representative(component_id, active_index)
+        component <- get_component(component_id)
+        component$active_members <- component$active_members - 1L
+        set_component(component_id, component)
+        if (component$active_members == 0L) finalize_component(component_id)
+    } else {
+        append_singleton_representative(active_index)
+    }
+    invisible(NULL)
+}
+
 expire_active_until <- function(minimum_start) {
     active_length <- length(state$active_start)
     while (state$active_head <= active_length && state$active_start[state$active_head] < minimum_start) {
-        component_id <- state$active_component[state$active_head]
-        if (component_id > 0L) {
-            component <- get_component(component_id)
-            component$active_members <- component$active_members - 1L
-            set_component(component_id, component)
-            if (component$active_members == 0L) finalize_component(component_id)
-        }
+        expire_active_entry(state$active_head)
         state$active_head <- state$active_head + 1L
     }
     if (state$active_head > active_length) {
         state$active_start <- numeric()
+        state$active_end <- integer()
         state$active_site <- character()
         state$active_component <- integer()
+        state$active_connectivity <- numeric()
         state$active_values <- list()
         state$active_head <- 1L
     } else if (state$active_head > 1024L) {
         retained <- seq.int(state$active_head, active_length)
         state$active_start <- state$active_start[retained]
+        state$active_end <- state$active_end[retained]
         state$active_site <- state$active_site[retained]
         state$active_component <- state$active_component[retained]
+        state$active_connectivity <- state$active_connectivity[retained]
         state$active_values <- state$active_values[retained]
         state$active_head <- 1L
     }
@@ -303,18 +400,14 @@ flush_chromosome <- function() {
     active_length <- length(state$active_start)
     if (state$active_head <= active_length) {
         for (active_index in seq.int(state$active_head, active_length)) {
-            component_id <- state$active_component[active_index]
-            if (component_id > 0L) {
-                component <- get_component(component_id)
-                component$active_members <- component$active_members - 1L
-                set_component(component_id, component)
-                if (component$active_members == 0L) finalize_component(component_id)
-            }
+            expire_active_entry(active_index)
         }
     }
     state$active_start <- numeric()
+    state$active_end <- integer()
     state$active_site <- character()
     state$active_component <- integer()
+    state$active_connectivity <- numeric()
     state$active_values <- list()
     state$active_head <- 1L
     state$current_chromosome <- NULL
@@ -322,7 +415,7 @@ flush_chromosome <- function() {
     invisible(NULL)
 }
 
-process_cpg <- function(chromosome, start, site_id, standardized_values, is_valid) {
+process_cpg <- function(chromosome, start, end, site_id, standardized_values, is_valid) {
     if (is.null(state$current_chromosome) || chromosome != state$current_chromosome) {
         flush_chromosome()
         state$current_chromosome <- chromosome
@@ -350,6 +443,7 @@ process_cpg <- function(chromosome, start, site_id, standardized_values, is_vali
 
     component_id <- 0L
     if (length(matching_indices) > 0L) {
+        state$active_connectivity[matching_indices] <- state$active_connectivity[matching_indices] + abs(matching_correlations)
         existing_components <- unique(state$active_component[matching_indices])
         existing_components <- existing_components[existing_components > 0L]
         component_id <- if (length(existing_components) == 0L) new_component(chromosome) else existing_components[[1]]
@@ -371,8 +465,10 @@ process_cpg <- function(chromosome, start, site_id, standardized_values, is_vali
     }
 
     state$active_start <- c(state$active_start, start)
+    state$active_end <- c(state$active_end, as.integer(end))
     state$active_site <- c(state$active_site, site_id)
     state$active_component <- c(state$active_component, component_id)
+    state$active_connectivity <- c(state$active_connectivity, sum(abs(matching_correlations)))
     state$active_values[[length(state$active_values) + 1L]] <- standardized_values
     invisible(NULL)
 }
@@ -386,6 +482,8 @@ repeat {
     if (ncol(block) != length(header)) stop("BED row has a different number of columns than the header")
     starts <- suppressWarnings(as.integer(block[[metadata_columns[[2]]]]))
     if (anyNA(starts)) stop("BED start column is not integer-like")
+    ends <- suppressWarnings(as.integer(block[[metadata_columns[[3]]]]))
+    if (anyNA(ends)) stop("BED end column is not integer-like")
     chromosomes <- as.character(block[[metadata_columns[[1]]]])
     site_ids <- as.character(block[[metadata_columns[[4]]]])
     raw_values <- as.matrix(block[, ..bed_sample_ids])
@@ -394,13 +492,15 @@ repeat {
     values <- values[, sample_indices, drop = FALSE]
     standardized <- residualize_and_standardize(values, if (is.null(covariate_design)) NULL else covariate_design$qr)
     for (row_index in seq_len(nrow(block))) {
-        process_cpg(chromosomes[[row_index]], starts[[row_index]], site_ids[[row_index]],
+        process_cpg(chromosomes[[row_index]], starts[[row_index]], ends[[row_index]], site_ids[[row_index]],
                     standardized$values[row_index, ], standardized$valid[[row_index]])
     }
 }
 flush_chromosome()
 flush_cluster_buffer()
+flush_representative_buffer()
 if (!state$clusters_written) fwrite(make_empty_clusters(), cluster_table_path, sep = "\t")
+if (!state$representatives_written) fwrite(make_empty_representatives(), representative_table_path, sep = "\t")
 status <- if (nzchar(Sys.which("bgzip"))) system2("bgzip", c("-f", cluster_table_path)) else 1L
 if (!identical(status, 0L)) {
     if (nzchar(Sys.which("gzip"))) {
@@ -408,8 +508,16 @@ if (!identical(status, 0L)) {
     }
     if (!identical(status, 0L)) stop("Failed to compress correlation-cluster output")
 }
+status <- if (nzchar(Sys.which("bgzip"))) system2("bgzip", c("-f", representative_table_path)) else 1L
+if (!identical(status, 0L)) {
+    if (nzchar(Sys.which("gzip"))) {
+        status <- system2("gzip", c("-f", representative_table_path))
+    }
+    if (!identical(status, 0L)) stop("Failed to compress representative-CpG output")
+}
 
 cluster_table <- fread(cluster_output_path)
+representative_table <- fread(representative_output_path)
 summary_table <- data.table(
     input_bed = opt$InputBed,
     covariates = if (is_present(opt$Covariates)) opt$Covariates else "",
@@ -420,6 +528,7 @@ summary_table <- data.table(
     min_abs_correlation = opt$MinAbsCorrelation,
     n_correlated_pairs = state$n_correlated_pairs,
     n_clusters = nrow(cluster_table),
+    n_representative_cpgs = nrow(representative_table),
     n_cpgs_in_clusters = if (nrow(cluster_table) == 0L) 0L else sum(cluster_table$n_correlated_cpgs),
     mean_cluster_size = if (nrow(cluster_table) == 0L) NA_real_ else mean(cluster_table$n_correlated_cpgs),
     median_cluster_size = if (nrow(cluster_table) == 0L) NA_real_ else median(cluster_table$n_correlated_cpgs),
@@ -461,4 +570,5 @@ if (nrow(cluster_table) == 0L) {
 message("Processed ", state$n_cpgs, " CpGs across ", length(sample_ids), " sample(s)")
 message("Detected ", state$n_correlated_pairs, " correlated local pairs in ", nrow(cluster_table), " cluster(s)")
 message("Wrote cluster table: ", cluster_output_path)
+message("Wrote representative CpG list: ", representative_output_path)
 message("Wrote summary: ", summary_output_path)

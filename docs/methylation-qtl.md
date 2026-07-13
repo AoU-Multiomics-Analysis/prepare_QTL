@@ -65,9 +65,9 @@ and never depends on parallel task boundaries. The threshold is evaluated separa
 
 This chromosome-specific reduction also avoids the `data.table` limit of 2,147,483,647 rows that can be reached when all sample/site calls across the genome are combined into one long table. Each chromosome task localizes one call file per shard plus one consolidated cohort sample-QC table; the original shard sample-QC files are localized only once to build that consolidated table.
 
-## Local CpG-correlation QC
+## Local CpG-correlation clustering and sample connectivity
 
-[`scripts/methylation/AnalyzeMethylationCpGCorrelation.R`](../scripts/methylation/AnalyzeMethylationCpGCorrelation.R) characterizes local CpG correlation before phenotype pruning. It streams a sorted cohort INT methylation BED in blocks, optionally residualizes every CpG against the same TensorQTL-format covariates used for QTL mapping, and evaluates only CpG pairs within `WindowBP`.
+[`scripts/methylation/AnalyzeMethylationCpGCorrelation.R`](../scripts/methylation/AnalyzeMethylationCpGCorrelation.R) runs independently on each chromosome INT BED after preliminary phenotype PCs and optional additional covariates have been assembled. It residualizes CpGs against that full covariate set, calls local correlation clusters, and selects the CpG with the greatest sum of absolute local correlations in each cluster. Unclustered CpGs are retained as singleton representatives.
 
 ```bash
 Rscript AnalyzeMethylationCpGCorrelation.R \
@@ -78,7 +78,7 @@ Rscript AnalyzeMethylationCpGCorrelation.R \
   --MinAbsCorrelation 0.95
 ```
 
-The default is a conservative `|r| >= 0.95` threshold. The script writes a cluster table containing the number of correlated CpGs, mean and maximum direct correlated-pair distances, cluster span, and correlation summaries. It also writes a run summary and four QC plots: cluster size, mean pair distance, maximum pair distance, and cluster span versus size. It does not modify the phenotype BED or prune CpGs.
+The default is a conservative `|r| >= 0.95` threshold. The workflow writes per-chromosome cluster tables, summaries, and QC plots, then uses every representative CpG for landmark-based sample connectivity by default. These representatives are used only for connectivity; correlated CpGs are not removed from either final BED. Samples with connectivity Z-score below −3 are removed consistently from the final raw BED, INT BED, filtered long calls, and sample-QC output. Final phenotype PCs and optional QTL covariates are recalculated after this sample filter.
 
 ## QC stages and run log
 
@@ -92,6 +92,8 @@ For every sample, the log reports:
 At cohort level, the log reports the union of sites after chromosome filtering, sites observed with adequate coverage in at least one sample, sites passing all per-sample QC in at least one sample, counts passing/failing the sample-presence threshold, counts failing the methylation-MAD threshold, and the number of sample/site values imputed.
 
 The extreme-coverage threshold is a Tukey far-out fence calculated separately for each sample on `log10(cov)`. It is intended to exclude unusually high-coverage loci that may reflect copy-number or mapping artifacts.
+
+During each chromosome merge, the cohort-metric reduction reports progress every 1,000 CpGs by default. The standalone `MergeMethylationCohort.R` option `--ProgressEverySites` can adjust that interval.
 
 ## Important inputs
 
@@ -115,21 +117,25 @@ The extreme-coverage threshold is a Tukey far-out fence calculated separately fo
 | `ShardMemoryGB` / `ShardDiskGB` | `64` / `250` | Resources for each parallel shard. Disk must accommodate the 25 input BEDs and chromosome-split outputs; `SamplesPerShard` remains 25 by default. |
 | `MergeMemoryGB` / `MergeDiskGB` | `128` / `500` | Resources for each per-autosome cohort reduction and downstream phenotype-PC calculation. |
 | `AggregateMemoryGB` / `AggregateDiskGB` | `64` / `1000` | Resources for final streaming aggregation. The larger disk accommodates simultaneous localization of all chromosome-level output families. |
+| `CorrelationWindowBP` / `CorrelationMinAbsCorrelation` | `1000` / `0.95` | Local window and absolute Pearson threshold used to form residualized CpG clusters. |
+| `MaxConnectivityFeatures` / `ConnectivityLandmarks` / `ConnectivityZThreshold` | `0` / `200` / `-3` | Optional representative-CpG cap (`0` uses all representatives), landmark sample count, and low-connectivity outlier threshold. |
 
 ## Outputs
 
 | Output | Contents |
 | --- | --- |
-| `<prefix>.methylation.filtered.long.tsv.gz` | Calls from sites passing the final cohort threshold. |
+| `<prefix>.methylation.filtered.long.tsv.gz` | Calls from sites passing cohort QC and the sample connectivity filter. |
 | `<prefix>.methylation.site_qc.tsv.gz` | Compact all-site table with sample-presence counts and `keep_site`. |
 | `<prefix>.methylation.site_metadata.tsv.gz` | All observed sites, including coverage and methylation means, standard deviations, CVs, methylation MAD, coverage fractions, sample counts, `coverage_methylation_spearman_rho`, filter flags, `n_samples_imputed_in_qtl_bed`, and `keep_site`. |
-| `<prefix>.methylation.sample_qc.tsv` | One row per sample with coverage filter counts, extreme-coverage cutoffs, and pass counts. |
+| `<prefix>.methylation.sample_qc.tsv` | One row per sample with coverage QC plus connectivity score, Z-score, and pass flag. |
 | `<prefix>.methylation.filter_summary.tsv` | Counts of sites at each mutually exclusive cohort-QC stage. |
 | `<prefix>.methylation.filter_counts.png` | Bar chart of the sequential cohort-QC counts. |
 | `<prefix>.methylation.filter_upset.png` | ggupset UpSet chart showing overlap of low/missing coverage, extreme coverage, cohort sample-presence, and methylation-MAD conditions. |
 | `<prefix>.methylation.passing_site_annotations.tsv.gz` | One row per retained site with nearest TSS/gene, promoter, GTF subfeatures, gene-body/intergenic, cCRE, and CpG-island annotations. |
-| `<prefix>.methylation.raw.bed.gz` | TensorQTL-compatible phenotype BED with raw 0–1 methylation beta values. |
-| `<prefix>.methylation.INT.bed.gz` | TensorQTL-compatible phenotype BED after site-wise rank-based inverse normal transformation. |
+| `<prefix>.methylation.raw.bed.gz` | TensorQTL-compatible raw beta-value BED after sample connectivity filtering. |
+| `<prefix>.methylation.INT.bed.gz` | TensorQTL-compatible INT BED after the same sample connectivity filtering. |
+| `<prefix>.methylation.connectivity_representative_cpgs.tsv.gz` | Selected cluster representatives used for connectivity, including local-connectivity values. |
+| `<prefix>.methylation.connectivity_outliers.tsv` / `.connectivity_summary.tsv` | Removed samples and connectivity method/threshold summary. |
 | `<prefix>.methylation_phenotype_PCs.INT.tsv` | Phenotype PCs calculated from the INT BED. |
 | `<prefix>.methylation_QTL_covariates.INT.tsv` | Optional merged covariate matrix, written when `AdditionalCovariates` is supplied. |
 
@@ -178,7 +184,9 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 
 - [`scripts/methylation/FilterMethylationShard.R`](../scripts/methylation/FilterMethylationShard.R): per-sample chromosome and coverage QC.
 - [`scripts/methylation/BuildMethylationCohortSamples.R`](../scripts/methylation/BuildMethylationCohortSamples.R): builds the cohort sample order and one consolidated sample-QC table from sample or shard QC outputs.
-- [`scripts/methylation/AnalyzeMethylationCpGCorrelation.R`](../scripts/methylation/AnalyzeMethylationCpGCorrelation.R): streams a cohort INT methylation BED to summarize covariate-adjusted local CpG correlation clusters and QC plots.
+- [`scripts/methylation/AnalyzeMethylationCpGCorrelation.R`](../scripts/methylation/AnalyzeMethylationCpGCorrelation.R): calls covariate-adjusted local CpG clusters and selects the most connected representative per cluster.
+- [`scripts/methylation/BuildMethylationCorrelationCovariates.R`](../scripts/methylation/BuildMethylationCorrelationCovariates.R): formats preliminary phenotype PCs plus optional additional covariates for correlation clustering.
+- [`scripts/methylation/FinalizeMethylationConnectivity.R`](../scripts/methylation/FinalizeMethylationConnectivity.R): calculates landmark sample connectivity from representatives and filters raw/INT BEDs plus long calls to passing samples.
 - [`scripts/methylation/MergeMethylationCohort.R`](../scripts/methylation/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
 - [`scripts/methylation/MethylationUtils.R`](../scripts/methylation/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
 - [`scripts/methylation/AnnotateMethylationSites.R`](../scripts/methylation/AnnotateMethylationSites.R): passing-site gene/TSS, GTF-subfeature, cCRE, and CpG-island annotation task.
