@@ -85,7 +85,7 @@ Rscript AnalyzeMethylationCpGCorrelation.R \
   --MinAbsCorrelation 0.95
 ```
 
-The default is a conservative `|r| >= 0.95` threshold. The workflow writes per-chromosome cluster tables, summaries, and QC plots, then uses every representative CpG for landmark-based sample connectivity by default. These representatives are used only for connectivity; correlated CpGs are not removed from either final BED. Samples with connectivity Z-score below −3 are removed consistently from the final raw BED, INT BED, filtered long calls, and sample-QC output. Final phenotype PCs and optional QTL covariates are recalculated after this sample filter.
+The default is a conservative `|r| >= 0.95` threshold. The workflow writes per-chromosome cluster tables, summaries, and QC plots, then uses every representative CpG in the original full-matrix WGCNA connectivity calculation: biweight midcorrelation across samples, signed adjacency, and `fundamentalNetworkConcepts()` connectivity. These representatives are used only for connectivity; correlated CpGs are not removed from either final BED. Samples with connectivity Z-score below −3 are removed consistently from the final raw BED, INT BED, filtered long calls, and sample-QC output. Final phenotype PCs and optional QTL covariates are recalculated after this sample filter.
 
 ## QC stages and run log
 
@@ -125,7 +125,7 @@ During each chromosome merge, the cohort-metric reduction reports progress every
 | `MergeMemoryGB` / `MergeDiskGB` | `128` / `500` | Resources for each per-autosome cohort reduction and downstream phenotype-PC calculation. |
 | `AggregateMemoryGB` / `AggregateDiskGB` | `64` / `1000` | Resources for final streaming aggregation. The larger disk accommodates simultaneous localization of all chromosome-level output families. |
 | `CorrelationWindowBP` / `CorrelationMinAbsCorrelation` | `1000` / `0.95` | Local window and absolute Pearson threshold used to form residualized CpG clusters. |
-| `MaxConnectivityFeatures` / `ConnectivityLandmarks` / `ConnectivityZThreshold` | `0` / `200` / `-3` | Optional representative-CpG cap (`0` uses all representatives), landmark sample count, and low-connectivity outlier threshold. |
+| `ConnectivityZThreshold` | `-3` | Low-connectivity outlier threshold. Connectivity uses every correlation-pruned representative CpG and the original full-matrix WGCNA biweight-midcorrelation calculation. |
 
 ## Outputs
 
@@ -194,7 +194,7 @@ The WDL defaults to `MinSampleFraction = 0.95` and `MinMethylationMAD = 0.003`. 
 - [`scripts/methylation/BuildMethylationCohortSamples.R`](../scripts/methylation/BuildMethylationCohortSamples.R): builds the cohort sample order and one consolidated sample-QC table from sample or shard QC outputs.
 - [`scripts/methylation/AnalyzeMethylationCpGCorrelation.R`](../scripts/methylation/AnalyzeMethylationCpGCorrelation.R): calls covariate-adjusted local CpG clusters and selects the most connected representative per cluster.
 - [`scripts/methylation/BuildMethylationCorrelationCovariates.R`](../scripts/methylation/BuildMethylationCorrelationCovariates.R): formats preliminary phenotype PCs plus optional additional covariates for correlation clustering.
-- [`scripts/methylation/FinalizeMethylationConnectivity.R`](../scripts/methylation/FinalizeMethylationConnectivity.R): calculates landmark sample connectivity from representatives and filters raw/INT BEDs plus long calls to passing samples.
+- [`scripts/methylation/FinalizeMethylationConnectivity.R`](../scripts/methylation/FinalizeMethylationConnectivity.R): calculates full WGCNA sample connectivity from correlation-pruned representatives and filters raw/INT BEDs plus long calls to passing samples.
 - [`scripts/methylation/MergeMethylationCohort.R`](../scripts/methylation/MergeMethylationCohort.R): cohort-wide filtering, metadata, imputation, phenotype BED, and QC plot generation.
 - [`scripts/methylation/MethylationUtils.R`](../scripts/methylation/MethylationUtils.R): shared input, QC, transformation, and plotting functions sourced by both executable stages.
 - [`scripts/methylation/AnnotateMethylationSites.R`](../scripts/methylation/AnnotateMethylationSites.R): passing-site gene/TSS, GTF-subfeature, cCRE, and CpG-island annotation task.

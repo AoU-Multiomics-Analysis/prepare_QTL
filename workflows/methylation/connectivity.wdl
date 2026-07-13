@@ -77,8 +77,6 @@ task FinalizeMethylationConnectivity {
         File PreConnectivityIntMethylationBed
         File PreConnectivitySampleQC
         String OutputPrefix
-        Int MaxConnectivityFeatures
-        Int ConnectivityLandmarks
         Float ConnectivityZThreshold
         Int MemoryGB
         Int DiskGB
@@ -97,8 +95,6 @@ task FinalizeMethylationConnectivity {
             --IntBed "~{PreConnectivityIntMethylationBed}" \
             --SampleQC "~{PreConnectivitySampleQC}" \
             --OutputPrefix "~{OutputPrefix}" \
-            --MaxConnectivityFeatures ~{MaxConnectivityFeatures} \
-            --ConnectivityLandmarks ~{ConnectivityLandmarks} \
             --ConnectivityZThreshold ~{ConnectivityZThreshold}
     >>>
 
@@ -131,18 +127,16 @@ workflow RefineMethylationConnectivity {
         File PreConnectivitySampleQC
         File? AdditionalCovariates
         String OutputPrefix
-        Int PcMemoryGB
-        Int PcDiskGB
-        Int NumThreads
-        Int CorrelationWindowBP
-        Float CorrelationMinAbsCorrelation
-        Int CorrelationMemoryGB
-        Int CorrelationDiskGB
-        Int MaxConnectivityFeatures
-        Int ConnectivityLandmarks
-        Float ConnectivityZThreshold
-        Int ConnectivityMemoryGB
-        Int ConnectivityDiskGB
+        Int PcMemoryGB = 128
+        Int PcDiskGB = 500
+        Int NumThreads = 1
+        Int CorrelationWindowBP = 1000
+        Float CorrelationMinAbsCorrelation = 0.95
+        Int CorrelationMemoryGB = 64
+        Int CorrelationDiskGB = 250
+        Float ConnectivityZThreshold = -3.0
+        Int ConnectivityMemoryGB = 64
+        Int ConnectivityDiskGB = 1000
     }
 
     call ComputePCs.PhenotypePCs as PreliminaryIntPhenotypePCs {
@@ -183,8 +177,6 @@ workflow RefineMethylationConnectivity {
             PreConnectivityIntMethylationBed = PreConnectivityIntMethylationBed,
             PreConnectivitySampleQC = PreConnectivitySampleQC,
             OutputPrefix = OutputPrefix,
-            MaxConnectivityFeatures = MaxConnectivityFeatures,
-            ConnectivityLandmarks = ConnectivityLandmarks,
             ConnectivityZThreshold = ConnectivityZThreshold,
             MemoryGB = ConnectivityMemoryGB,
             DiskGB = ConnectivityDiskGB

@@ -1,11 +1,12 @@
 #!/usr/bin/env Rscript
 
-# Calculate scalable sample connectivity from locally de-correlated CpG
+# Calculate full sample connectivity from locally de-correlated CpG
 # representatives, then retain the passing samples in every final phenotype file.
 
 suppressPackageStartupMessages({
     library(data.table)
     library(optparse)
+    library(WGCNA)
 })
 
 open_input_connection <- function(path) {
@@ -140,10 +141,6 @@ option_list <- list(
     make_option("--IntBed", type = "character", help = "Pre-connectivity INT methylation BED [required]"),
     make_option("--SampleQC", type = "character", help = "Pre-connectivity sample-QC TSV [required]"),
     make_option("--OutputPrefix", type = "character", help = "Output prefix [required]"),
-    make_option("--MaxConnectivityFeatures", type = "integer", default = 0,
-                help = "Optional representative-CpG cap; 0 uses every representative [default: %default]"),
-    make_option("--ConnectivityLandmarks", type = "integer", default = 200,
-                help = "Number of evenly spaced samples used as connectivity landmarks [default: %default]"),
     make_option("--ConnectivityZThreshold", type = "double", default = -3,
                 help = "Samples below this connectivity Z score are removed [default: %default]"),
     make_option("--ChunkRows", type = "integer", default = 100,
@@ -154,8 +151,6 @@ required_options <- c("IntBedList", "RepresentativeList", "FilteredCalls", "RawB
 if (any(vapply(required_options, function(name) is.null(opt[[name]]), logical(1)))) {
     stop("--IntBedList, --RepresentativeList, --FilteredCalls, --RawBed, --IntBed, --SampleQC, and --OutputPrefix are required")
 }
-if (is.na(opt$MaxConnectivityFeatures) || opt$MaxConnectivityFeatures < 0L) stop("--MaxConnectivityFeatures must be non-negative")
-if (is.na(opt$ConnectivityLandmarks) || opt$ConnectivityLandmarks < 1L) stop("--ConnectivityLandmarks must be at least 1")
 if (is.na(opt$ChunkRows) || opt$ChunkRows < 1L) stop("--ChunkRows must be at least 1")
 if (!is.finite(opt$ConnectivityZThreshold)) stop("--ConnectivityZThreshold must be finite")
 for (path in c(opt$FilteredCalls, opt$RawBed, opt$IntBed, opt$SampleQC)) {
@@ -175,13 +170,6 @@ if (anyNA(representatives$phenotype_id) || any(!nzchar(representatives$phenotype
     stop("Representative-CpG tables contain missing, blank, or duplicate phenotype IDs")
 }
 setorder(representatives, `#chr`, start, end, phenotype_id)
-n_representatives_before_cap <- nrow(representatives)
-if (opt$MaxConnectivityFeatures > 0L && nrow(representatives) > opt$MaxConnectivityFeatures) {
-    selected_indices <- unique(round(seq.int(1L, nrow(representatives), length.out = opt$MaxConnectivityFeatures)))
-    representatives <- representatives[selected_indices]
-    message("Capped connectivity input from ", n_representatives_before_cap, " to ", nrow(representatives),
-            " representative CpGs, evenly spaced in genomic sort order")
-}
 
 output_dir <- dirname(opt$OutputPrefix)
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
@@ -215,19 +203,19 @@ method <- "not_computed"
 if (nrow(values) < 2L || length(sample_ids) < 3L) {
     message("Not enough nonconstant representative INT CpGs or samples to compute connectivity; keeping all samples")
 } else {
-    landmark_indices <- unique(round(seq.int(1L, length(sample_ids), length.out = min(length(sample_ids), opt$ConnectivityLandmarks))))
-    message("Computing landmark sample connectivity from ", nrow(values), " representative INT CpG(s), ",
-            length(sample_ids), " sample(s), and ", length(landmark_indices), " landmark sample(s)")
-    correlation_to_landmarks <- cor(values, values[, landmark_indices, drop = FALSE], use = "pairwise.complete.obs")
-    for (landmark_column in seq_along(landmark_indices)) {
-        correlation_to_landmarks[landmark_indices[[landmark_column]], landmark_column] <- NA_real_
-    }
-    connectivity_score <- rowMeans(0.5 + 0.5 * correlation_to_landmarks, na.rm = TRUE)
+    message("Computing full WGCNA sample connectivity from ", nrow(values), " representative INT CpG(s) and ",
+            length(sample_ids), " sample(s)")
+    normalized_adjacency <- 0.5 + 0.5 * WGCNA::bicor(
+        as.data.frame(values, check.names = FALSE),
+        use = "pairwise.complete.obs"
+    )
+    normalized_adjacency[is.na(normalized_adjacency)] <- 0
+    connectivity_score <- WGCNA::fundamentalNetworkConcepts(normalized_adjacency)$Connectivity
     names(connectivity_score) <- sample_ids
     connectivity_sd <- sd(connectivity_score, na.rm = TRUE)
     if (!is.finite(connectivity_sd) || connectivity_sd == 0) {
         message("Connectivity scores have zero or undefined variance; keeping all samples")
-        method <- "representative_landmark_pearson_zero_variance"
+        method <- "correlation_pruned_full_wgcna_bicor_zero_variance"
     } else {
         connectivity_zscore <- (connectivity_score - mean(connectivity_score, na.rm = TRUE)) / connectivity_sd
         names(connectivity_zscore) <- sample_ids
@@ -236,7 +224,7 @@ if (nrow(values) < 2L || length(sample_ids) < 3L) {
             Connectivity = connectivity_score[connectivity_zscore < opt$ConnectivityZThreshold],
             Z_score = connectivity_zscore[connectivity_zscore < opt$ConnectivityZThreshold]
         )
-        method <- "representative_landmark_pearson"
+        method <- "correlation_pruned_full_wgcna_bicor"
     }
 }
 
@@ -259,13 +247,12 @@ fwrite(sample_qc, sample_qc_output, sep = "\t", na = "NA")
 fwrite(outliers, outliers_output, sep = "\t", na = "NA")
 fwrite(data.table(
     method = method,
-    n_representative_cpgs_before_cap = n_representatives_before_cap,
-    n_representative_cpgs_selected = nrow(representatives),
+    n_representative_cpgs = nrow(representatives),
     n_representative_cpgs_used = nrow(values),
     n_samples_before = length(sample_ids),
     n_samples_removed = nrow(outliers),
     n_samples_retained = length(retained_samples),
-    n_landmarks = min(length(sample_ids), opt$ConnectivityLandmarks),
+    n_samples_in_full_correlation = length(sample_ids),
     z_threshold = opt$ConnectivityZThreshold
 ), summary_output, sep = "\t")
 

@@ -187,8 +187,6 @@ workflow MergeMethylation {
         Float CorrelationMinAbsCorrelation = 0.95
         Int CorrelationMemoryGB = 64
         Int CorrelationDiskGB = 250
-        Int MaxConnectivityFeatures = 0
-        Int ConnectivityLandmarks = 200
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
     }
@@ -266,8 +264,6 @@ workflow MergeMethylation {
             CorrelationMinAbsCorrelation = CorrelationMinAbsCorrelation,
             CorrelationMemoryGB = CorrelationMemoryGB,
             CorrelationDiskGB = CorrelationDiskGB,
-            MaxConnectivityFeatures = MaxConnectivityFeatures,
-            ConnectivityLandmarks = ConnectivityLandmarks,
             ConnectivityZThreshold = ConnectivityZThreshold,
             NumThreads = NumThreads
     }

@@ -263,8 +263,6 @@ task FinalizeMethylationConnectivity {
         File PreConnectivityIntMethylationBed
         File PreConnectivitySampleQC
         String OutputPrefix
-        Int MaxConnectivityFeatures
-        Int ConnectivityLandmarks
         Float ConnectivityZThreshold
         Int MemoryGB
         Int DiskGB
@@ -283,8 +281,6 @@ task FinalizeMethylationConnectivity {
             --IntBed "~{PreConnectivityIntMethylationBed}" \
             --SampleQC "~{PreConnectivitySampleQC}" \
             --OutputPrefix "~{OutputPrefix}" \
-            --MaxConnectivityFeatures ~{MaxConnectivityFeatures} \
-            --ConnectivityLandmarks ~{ConnectivityLandmarks} \
             --ConnectivityZThreshold ~{ConnectivityZThreshold}
     >>>
 
@@ -388,8 +384,6 @@ workflow AggregateMethylationCohort {
         Float CorrelationMinAbsCorrelation = 0.95
         Int CorrelationMemoryGB = 64
         Int CorrelationDiskGB = 250
-        Int MaxConnectivityFeatures = 0
-        Int ConnectivityLandmarks = 200
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
     }
@@ -498,8 +492,6 @@ workflow AggregateMethylationCohort {
             PreConnectivityIntMethylationBed = AggregateMethylationChromosomes.PreConnectivityIntMethylationBed,
             PreConnectivitySampleQC = AggregateMethylationChromosomes.PreConnectivitySampleQC,
             OutputPrefix = OutputPrefix,
-            MaxConnectivityFeatures = MaxConnectivityFeatures,
-            ConnectivityLandmarks = ConnectivityLandmarks,
             ConnectivityZThreshold = ConnectivityZThreshold,
             MemoryGB = AggregateMemoryGB,
             DiskGB = AggregateDiskGB
