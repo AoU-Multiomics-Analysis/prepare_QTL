@@ -33,9 +33,9 @@ registered in [`.dockstore.yml`](../.dockstore.yml) and checked in CI.
 ## Internal methylation stages
 
 - `methylation/AggregateMethylationCohortArrays.wdl`: array-based cohort implementation used only inside `methylation/merge_methylation.wdl`.
-- `methylation/cohort_aggregation.wdl`: cohort-manifest expansion, sample validation, per-chromosome merging, and cohort-wide aggregation.
+- `methylation/cohort_aggregation.wdl`: cohort-manifest expansion, sample validation, per-chromosome merging, cohort-wide aggregation, and annotation orchestration.
 - `methylation/connectivity.wdl`: preliminary phenotype PCs, covariate-adjusted CpG correlation, and sample-connectivity filtering.
-- `methylation/annotation.wdl`: annotation of passing methylation sites; this stage can run in parallel with connectivity analysis.
+- `methylation/annotation.wdl`: annotation of passing methylation sites, called by the aggregation workflow.
 - `methylation/qtl_covariates.wdl`: final phenotype PCs and optional TensorQTL covariate assembly.
 
 `methylation/AggregateMethylationCohort.wdl` is intentionally a thin public

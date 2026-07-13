@@ -1,6 +1,8 @@
 version 1.0
+import "annotation.wdl" as Annotation
 
-# Cohort ingestion, per-chromosome merging, and cohort-wide aggregation.
+# Cohort ingestion, per-chromosome merging, cohort-wide aggregation, and site
+# annotation.
 
 task PrepareMethylationCohortManifest {
     input {
@@ -272,10 +274,16 @@ workflow AggregateMethylationData {
         String AutosomePrefix
         String ValueColumn
         Float ValueMultiplier
+        File AnnotationGTF
+        File CCREAnnotations
+        File CpGIslandAnnotations
+        Int PromoterWindow
         Int MergeMemoryGB
         Int MergeDiskGB
         Int AggregateMemoryGB
         Int AggregateDiskGB
+        Int AnnotationMemoryGB
+        Int AnnotationDiskGB
         Int NumThreads
     }
 
@@ -357,6 +365,18 @@ workflow AggregateMethylationData {
             NumThreads = NumThreads
     }
 
+    call Annotation.AnnotateMethylationCohortSites as AnnotateSites {
+        input:
+            PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata,
+            AnnotationGTF = AnnotationGTF,
+            CCREAnnotations = CCREAnnotations,
+            CpGIslandAnnotations = CpGIslandAnnotations,
+            OutputPrefix = OutputPrefix,
+            PromoterWindow = PromoterWindow,
+            MemoryGB = AnnotationMemoryGB,
+            DiskGB = AnnotationDiskGB
+    }
+
     output {
         File CohortSamples = BuildMethylationCohortSamples.CohortSamples
         Int TotalSamples = BuildMethylationCohortSamples.TotalSamples
@@ -372,5 +392,6 @@ workflow AggregateMethylationData {
         File FilterUpsetPlot = AggregateMethylationChromosomes.FilterUpsetPlot
         File PreConnectivityRawMethylationBed = AggregateMethylationChromosomes.PreConnectivityRawMethylationBed
         File PreConnectivityIntMethylationBed = AggregateMethylationChromosomes.PreConnectivityIntMethylationBed
+        File PassingSiteAnnotations = AnnotateSites.PassingSiteAnnotations
     }
 }

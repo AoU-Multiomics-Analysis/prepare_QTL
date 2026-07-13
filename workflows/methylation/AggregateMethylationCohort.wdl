@@ -1,7 +1,6 @@
 version 1.0
 import "cohort_aggregation.wdl" as CohortAggregation
 import "connectivity.wdl" as Connectivity
-import "annotation.wdl" as Annotation
 import "qtl_covariates.wdl" as QtlCovariates
 
 # Public cohort-level entry point for per-sample methylation outputs. The input
@@ -50,10 +49,16 @@ workflow AggregateMethylationCohort {
             AutosomePrefix = AutosomePrefix,
             ValueColumn = ValueColumn,
             ValueMultiplier = ValueMultiplier,
+            AnnotationGTF = AnnotationGTF,
+            CCREAnnotations = CCREAnnotations,
+            CpGIslandAnnotations = CpGIslandAnnotations,
+            PromoterWindow = PromoterWindow,
             MergeMemoryGB = MergeMemoryGB,
             MergeDiskGB = MergeDiskGB,
             AggregateMemoryGB = AggregateMemoryGB,
             AggregateDiskGB = AggregateDiskGB,
+            AnnotationMemoryGB = AnnotationMemoryGB,
+            AnnotationDiskGB = AnnotationDiskGB,
             NumThreads = NumThreads
     }
 
@@ -79,18 +84,6 @@ workflow AggregateMethylationCohort {
             ConnectivityZThreshold = ConnectivityZThreshold,
             ConnectivityMemoryGB = AggregateMemoryGB,
             ConnectivityDiskGB = AggregateDiskGB
-    }
-
-    call Annotation.AnnotateMethylationCohortSites as AnnotateSites {
-        input:
-            PassingSiteMetadata = AggregateCohort.PassingSiteMetadata,
-            AnnotationGTF = AnnotationGTF,
-            CCREAnnotations = CCREAnnotations,
-            CpGIslandAnnotations = CpGIslandAnnotations,
-            OutputPrefix = OutputPrefix,
-            PromoterWindow = PromoterWindow,
-            MemoryGB = AnnotationMemoryGB,
-            DiskGB = AnnotationDiskGB
     }
 
     call QtlCovariates.PrepareMethylationQtlCovariates as PrepareQtlCovariates {
@@ -119,7 +112,7 @@ workflow AggregateMethylationCohort {
         File ConnectivityRepresentativeCpGs = RefineConnectivity.ConnectivityRepresentativeCpGs
         Array[File] CorrelationClustersByChromosome = RefineConnectivity.CorrelationClustersByChromosome
         Array[File] CorrelationSummariesByChromosome = RefineConnectivity.CorrelationSummariesByChromosome
-        File PassingSiteAnnotations = AnnotateSites.PassingSiteAnnotations
+        File PassingSiteAnnotations = AggregateCohort.PassingSiteAnnotations
         File IntPhenotypePCsOut = PrepareQtlCovariates.IntPhenotypePCsOut
         File? IntQtlCovariates = PrepareQtlCovariates.IntQtlCovariates
         File CohortSamples = AggregateCohort.CohortSamples
