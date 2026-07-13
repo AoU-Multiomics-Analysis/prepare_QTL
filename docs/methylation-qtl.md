@@ -12,7 +12,7 @@ Use one pb-CpG-tools `.combined.bed.gz` file per sample. The workflow expects th
 
 Choose the entry point that matches how inputs are organized:
 
-- [`workflows/ProcessMethylationSample.wdl`](../workflows/ProcessMethylationSample.wdl) is the Terra-table sample workflow. Run it once per sample entity with `SampleID` and `MethylationBed` bound directly to table columns. It has no manifest input and writes one sample-QC file plus one QC-flagged call table for each autosome.
+- [`workflows/ProcessMethylationSample.wdl`](../workflows/ProcessMethylationSample.wdl) is the Terra-table sample workflow. Run it once per sample entity with `SampleID` and `MethylationBed` bound directly to table columns. It has no manifest input and writes one sample-QC file plus one QC-flagged call table for each autosome. Its per-sample parsing/filtering is performed by the compiled streaming Rust tool in `rust/methylation_filter`; the manifest-sharded workflow continues to use the established R implementation.
 - [`workflows/AggregateMethylationCohort.wdl`](../workflows/AggregateMethylationCohort.wdl) is the Terra cohort workflow. Supply one `CohortManifest` file containing the per-sample QC and 22 chromosome-output paths. This avoids placing 22 large file arrays into Terra's workflow-submission JSON.
 - [`workflows/merge_methylation.wdl`](../workflows/merge_methylation.wdl) remains the manifest/shard entry point. It retains its array-based internal aggregation implementation, which is safe because those file arrays are created inside Cromwell rather than submitted through Terra's API.
 

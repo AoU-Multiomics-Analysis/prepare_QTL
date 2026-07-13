@@ -34,14 +34,14 @@ task FilterMethylationSample {
         # task-local implementation detail only; users do not provide one.
         printf 'sample_id\tfile_path\n%s\t%s\n' "~{SampleID}" "~{MethylationBed}" > input_manifest.tsv
 
-        Rscript /tmp/FilterMethylationShard.R \
-            --InputManifest input_manifest.tsv \
-            --OutputPrefix "~{OutputPrefix}" \
-            --MinCoverage ~{MinCoverage} \
-            --FilterChroms "~{FilterChroms}" \
-            --FenceK ~{FenceK} \
-            --AutosomePrefix "~{AutosomePrefix}" \
-            --NumThreads ~{NumThreads}
+        methylation-filter \
+            --input-manifest input_manifest.tsv \
+            --output-prefix "~{OutputPrefix}" \
+            --min-coverage ~{MinCoverage} \
+            --filter-chroms "~{FilterChroms}" \
+            --fence-k ~{FenceK} \
+            --autosome-prefix "~{AutosomePrefix}" \
+            --num-threads ~{NumThreads}
     >>>
 
     runtime {
