@@ -23,6 +23,7 @@ workflow AggregateMethylationCohort {
         Int PromoterWindow = 2000
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
+        Boolean ComputeCoverageMethylationCorrelation = true
         Int MergeMemoryGB = 128
         Int MergeDiskGB = 500
         Int AggregateMemoryGB = 64
@@ -47,6 +48,7 @@ workflow AggregateMethylationCohort {
             AutosomePrefix = AutosomePrefix,
             ValueColumn = ValueColumn,
             ValueMultiplier = ValueMultiplier,
+            ComputeCoverageMethylationCorrelation = ComputeCoverageMethylationCorrelation,
             AnnotationGTF = AnnotationGTF,
             CCREAnnotations = CCREAnnotations,
             CpGIslandAnnotations = CpGIslandAnnotations,

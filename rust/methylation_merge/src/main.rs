@@ -40,6 +40,8 @@ struct Args {
     value_multiplier: f64,
     #[arg(long, default_value_t = 1000)]
     progress_every_sites: usize,
+    #[arg(long, default_value_t = false)]
+    skip_coverage_methylation_correlation: bool,
 }
 
 #[derive(Error, Debug)]
@@ -440,6 +442,17 @@ fn spearman(left: &[f64], right: &[f64]) -> Option<f64> {
         Some(numerator / (xd * yd).sqrt())
     }
 }
+fn coverage_correlation_summary(
+    compute: bool,
+    methylation: &[f64],
+    coverage: &[f64],
+) -> (usize, Option<f64>) {
+    if compute {
+        (methylation.len(), spearman(methylation, coverage))
+    } else {
+        (0, None)
+    }
+}
 fn inverse_normal(values: &[f64]) -> Vec<f64> {
     let ranks = ranks(values);
     ranks
@@ -712,6 +725,7 @@ fn process_site(
     total: usize,
     required: usize,
     min_mad: f64,
+    compute_coverage_methylation_correlation: bool,
     outputs: &mut Outputs,
     scratch: &mut SiteScratch,
 ) -> Result<bool> {
@@ -727,8 +741,8 @@ fn process_site(
     let mut methyl_all = Vec::new();
     let mut cov_pass = Vec::new();
     let mut methyl_pass = Vec::new();
-    let mut corr_methyl = Vec::new();
-    let mut corr_cov = Vec::new();
+    let mut corr_methyl = compute_coverage_methylation_correlation.then(Vec::new);
+    let mut corr_cov = compute_coverage_methylation_correlation.then(Vec::new);
     let mut n_min = 0usize;
     let mut n_pass = 0usize;
     for call in calls {
@@ -758,12 +772,20 @@ fn process_site(
                 methyl_pass.push(x);
             }
             raw_values[call.sample_index] = call.value.filter(|x| x.is_finite());
-            if let (Some(m), Some(c)) = (
-                call.value.filter(|x| x.is_finite()),
-                call.normalized_log_cov,
-            ) {
-                corr_methyl.push(m);
-                corr_cov.push(c);
+            if compute_coverage_methylation_correlation {
+                if let (Some(m), Some(c)) = (
+                    call.value.filter(|x| x.is_finite()),
+                    call.normalized_log_cov,
+                ) {
+                    corr_methyl
+                        .as_mut()
+                        .expect("correlation vectors are initialized when enabled")
+                        .push(m);
+                    corr_cov
+                        .as_mut()
+                        .expect("correlation vectors are initialized when enabled")
+                        .push(c);
+                }
             }
         }
     }
@@ -776,6 +798,11 @@ fn process_site(
     let median_cov_pass = median(&cov_pass);
     let methyl_mad = mad(&methyl_pass);
     let pass_mad = methyl_mad.is_some_and(|x| x >= min_mad);
+    let (n_corr, corr_rho) = coverage_correlation_summary(
+        compute_coverage_methylation_correlation,
+        corr_methyl.as_deref().unwrap_or(&[]),
+        corr_cov.as_deref().unwrap_or(&[]),
+    );
     let keep = pass_presence && pass_mad;
     let failure = if !pass_min {
         "Insufficient minimum coverage"
@@ -858,8 +885,8 @@ fn process_site(
         number(methyl_pass_summary.sd),
         number(methyl_pass_summary.cv),
         number(methyl_mad),
-        corr_methyl.len().to_string(),
-        number(spearman(&corr_methyl, &corr_cov)),
+        n_corr.to_string(),
+        number(corr_rho),
         required.to_string(),
         bool_text(pass_min).to_owned(),
         bool_text(pass_presence).to_owned(),
@@ -920,6 +947,7 @@ fn main() -> Result<()> {
                 args.total_samples,
                 required,
                 args.min_methylation_mad,
+                !args.skip_coverage_methylation_correlation,
                 &mut outputs,
                 &mut scratch,
             )? {
@@ -954,9 +982,12 @@ fn main() -> Result<()> {
             record.get(schema.per_sample_qc_pass).unwrap_or_default(),
             "per_sample_qc_pass",
         )?;
-        let normalized = cov
-            .filter(|x| x.is_finite())
-            .map(|x| x.ln_1p() - baselines[index]);
+        let normalized = if args.skip_coverage_methylation_correlation {
+            None
+        } else {
+            cov.filter(|x| x.is_finite())
+                .map(|x| x.ln_1p() - baselines[index])
+        };
         current.push(Call {
             record,
             sample_index: index,
@@ -976,6 +1007,7 @@ fn main() -> Result<()> {
             args.total_samples,
             required,
             args.min_methylation_mad,
+            !args.skip_coverage_methylation_correlation,
             &mut outputs,
             &mut scratch,
         )? {
@@ -1000,4 +1032,27 @@ fn main() -> Result<()> {
         args.chromosome
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::coverage_correlation_summary;
+
+    #[test]
+    fn disabled_depth_correlation_returns_no_observations() {
+        let (n_samples, rho) =
+            coverage_correlation_summary(false, &[0.1, 0.4, 0.8], &[1.0, 2.0, 3.0]);
+
+        assert_eq!(n_samples, 0);
+        assert!(rho.is_none());
+    }
+
+    #[test]
+    fn enabled_depth_correlation_returns_spearman_summary() {
+        let (n_samples, rho) =
+            coverage_correlation_summary(true, &[0.1, 0.4, 0.8], &[1.0, 2.0, 3.0]);
+
+        assert_eq!(n_samples, 3);
+        assert!((rho.expect("nonconstant inputs have a correlation") - 1.0).abs() < 1e-12);
+    }
 }

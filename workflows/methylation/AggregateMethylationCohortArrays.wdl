@@ -47,6 +47,7 @@ task MergeMethylationChromosome {
         Float MinMethylationMAD
         String ValueColumn
         Float ValueMultiplier
+        Boolean ComputeCoverageMethylationCorrelation
         Int MemoryGB
         Int DiskGB
         Int NumThreads
@@ -56,6 +57,10 @@ task MergeMethylationChromosome {
         set -euo pipefail
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
         printf '%s\n' "~{CohortSampleQC}" > sample_qc_files.list
+        coverage_correlation_arg=""
+        if [ "~{ComputeCoverageMethylationCorrelation}" = "false" ]; then
+            coverage_correlation_arg="--SkipCoverageMethylationCorrelation"
+        fi
 
         Rscript /tmp/MergeMethylationCohort.R \
             --AllCallList all_call_shards.list \
@@ -69,7 +74,7 @@ task MergeMethylationChromosome {
             --MinMethylationMAD ~{MinMethylationMAD} \
             --ValueColumn "~{ValueColumn}" \
             --ValueMultiplier ~{ValueMultiplier} \
-            --SkipFilterPlots
+            --SkipFilterPlots ${coverage_correlation_arg}
     >>>
 
     runtime {
@@ -374,6 +379,7 @@ workflow AggregateMethylationCohort {
         Int PromoterWindow = 2000
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
+        Boolean ComputeCoverageMethylationCorrelation = true
         Int MergeMemoryGB = 128
         Int MergeDiskGB = 500
         Int AggregateMemoryGB = 64
@@ -433,6 +439,7 @@ workflow AggregateMethylationCohort {
                 MinMethylationMAD = MinMethylationMAD,
                 ValueColumn = ValueColumn,
                 ValueMultiplier = ValueMultiplier,
+                ComputeCoverageMethylationCorrelation = ComputeCoverageMethylationCorrelation,
                 MemoryGB = MergeMemoryGB,
                 DiskGB = MergeDiskGB,
                 NumThreads = NumThreads
