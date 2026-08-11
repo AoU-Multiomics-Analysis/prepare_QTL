@@ -174,6 +174,7 @@ workflow MergeMethylation {
         Int PromoterWindow = 2000
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
+        Boolean ComputeCoverageMethylationCorrelation = true
         Int ShardMemoryGB = 64
         Int ShardDiskGB = 250
         Int ShardNumThreads = 4
@@ -254,6 +255,7 @@ workflow MergeMethylation {
             PromoterWindow = PromoterWindow,
             ValueColumn = ValueColumn,
             ValueMultiplier = ValueMultiplier,
+            ComputeCoverageMethylationCorrelation = ComputeCoverageMethylationCorrelation,
             MergeMemoryGB = MergeMemoryGB,
             MergeDiskGB = MergeDiskGB,
             AggregateMemoryGB = AggregateMemoryGB,

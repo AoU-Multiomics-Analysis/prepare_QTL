@@ -89,6 +89,7 @@ task MergeMethylationChromosome {
         Float MinMethylationMAD
         String ValueColumn
         Float ValueMultiplier
+        Boolean ComputeCoverageMethylationCorrelation
         Int MemoryGB
         Int DiskGB
         Int NumThreads
@@ -97,6 +98,10 @@ task MergeMethylationChromosome {
     command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
+        coverage_correlation_arg=""
+        if [ "~{ComputeCoverageMethylationCorrelation}" = "false" ]; then
+            coverage_correlation_arg="--skip-coverage-methylation-correlation"
+        fi
         methylation-chromosome-merge \
             --all-call-list all_call_shards.list \
             --sample-qc "~{CohortSampleQC}" \
@@ -109,7 +114,7 @@ task MergeMethylationChromosome {
             --min-methylation-mad ~{MinMethylationMAD} \
             --value-column "~{ValueColumn}" \
             --value-multiplier ~{ValueMultiplier} \
-            --progress-every-sites 1000
+            --progress-every-sites 1000 ${coverage_correlation_arg}
     >>>
 
     runtime {
@@ -274,6 +279,7 @@ workflow AggregateMethylationData {
         String AutosomePrefix
         String ValueColumn
         Float ValueMultiplier
+        Boolean ComputeCoverageMethylationCorrelation
         File AnnotationGTF
         File CCREAnnotations
         File CpGIslandAnnotations
@@ -344,6 +350,7 @@ workflow AggregateMethylationData {
                 MinMethylationMAD = MinMethylationMAD,
                 ValueColumn = ValueColumn,
                 ValueMultiplier = ValueMultiplier,
+                ComputeCoverageMethylationCorrelation = ComputeCoverageMethylationCorrelation,
                 MemoryGB = MergeMemoryGB,
                 DiskGB = MergeDiskGB,
                 NumThreads = NumThreads

@@ -120,6 +120,7 @@ During each chromosome merge, the cohort-metric reduction reports progress every
 | `PromoterWindow` | `2000` | Bases either side of each strand-aware TSS classified as promoter. |
 | `ValueColumn` | `mod_score` | Column used as methylation phenotype. |
 | `ValueMultiplier` | `0.01` | Converts pb-CpG `mod_score` percentages to 0–1 beta values. |
+| `ComputeCoverageMethylationCorrelation` | `true` | Computes the per-site methylation-versus-normalized-sequencing-depth Spearman diagnostic. Set to `false` to skip it without changing site filtering or QTL phenotypes. |
 | `AdditionalCovariates` | unset | Optional TSV containing `sample_id` plus genotype PCs or other covariates to merge with INT phenotype PCs. |
 | `ShardMemoryGB` / `ShardDiskGB` | `64` / `250` | Resources for each parallel shard. Disk must accommodate the 25 input BEDs and chromosome-split outputs; `SamplesPerShard` remains 25 by default. |
 | `MergeMemoryGB` / `MergeDiskGB` | `128` / `500` | Resources for each per-autosome cohort reduction and downstream phenotype-PC calculation. |
@@ -154,7 +155,7 @@ The site metadata has two metric families:
 
 `fraction_samples_min_coverage` uses the complete input cohort as its denominator. `fraction_samples_passing_per_sample_qc` additionally excludes extreme-coverage calls. `pass_sample_presence_filter` and `pass_methylation_mad_filter` show the two cohort filters separately; `keep_site` is their final combined decision.
 
-`coverage_methylation_spearman_rho` is a diagnostic only: it is the per-site Spearman correlation between methylation and `log1p(cov) - log1p(sample_median_cov)`, using calls that passed the per-sample coverage QC. `n_samples_coverage_methylation_correlation` gives the number of calls contributing to that statistic. Neither field changes site retention or QTL output.
+`coverage_methylation_spearman_rho` is a diagnostic only: it is the per-site Spearman correlation between methylation and `log1p(cov) - log1p(sample_median_cov)`, using calls that passed the per-sample coverage QC. `n_samples_coverage_methylation_correlation` gives the number of calls contributing to that statistic. Neither field changes site retention or QTL output. The diagnostic is controlled by `ComputeCoverageMethylationCorrelation` (enabled by default); when disabled, the metadata schema is unchanged and these fields are written as `NA` and `0`, respectively.
 
 The filter-count chart and TSV use mutually exclusive stages so the counts add up to every observed site: insufficient minimum-coverage samples, loss of sufficient samples after extreme-coverage exclusions, low MAD after sample-presence QC, or passing all cohort filters. The ggupset UpSet plot is complementary: it retains overlapping conditions, including a site that still passes overall QC despite one or more missing or extreme-coverage calls.
 

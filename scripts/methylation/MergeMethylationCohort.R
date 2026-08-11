@@ -26,6 +26,8 @@ option_list <- list(
                 help = "Multiplier applied to ValueColumn [default: %default]"),
     make_option("--ProgressEverySites", type = "integer", default = 1000,
                 help = "Write a cohort-metric progress message after this many sites [default: %default]"),
+    make_option("--SkipCoverageMethylationCorrelation", action = "store_true", default = FALSE,
+                help = "Do not compute per-site methylation-versus-normalized-coverage Spearman correlation"),
     make_option("--SkipFilterPlots", action = "store_true", default = FALSE,
                 help = "Do not write filter summary/count/UpSet outputs")
 )
@@ -76,19 +78,21 @@ sample_qc <- read_sample_qc(read_file_list(opt$SampleQcList, "Sample-QC"), n_sam
 if (!setequal(sample_qc$sample_id, cohort_sample_ids)) {
     stop("Sample-QC files do not contain exactly the cohort sample IDs")
 }
-sample_coverage_baseline <- sample_qc[, .(
-    sample_id,
-    sample_median_log_coverage = log1p(as.numeric(median_cov))
-)]
-if (any(!is.finite(sample_coverage_baseline$sample_median_log_coverage))) {
-    stop("Sample-QC files contain a missing or non-positive median_cov value")
+if (!opt$SkipCoverageMethylationCorrelation) {
+    sample_coverage_baseline <- sample_qc[, .(
+        sample_id,
+        sample_median_log_coverage = log1p(as.numeric(median_cov))
+    )]
+    if (any(!is.finite(sample_coverage_baseline$sample_median_log_coverage))) {
+        stop("Sample-QC files contain a missing or non-positive median_cov value")
+    }
+    all_site_calls[sample_coverage_baseline, on = "sample_id",
+                   sample_median_log_coverage := i.sample_median_log_coverage]
+    if (anyNA(all_site_calls$sample_median_log_coverage)) {
+        stop("All-call files contain sample(s) absent from the Sample-QC files")
+    }
+    all_site_calls[, sample_normalized_log_coverage := log1p(cov) - sample_median_log_coverage]
 }
-all_site_calls[sample_coverage_baseline, on = "sample_id",
-               sample_median_log_coverage := i.sample_median_log_coverage]
-if (anyNA(all_site_calls$sample_median_log_coverage)) {
-    stop("All-call files contain sample(s) absent from the Sample-QC files")
-}
-all_site_calls[, sample_normalized_log_coverage := log1p(cov) - sample_median_log_coverage]
 chromosome_label <- if (nzchar(opt$Chromosome)) paste0(" for ", opt$Chromosome) else ""
 message("Reading per-sample-QC-passing calls and all-site metadata from ",
         length(all_call_paths), " shard(s)", chromosome_label, " for ", n_samples, " total samples")
@@ -115,6 +119,19 @@ message("Computing cohort metrics for ", total_sites_for_metrics, " site(s)", ch
         "; reporting progress every ", opt$ProgressEverySites, " site(s)")
 site_metadata <- all_site_calls[, {
     per_sample_pass <- per_sample_qc_pass == TRUE
+    coverage_methylation_metrics <- if (opt$SkipCoverageMethylationCorrelation) {
+        list(n_samples = 0L, spearman_rho = NA_real_)
+    } else {
+        list(
+            n_samples = sum(
+                per_sample_pass & is.finite(methylation_value_for_metrics) & is.finite(sample_normalized_log_coverage)
+            ),
+            spearman_rho = safe_spearman(
+                methylation_value_for_metrics[per_sample_pass],
+                sample_normalized_log_coverage[per_sample_pass]
+            )
+        )
+    }
     metrics <- list(
         n_samples_observed = uniqueN(sample_id),
         fraction_samples_observed = uniqueN(sample_id) / n_samples,
@@ -138,13 +155,8 @@ site_metadata <- all_site_calls[, {
         sd_methylation_passing_per_sample_qc = safe_sd(methylation_value_for_metrics[per_sample_pass]),
         cv_methylation_passing_per_sample_qc = safe_cv(methylation_value_for_metrics[per_sample_pass]),
         methylation_mad_passing_per_sample_qc = safe_mad(methylation_value_for_metrics[per_sample_pass]),
-        n_samples_coverage_methylation_correlation = sum(
-            per_sample_pass & is.finite(methylation_value_for_metrics) & is.finite(sample_normalized_log_coverage)
-        ),
-        coverage_methylation_spearman_rho = safe_spearman(
-            methylation_value_for_metrics[per_sample_pass],
-            sample_normalized_log_coverage[per_sample_pass]
-        )
+        n_samples_coverage_methylation_correlation = coverage_methylation_metrics$n_samples,
+        coverage_methylation_spearman_rho = coverage_methylation_metrics$spearman_rho
     )
     processed_sites_for_metrics <<- processed_sites_for_metrics + 1L
     if (processed_sites_for_metrics %% opt$ProgressEverySites == 0L ||
