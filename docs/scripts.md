@@ -151,14 +151,16 @@ Computes phenotype principal components (PCs) from a normalized BED file.
 1. Reads a normalized BED file, such as expression, splicing, or proteomics.
 2. Runs PCA on the molecular phenotype data using `PCAtools::pca`.
 3. Selects the optimal number of PCs using the Gavish-Donoho method (`chooseGavishDonoho`).
-4. Writes the phenotype PCs to a TSV file.
+4. Writes two phenotype-PC TSV files from the same PCA run: the existing Gavish-Donoho-selected output and a `.all.tsv` output containing every available rotated PC.
 
 **Inputs:**
 - `--bed_file`: A normalized BED file of molecular phenotype data.
 - `--output_prefix`: Prefix for the output file.
 - `--output_suffix`: Optional suffix added before the `.tsv` extension.
 
-**Output:** `<output_prefix>_phenotype_PCs<output_suffix>.tsv`
+**Outputs:**
+- `<output_prefix>_phenotype_PCs<output_suffix>.tsv`: Gavish-Donoho-selected phenotype PCs.
+- `<output_prefix>_phenotype_PCs<output_suffix>.all.tsv`: all available rotated phenotype PCs.
 
 ## `scripts/common/MergeCovariates.R`
 
@@ -166,7 +168,7 @@ Merges additional covariates, such as genotype PCs, and molecular phenotype PCs 
 
 **What it does:**
 1. Reads additional covariates and molecular phenotype PCs from TSV files.
-2. Inner-joins the two tables by sample ID, using `sample_id` in the additional covariates file and `ID` in the phenotype PCs file.
+2. Inner-joins the two tables by sample ID, using `sample_id` in the additional covariates file and `ID` in the Gavish-Donoho-selected phenotype PCs file.
 3. Transposes the merged table so that rows are covariate names and columns are sample IDs, as required by tensorQTL.
 4. Writes the combined covariate matrix to a TSV file.
 
