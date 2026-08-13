@@ -285,6 +285,7 @@ workflow MergeMethylation {
         Array[File] CorrelationSummariesByChromosome = CohortMerge.CorrelationSummariesByChromosome
         File PassingSiteAnnotations = CohortMerge.PassingSiteAnnotations
         File IntPhenotypePCsOut = CohortMerge.IntPhenotypePCsOut
+        File IntPhenotypePCsAllOut = CohortMerge.IntPhenotypePCsAllOut
         File? IntQtlCovariates = CohortMerge.IntQtlCovariates
         Array[File] ShardSampleQC = FilterMethylationShard.SampleQC
     }
