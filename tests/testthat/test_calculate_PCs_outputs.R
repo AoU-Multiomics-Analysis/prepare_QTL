@@ -1,4 +1,4 @@
-source(file.path("scripts", "common", "PCOutputUtils.R"))
+source(file.path("..", "..", "scripts", "common", "PCOutputUtils.R"))
 
 testthat::test_that("full output retains every rotated PC and selected is a prefix", {
     rotated <- data.frame(
