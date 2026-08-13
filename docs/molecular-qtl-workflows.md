@@ -12,7 +12,7 @@ The eQTL, pQTL, and sQTL prepare workflows now compute both molecular phenotype 
 - `.scaled`: Centered and scaled molecular phenotypes. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
-Each workflow computes phenotype PCs separately for the `.INT` and `.scaled` outputs only. Raw BED files are emitted as workflow outputs but are not used for phenotype PCs, covariate merging, or residualization. `AdditionalCovariates` is an optional TSV of covariates with a `sample_id` column. When provided, the workflow runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) twice to merge those covariates with the `.INT` and `.scaled` phenotype PCs.
+Each workflow computes phenotype PCs separately for the `.INT` and `.scaled` outputs only. For each transformed branch, the workflow emits both the existing Gavish-Donoho-selected phenotype-PC TSV and a matching `.all.tsv` file containing every available rotated PC from the same PCA run. Raw BED files are emitted as workflow outputs but are not used for phenotype PCs, covariate merging, or residualization. `AdditionalCovariates` is an optional TSV of covariates with a `sample_id` column. When provided, the workflow runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) twice to merge those covariates with the selected `.INT` and `.scaled` phenotype-PC TSVs.
 
 The prepare scripts remove WGCNA sample connectivity outliers from `.INT` and `.scaled` matrices before those BED files are emitted. For each transformed branch, the scripts compute a sample-sample biweight midcorrelation matrix with `WGCNA::bicor(..., use = "pairwise.complete.obs")`, transform it to adjacency with `0.5 + 0.5 * correlation`, calculate sample connectivity with `WGCNA::fundamentalNetworkConcepts()`, and remove samples with connectivity `Z_score < -3`. Removed samples are written as `connectivity_outliers.tsv` outputs with `SampleID` and `Z_score` columns. If there are fewer than 3 samples, fewer than 2 features, or zero/undefined connectivity variance, the scripts keep all samples and write an empty outlier TSV. Raw BED files keep all samples after the initial sample-list filter.
 
@@ -30,7 +30,7 @@ End-to-end workflow for preparing gene expression data for eQTL analysis.
 
 **Inputs:** Raw count GCT file, GENCODE GTF, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
 
-**Outputs:** `.expression.INT.bed.gz`, `.expression.scaled.bed.gz`, `.expression.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv`, and optionally residualized BEDs ending in `.residualized.bed.gz`.
+**Outputs:** `.expression.INT.bed.gz`, `.expression.scaled.bed.gz`, `.expression.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, selected phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, full phenotype-PC matrices ending in `.INT.all.tsv` and `.scaled.all.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv` that continue to use the selected PC files, and optionally residualized BEDs ending in `.residualized.bed.gz`.
 
 ## `workflows/proteomics/prepare_pQTL.wdl`
 
@@ -44,7 +44,7 @@ End-to-end workflow for preparing Olink proteomics data for pQTL analysis.
 
 **Inputs:** Olink proteomics data file, GENCODE GTF, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
 
-**Outputs:** `.protein.INT.bed.gz`, `.protein.scaled.bed.gz`, `.protein.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv`, and optionally residualized BEDs ending in `.residualized.bed.gz`.
+**Outputs:** `.protein.INT.bed.gz`, `.protein.scaled.bed.gz`, `.protein.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, selected phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, full phenotype-PC matrices ending in `.INT.all.tsv` and `.scaled.all.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv` that continue to use the selected PC files, and optionally residualized BEDs ending in `.residualized.bed.gz`.
 
 ## `workflows/proteomics/normalize_pQTL.wdl`
 
@@ -58,7 +58,7 @@ Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 
 `workflows/methylation/ProcessMethylationSample.wdl` runs per sample from direct Terra table fields (`SampleID` and `MethylationBed`), with no external manifest. It writes sample QC plus 22 autosome-specific QC-flagged call tables.
 
-`workflows/methylation/AggregateMethylationCohort.wdl` consumes one compact cohort manifest containing those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates phenotype PCs from the INT BED, and optionally merges them with additional covariates.
+`workflows/methylation/AggregateMethylationCohort.wdl` consumes one compact cohort manifest containing those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates both selected and full phenotype-PC outputs from the INT BED, and optionally merges the selected phenotype PCs with additional covariates.
 
 `workflows/methylation/merge_methylation.wdl` is the source-BED manifest/shard wrapper for batch processing. It retains concurrent `gsutil` localization and uses an internal array-based cohort implementation, avoiding Terra's external workflow-input size limit.
 
@@ -76,7 +76,7 @@ End-to-end workflow for preparing splice junction data for sQTL analysis.
 
 **Inputs:** LeafCutter BED file, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
 
-**Outputs:** `.splicing.INT.bed.gz`, `.splicing.scaled.bed.gz`, `.splicing.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv`, and optionally residualized BEDs ending in `.residualized.bed.gz`.
+**Outputs:** `.splicing.INT.bed.gz`, `.splicing.scaled.bed.gz`, `.splicing.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, selected phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, full phenotype-PC matrices ending in `.INT.all.tsv` and `.scaled.all.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv` that continue to use the selected PC files, and optionally residualized BEDs ending in `.residualized.bed.gz`.
 
 ## `workflows/common/calculate_phenotypePCs.wdl`
 
@@ -87,7 +87,7 @@ Workflow that computes phenotype PCs from any normalized molecular phenotype BED
 
 **Inputs:** Normalized BED file, output prefix, optional output suffix, resource parameters.
 
-**Outputs:** Phenotype PCs TSV (`<OutputPrefix>_phenotype_PCs<OutputSuffix>.tsv`).
+**Outputs:** Selected phenotype PCs TSV (`<OutputPrefix>_phenotype_PCs<OutputSuffix>.tsv`) and full rotated-PC TSV (`<OutputPrefix>_phenotype_PCs<OutputSuffix>.all.tsv`).
 
 ## `workflows/common/MergeCovariates.wdl`
 
@@ -96,7 +96,7 @@ Workflow that merges additional covariates, such as genotype PCs, and molecular 
 **Steps:**
 1. Runs `MergeCovariates.R` to inner-join additional covariates and molecular PCs, then transpose the result.
 
-**Inputs:** Additional covariates TSV with `sample_id`, molecular PCs TSV, output prefix, optional output suffix.
+**Inputs:** Additional covariates TSV with `sample_id`, Gavish-Donoho-selected molecular PCs TSV, output prefix, optional output suffix.
 
 **Outputs:** Combined QTL covariate file (`<OutputPrefix>_QTL_covariates<OutputSuffix>.tsv`).
 

@@ -553,6 +553,7 @@ workflow AggregateMethylationCohort {
         Array[File] CorrelationSummariesByChromosome = AnalyzeMethylationAutosomeCorrelation.CorrelationSummary
         File PassingSiteAnnotations = AnnotateMethylationSites.PassingSiteAnnotations
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
+        File IntPhenotypePCsAllOut = IntPhenotypePCs.OutPhenotypePCsAll
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         File CohortSamples = BuildMethylationCohortSamples.CohortSamples
         Int TotalSamples = BuildMethylationCohortSamples.TotalSamples

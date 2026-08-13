@@ -36,6 +36,7 @@ workflow PrepareMethylationQtlCovariates {
 
     output {
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
+        File IntPhenotypePCsAllOut = IntPhenotypePCs.OutPhenotypePCsAll
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
     }
 }

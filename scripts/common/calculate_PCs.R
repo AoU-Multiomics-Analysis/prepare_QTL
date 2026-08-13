@@ -3,6 +3,14 @@ library(data.table)
 library(PCAtools)
 library(janitor)
 
+script_file <- grep("^--file=", commandArgs(), value = TRUE)
+if (length(script_file) > 0) {
+    script_file <- sub("^--file=", "", script_file[[1]])
+} else {
+    script_file <- "scripts/common/calculate_PCs.R"
+}
+source(file.path(dirname(normalizePath(script_file)), "PCOutputUtils.R"))
+
 ########## PARSE COMMAND LINE ARGUMENTS ##########
 
 option_list <- list(
@@ -26,6 +34,7 @@ prefix <- opt$output_prefix
 suffix <- opt$output_suffix
 
 phenotype_pcs_out <- paste0(prefix,'_phenotype_PCs',suffix,'.tsv')
+phenotype_pcs_all_out <- paste0(prefix,'_phenotype_PCs',suffix,'.all.tsv')
 #QTL_covariates <- paste0(prefix,'_QTL_covariates.tsv')
 message(paste0('Writing to: ' ,phenotype_pcs_out))
 
@@ -36,13 +45,7 @@ subsetted_expression_dat <- expression_df %>% select(-c(1,2,3,4))
 pca_standardized <- PCAtools::pca(subsetted_expression_dat)
 n_pcs <- chooseGavishDonoho( subsetted_expression_dat ,  var.explained = pca_standardized$sdev^2, noise = 1)
 message(paste0('Using' , n_pcs,' PCs'))
-pca_out <- pca_standardized$rotated %>%
-   data.frame() %>%
-   select(1:n_pcs) %>%
-   rownames_to_column('ID') %>%
-   mutate(ID = str_remove(ID,'X'))
-
-pca_out
+list(rotated = pca_standardized$rotated, n_pcs = n_pcs)
 }
 
 
@@ -59,7 +62,12 @@ PCA_data <- compute_pcs(bed_df)
 
 message('Writing PCs')
 # writes phenotype PC to output
-PCA_data %>% write_tsv(phenotype_pcs_out)
+write_pca_outputs(
+    rotated = PCA_data$rotated,
+    n_pcs = PCA_data$n_pcs,
+    selected_path = phenotype_pcs_out,
+    all_path = phenotype_pcs_all_out
+)
 
 # merges genetic PCs and phenotype PCs
 #merged_data <- genetic_PCs %>%

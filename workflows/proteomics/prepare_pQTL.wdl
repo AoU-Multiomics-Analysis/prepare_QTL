@@ -136,6 +136,8 @@ workflow pQTLPrepareData {
         File ScaledConnectivityOutliers = PrepareProteomicData.ScaledConnectivityOutliers
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File ScaledPhenotypePCsOut = ScaledPhenotypePCs.OutPhenotypePCs
+        File IntPhenotypePCsAllOut = IntPhenotypePCs.OutPhenotypePCsAll
+        File ScaledPhenotypePCsAllOut = ScaledPhenotypePCs.OutPhenotypePCsAll
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
         File? ScaledQtlCovariates = MergeScaledAdditionalCovariates.QtlCovariates
         File? IntResidualizedBedFile = ResidualizeIntPhenotypes.ResidualizedBed

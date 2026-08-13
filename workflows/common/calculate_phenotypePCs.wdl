@@ -25,6 +25,7 @@ task ComputePCs{
 
     output {
         File PhenotypePCsTSV="~{OutputPrefix}_phenotype_PCs~{OutputSuffix}.tsv"
+        File PhenotypePCsAllTSV="~{OutputPrefix}_phenotype_PCs~{OutputSuffix}.all.tsv"
     }
 }
 
@@ -51,6 +52,7 @@ workflow PhenotypePCs {
 
     output {
         File OutPhenotypePCs= ComputePCs.PhenotypePCsTSV
+        File OutPhenotypePCsAll = ComputePCs.PhenotypePCsAllTSV
     }
 
 }
