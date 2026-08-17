@@ -172,6 +172,7 @@ workflow MergeMethylation {
         String AutosomePrefix = "chr"
         Float FenceK = 3.0
         Int PromoterWindow = 2000
+        Boolean AnnotateSites = true
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
         Boolean ComputeCoverageMethylationCorrelation = true
@@ -182,8 +183,8 @@ workflow MergeMethylation {
         Int MergeDiskGB = 500
         Int AggregateMemoryGB = 64
         Int AggregateDiskGB = 1000
-        Int AnnotationMemoryGB = 64
-        Int AnnotationDiskGB = 100
+        Int AnnotationMemoryGB = 256
+        Int AnnotationDiskGB = 200
         Int CorrelationWindowBP = 1000
         Float CorrelationMinAbsCorrelation = 0.95
         Int CorrelationMemoryGB = 64
@@ -253,6 +254,7 @@ workflow MergeMethylation {
             MinMethylationMAD = MinMethylationMAD,
             AutosomePrefix = AutosomePrefix,
             PromoterWindow = PromoterWindow,
+            AnnotateSites = AnnotateSites,
             ValueColumn = ValueColumn,
             ValueMultiplier = ValueMultiplier,
             ComputeCoverageMethylationCorrelation = ComputeCoverageMethylationCorrelation,
@@ -285,7 +287,7 @@ workflow MergeMethylation {
         File ConnectivityRepresentativeCpGs = CohortMerge.ConnectivityRepresentativeCpGs
         Array[File] CorrelationClustersByChromosome = CohortMerge.CorrelationClustersByChromosome
         Array[File] CorrelationSummariesByChromosome = CohortMerge.CorrelationSummariesByChromosome
-        File PassingSiteAnnotations = CohortMerge.PassingSiteAnnotations
+        File? PassingSiteAnnotations = CohortMerge.PassingSiteAnnotations
         File IntPhenotypePCsOut = CohortMerge.IntPhenotypePCsOut
         File IntPhenotypePCsAllOut = CohortMerge.IntPhenotypePCsAllOut
         File? IntQtlCovariates = CohortMerge.IntQtlCovariates

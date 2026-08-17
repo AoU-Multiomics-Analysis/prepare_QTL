@@ -284,6 +284,7 @@ workflow AggregateMethylationData {
         File CCREAnnotations
         File CpGIslandAnnotations
         Int PromoterWindow
+        Boolean AnnotateSites = true
         Int MergeMemoryGB
         Int MergeDiskGB
         Int AggregateMemoryGB
@@ -372,16 +373,18 @@ workflow AggregateMethylationData {
             NumThreads = NumThreads
     }
 
-    call Annotation.AnnotateMethylationCohortSites as AnnotateSites {
-        input:
-            PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata,
-            AnnotationGTF = AnnotationGTF,
-            CCREAnnotations = CCREAnnotations,
-            CpGIslandAnnotations = CpGIslandAnnotations,
-            OutputPrefix = OutputPrefix,
-            PromoterWindow = PromoterWindow,
-            MemoryGB = AnnotationMemoryGB,
-            DiskGB = AnnotationDiskGB
+    if (AnnotateSites) {
+        call Annotation.AnnotateMethylationCohortSites as AnnotateSitesTask {
+            input:
+                PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata,
+                AnnotationGTF = AnnotationGTF,
+                CCREAnnotations = CCREAnnotations,
+                CpGIslandAnnotations = CpGIslandAnnotations,
+                OutputPrefix = OutputPrefix,
+                PromoterWindow = PromoterWindow,
+                MemoryGB = AnnotationMemoryGB,
+                DiskGB = AnnotationDiskGB
+        }
     }
 
     output {
@@ -399,6 +402,6 @@ workflow AggregateMethylationData {
         File FilterUpsetPlot = AggregateMethylationChromosomes.FilterUpsetPlot
         File PreConnectivityRawMethylationBed = AggregateMethylationChromosomes.PreConnectivityRawMethylationBed
         File PreConnectivityIntMethylationBed = AggregateMethylationChromosomes.PreConnectivityIntMethylationBed
-        File PassingSiteAnnotations = AnnotateSites.PassingSiteAnnotations
+        File? PassingSiteAnnotations = AnnotateSitesTask.PassingSiteAnnotations
     }
 }

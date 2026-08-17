@@ -21,6 +21,7 @@ workflow AggregateMethylationCohort {
         Float MinMethylationMAD = 0.003
         String AutosomePrefix = "chr"
         Int PromoterWindow = 2000
+        Boolean AnnotateSites = true
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
         Boolean ComputeCoverageMethylationCorrelation = true
@@ -28,8 +29,8 @@ workflow AggregateMethylationCohort {
         Int MergeDiskGB = 500
         Int AggregateMemoryGB = 64
         Int AggregateDiskGB = 1000
-        Int AnnotationMemoryGB = 64
-        Int AnnotationDiskGB = 100
+        Int AnnotationMemoryGB = 256
+        Int AnnotationDiskGB = 200
         Int CorrelationWindowBP = 1000
         Float CorrelationMinAbsCorrelation = 0.95
         Int CorrelationMemoryGB = 64
@@ -53,6 +54,7 @@ workflow AggregateMethylationCohort {
             CCREAnnotations = CCREAnnotations,
             CpGIslandAnnotations = CpGIslandAnnotations,
             PromoterWindow = PromoterWindow,
+            AnnotateSites = AnnotateSites,
             MergeMemoryGB = MergeMemoryGB,
             MergeDiskGB = MergeDiskGB,
             AggregateMemoryGB = AggregateMemoryGB,
@@ -110,7 +112,7 @@ workflow AggregateMethylationCohort {
         File ConnectivityRepresentativeCpGs = RefineConnectivity.ConnectivityRepresentativeCpGs
         Array[File] CorrelationClustersByChromosome = RefineConnectivity.CorrelationClustersByChromosome
         Array[File] CorrelationSummariesByChromosome = RefineConnectivity.CorrelationSummariesByChromosome
-        File PassingSiteAnnotations = AggregateCohort.PassingSiteAnnotations
+        File? PassingSiteAnnotations = AggregateCohort.PassingSiteAnnotations
         File IntPhenotypePCsOut = PrepareQtlCovariates.IntPhenotypePCsOut
         File IntPhenotypePCsAllOut = PrepareQtlCovariates.IntPhenotypePCsAllOut
         File? IntQtlCovariates = PrepareQtlCovariates.IntQtlCovariates

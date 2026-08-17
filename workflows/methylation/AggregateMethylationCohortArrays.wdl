@@ -377,6 +377,7 @@ workflow AggregateMethylationCohort {
         Float MinMethylationMAD = 0.003
         String AutosomePrefix = "chr"
         Int PromoterWindow = 2000
+        Boolean AnnotateSites = true
         String ValueColumn = "mod_score"
         Float ValueMultiplier = 0.01
         Boolean ComputeCoverageMethylationCorrelation = true
@@ -384,8 +385,8 @@ workflow AggregateMethylationCohort {
         Int MergeDiskGB = 500
         Int AggregateMemoryGB = 64
         Int AggregateDiskGB = 1000
-        Int AnnotationMemoryGB = 64
-        Int AnnotationDiskGB = 100
+        Int AnnotationMemoryGB = 256
+        Int AnnotationDiskGB = 200
         Int CorrelationWindowBP = 1000
         Float CorrelationMinAbsCorrelation = 0.95
         Int CorrelationMemoryGB = 64
@@ -504,16 +505,18 @@ workflow AggregateMethylationCohort {
             DiskGB = AggregateDiskGB
     }
 
-    call AnnotateMethylationSites {
-        input:
-            SiteMetadata = AggregateMethylationChromosomes.SiteMetadata,
-            AnnotationGTF = AnnotationGTF,
-            CCREAnnotations = CCREAnnotations,
-            CpGIslandAnnotations = CpGIslandAnnotations,
-            OutputPrefix = OutputPrefix,
-            PromoterWindow = PromoterWindow,
-            MemoryGB = AnnotationMemoryGB,
-            DiskGB = AnnotationDiskGB
+    if (AnnotateSites) {
+        call AnnotateMethylationSites {
+            input:
+                SiteMetadata = AggregateMethylationChromosomes.SiteMetadata,
+                AnnotationGTF = AnnotationGTF,
+                CCREAnnotations = CCREAnnotations,
+                CpGIslandAnnotations = CpGIslandAnnotations,
+                OutputPrefix = OutputPrefix,
+                PromoterWindow = PromoterWindow,
+                MemoryGB = AnnotationMemoryGB,
+                DiskGB = AnnotationDiskGB
+        }
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
@@ -551,7 +554,7 @@ workflow AggregateMethylationCohort {
         File ConnectivityRepresentativeCpGs = FinalizeMethylationConnectivity.ConnectivityRepresentativeCpGs
         Array[File] CorrelationClustersByChromosome = AnalyzeMethylationAutosomeCorrelation.CorrelationClusters
         Array[File] CorrelationSummariesByChromosome = AnalyzeMethylationAutosomeCorrelation.CorrelationSummary
-        File PassingSiteAnnotations = AnnotateMethylationSites.PassingSiteAnnotations
+        File? PassingSiteAnnotations = AnnotateMethylationSites.PassingSiteAnnotations
         File IntPhenotypePCsOut = IntPhenotypePCs.OutPhenotypePCs
         File IntPhenotypePCsAllOut = IntPhenotypePCs.OutPhenotypePCsAll
         File? IntQtlCovariates = MergeIntAdditionalCovariates.QtlCovariates
