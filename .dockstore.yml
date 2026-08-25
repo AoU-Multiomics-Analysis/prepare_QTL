@@ -14,6 +14,9 @@ workflows:
     primaryDescriptorPath: /workflows/splicing/prepare_sQTL.wdl
     name: prepare_sQTL
   - subclass: WDL
+    primaryDescriptorPath: /workflows/methylation/prepare_mQTL.wdl
+    name: prepare_mQTL
+  - subclass: WDL
     primaryDescriptorPath: /workflows/methylation/merge_methylation.wdl
     name: merge_methylation
   - subclass: WDL

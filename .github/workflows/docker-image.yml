@@ -40,6 +40,15 @@ jobs:
           tags: |
             ${{ steps.meta.outputs.tags }}
 
+      - name: Smoke test merged methylation preparation
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace:ro" \
+            -w /workspace \
+            -e PREPARE_METHYLATION_SCRIPT=/tmp/PrepareMethylation.R \
+            "${{ fromJSON(steps.meta.outputs.json).tags[0] }}" \
+            Rscript tests/test_prepare_methylation.R
+
   build_methylation_rust:
     runs-on: ubuntu-latest
     permissions:

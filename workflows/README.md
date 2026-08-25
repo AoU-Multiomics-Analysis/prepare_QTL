@@ -22,6 +22,7 @@ implementation modules.
 | Expression | `expression/prepare_eQTL.wdl` | Prepare expression QTL phenotypes. |
 | Proteomics | `proteomics/normalize_pQTL.wdl`, `proteomics/prepare_pQTL.wdl` | Normalize Olink data and prepare protein QTL phenotypes. |
 | Splicing | `splicing/prepare_sQTL.wdl` | Prepare splice QTL phenotypes. |
+| Methylation | `methylation/prepare_mQTL.wdl` | Prepare QTL phenotypes from an existing merged methylation BED. |
 | Methylation | `methylation/ProcessMethylationSample.wdl` | Per-sample Terra-table processing. |
 | Methylation | `methylation/AggregateMethylationCohort.wdl` | Cohort aggregation from one compact `CohortManifest`. |
 | Methylation | `methylation/merge_methylation.wdl` | Legacy source-BED manifest/shard entry point. |

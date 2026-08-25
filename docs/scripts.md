@@ -26,6 +26,10 @@ If a transformed matrix has fewer than 3 samples, fewer than 2 features, or zero
 
 The scripts still accept `--RankNormalize` for backwards compatibility, but the option is deprecated and no longer selects a single output mode.
 
+## `scripts/methylation/PrepareMethylation.R`
+
+Prepares an existing merged methylation BED. It accepts a headerless one-column sample list or one with a `sample_id`, `SampleID`, or `ID` header and requires every requested sample to exist. It removes `.meth_region_stats` suffixes, filters features by chromosome and missingness, and mean-imputes the remaining missing values. At least two samples and two retained features are required for downstream PCs. It writes raw, inverse-normalized, and scaled BED files. The raw output keeps all selected samples. The two normalized outputs remove connectivity outliers independently and write separate outlier reports.
+
 ## `scripts/expression/PrepareExpression.R`
 
 Prepares RNA-seq gene expression data for eQTL analysis.

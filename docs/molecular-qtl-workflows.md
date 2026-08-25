@@ -56,6 +56,8 @@ Workflow that median-normalizes Olink NPX parquet files before pQTL preparation.
 
 ## Methylation workflows
 
+`workflows/methylation/prepare_mQTL.wdl` is the entry point for an existing merged methylation BED. It accepts a headerless one-column sample list or a list headed by `sample_id`, `SampleID`, or `ID`; every requested sample must exist in the BED. It removes `.meth_region_stats` suffixes, keeps autosomal features below the missingness threshold, and mean-imputes retained missing values. At least two samples and two retained features are required. It writes raw, INT, and scaled BED files. Connectivity filtering applies independently to the INT and scaled files, while the raw file keeps all selected samples. The workflow calculates PCs for the two normalized files and optionally merges them with additional covariates.
+
 `workflows/methylation/ProcessMethylationSample.wdl` runs per sample from direct Terra table fields (`SampleID` and `MethylationBed`), with no external manifest. It writes sample QC plus 22 autosome-specific QC-flagged call tables.
 
 `workflows/methylation/AggregateMethylationCohort.wdl` consumes one compact cohort manifest containing those per-sample outputs, reconstructs the cohort sample list from the QC files, evaluates sample-presence and methylation-MAD filters in parallel per autosome, and aggregates final metadata and BEDs. Missing values among retained sites are imputed with the cohort feature mean before it writes raw beta-value and inverse-normalized TensorQTL BEDs, calculates both selected and full phenotype-PC outputs from the INT BED, and optionally merges the selected phenotype PCs with additional covariates.
