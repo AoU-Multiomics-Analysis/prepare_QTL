@@ -26,6 +26,7 @@ This change will:
   retained cell types.
 - Add a manifest that links each cell type to its QTL-ready INT and scaled
   files.
+- Add one user-configurable log2 pseudocount that defaults to zero.
 - Add pinned container and GitHub Actions support for the migrated
   deconvolution code.
 - Add a final deprecation notice to the old repository after the integrated
@@ -79,7 +80,10 @@ expression BED contains:
 #chr  start  end  gene_id  <sample columns...>
 ```
 
-The sample values must be finite, strictly positive, linear CPM values.
+The sample values must be finite, nonnegative, linear CPM values. When
+`log2_pseudocount` is `0`, all values must be strictly positive. Zero values are
+valid only when `log2_pseudocount` is greater than zero. Negative values are
+always invalid.
 
 The standalone workflow will preserve both proportion modes:
 
@@ -105,6 +109,16 @@ The end-to-end workflow will require:
 - `AdditionalCovariates` for merging with phenotype PCs.
 - An output prefix.
 
+The workflow will expose:
+
+```wdl
+Float log2_pseudocount = 0.0
+```
+
+The value must be finite and greater than or equal to zero. The same value will
+be used for the dtangle and TCA expression views and recorded in the effective
+parameter output.
+
 Optional deconvolution covariates remain separate from the required additional
 QTL covariates. They have different statistical roles and will have distinct
 input names.
@@ -113,12 +127,12 @@ input names.
 
 1. The deconvolution subworkflow reads the linear-CPM BED.
 2. dtangle maps gene IDs through the GTF, aggregates duplicate symbols in
-   linear CPM, intersects the result with LM22, and applies `log2()` exactly
-   once without a pseudocount.
-3. TCA uses every valid, nonconstant gene-ID row and applies `log2()` exactly
-   once without a pseudocount.
-4. TCA exports one coordinate-preserving log2-CPM BED for each retained major
-   cell type.
+   linear CPM, intersects the result with LM22, and applies
+   `log2(CPM + log2_pseudocount)` exactly once.
+3. TCA uses every valid, nonconstant gene-ID row and applies
+   `log2(CPM + log2_pseudocount)` exactly once.
+4. TCA exports one coordinate-preserving BED on the resulting log2 scale for
+   each retained major cell type.
 5. A scatter-input task validates the BED inventory against the WDL
    `Array[File]`. It emits aligned arrays of display names, safe slugs, and BED
    files.
@@ -245,6 +259,8 @@ The workflow will stop with a direct error when:
 - The deconvolution BED inventory and BED array do not match.
 - An inventory cell type, slug, or path is empty or duplicated.
 - The inventory scale is not `log2_cpm`.
+- The pseudocount is negative or non-finite.
+- A zero CPM value is present while the pseudocount is zero.
 - A scatter output array has the wrong length or order.
 - A required INT, scaled, PC, covariate, or outlier file is absent.
 - The manifest would contain a task-local directory instead of a stable
@@ -265,7 +281,9 @@ when calls run concurrently.
 The workflow catalog and user documentation will describe:
 
 - Linear-CPM input requirements.
-- The one-time log2 transformation in deconvolution.
+- The one-time `log2(CPM + log2_pseudocount)` transformation in
+  deconvolution.
+- The zero-default pseudocount and its effect on zero-value validation.
 - The lack of a second log transformation in QTL preparation.
 - Independent connectivity filtering.
 - Manifest fields and authoritative WDL arrays.
@@ -288,6 +306,8 @@ Local tests will cover logic that does not require the specialized container:
 - WDL 1.0 parsing and import resolution.
 - Dockstore descriptor registration.
 - No second log transform for `Log2CpmBed`.
+- Pseudocount validation, zero-value behavior, and identical dtangle/TCA
+  pseudocount use.
 - Required WDL logging fields.
 
 GitHub Actions will build the dedicated Micromamba image and run small
