@@ -18,6 +18,104 @@ cell type. This workflow calls the existing single-matrix
 [`prepare_eQTL.wdl`](../workflows/expression/prepare_eQTL.wdl). It does not
 copy the expression-QTL tasks.
 
+## Public input contracts
+
+The tables below use the public WDL input names. `None` means that an optional
+input has no default file. `Required` means that the workflow call must supply
+a value.
+
+### Standalone deconvolution inputs
+
+| Input | Type | Default | Contract |
+| --- | --- | --- | --- |
+| `expression` | `File` | Required | Linear-CPM BED described below. |
+| `gtf` | `File` | Required | Gene annotation used to map gene IDs to symbols in dtangle mode. The WDL requires it in both modes. |
+| `lm22` | `File?` | `None` | LM22 reference matrix. Supply exactly one proportion-mode input. |
+| `precomputed_proportions` | `File?` | `None` | Sample-by-LM22 proportion matrix. Supply exactly one proportion-mode input. |
+| `covariates` | `File?` | `None` | Optional TCA covariates with `sample_id` first. Samples must match the expression order. Values must be finite numeric values, with no intercept or constant column. |
+| `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for all deconvolution tasks. |
+| `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for all tasks. |
+| `max_retries` | `Int` | `2` | Global retry value for all tasks. |
+| `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
+| `dtangle_marker_fraction` | `Float` | `0.10` | dtangle marker fraction in `(0, 1]`. |
+| `dtangle_quantile_normalize` | `Boolean` | `false` | If `true`, quantile-normalize the joined LM22 and bulk profiles before dtangle. |
+| `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
+| `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
+| `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
+| `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
+| `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
+| `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
+| `dtangle_memory` | `String` | `"32 GB"` | Memory for the dtangle task. |
+| `dtangle_disk_gb` | `Int` | `100` | Local disk in GB for the dtangle task. |
+| `proportions_cpu` | `Int` | `2` | CPU count for proportion processing. |
+| `proportions_memory` | `String` | `"16 GB"` | Memory for proportion processing. |
+| `proportions_disk_gb` | `Int` | `50` | Local disk in GB for proportion processing. |
+| `fit_cpu` | `Int` | `16` | CPU count for TCA fitting. |
+| `fit_memory` | `String` | `"192 GB"` | Memory for TCA fitting. |
+| `fit_disk_gb` | `Int` | `750` | Local disk in GB for TCA fitting. |
+| `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
+| `export_memory` | `String` | `"128 GB"` | Memory for TCA BED export. |
+| `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
+| `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
+| `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
+| `manifest_disk_gb` | `Int` | `100` | Local disk in GB for the deconvolution manifest. |
+
+### Integrated cell-type eQTL inputs
+
+| Input | Type | Default | Contract |
+| --- | --- | --- | --- |
+| `expression` | `File` | Required | Linear-CPM BED described below. |
+| `gtf` | `File` | Required | Gene annotation used to map gene IDs to symbols in dtangle mode. The WDL requires it in both modes. |
+| `lm22` | `File?` | `None` | LM22 reference matrix. Supply exactly one proportion-mode input. |
+| `precomputed_proportions` | `File?` | `None` | Sample-by-LM22 proportion matrix. Supply exactly one proportion-mode input. |
+| `deconvolution_covariates` | `File?` | `None` | Optional TCA covariates. This is the integrated alias of standalone `covariates`. |
+| `SampleList` | `File` | Required | Sample list passed to every scattered expression-QTL call. |
+| `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
+| `OutputPrefix` | `String` | Required | Nonempty prefix. Each scatter call adds the cell-type slug. |
+| `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for deconvolution and integration tasks. |
+| `qtl_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl:main"` | Container for scattered expression-QTL tasks. |
+| `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for deconvolution and QTL tasks. |
+| `max_retries` | `Int` | `2` | Global retry value for deconvolution and QTL tasks. |
+| `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
+| `dtangle_marker_fraction` | `Float` | `0.10` | dtangle marker fraction in `(0, 1]`. |
+| `dtangle_quantile_normalize` | `Boolean` | `false` | If `true`, quantile-normalize the joined LM22 and bulk profiles before dtangle. |
+| `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
+| `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
+| `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
+| `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
+| `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
+| `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
+| `dtangle_memory` | `String` | `"32 GB"` | Memory for the dtangle task. |
+| `dtangle_disk_gb` | `Int` | `100` | Local disk in GB for the dtangle task. |
+| `proportions_cpu` | `Int` | `2` | CPU count for proportion processing. |
+| `proportions_memory` | `String` | `"16 GB"` | Memory for proportion processing. |
+| `proportions_disk_gb` | `Int` | `50` | Local disk in GB for proportion processing. |
+| `fit_cpu` | `Int` | `16` | CPU count for TCA fitting. |
+| `fit_memory` | `String` | `"192 GB"` | Memory for TCA fitting. |
+| `fit_disk_gb` | `Int` | `750` | Local disk in GB for TCA fitting. |
+| `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
+| `export_memory` | `String` | `"128 GB"` | Memory for TCA BED export. |
+| `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
+| `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
+| `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
+| `manifest_disk_gb` | `Int` | `100` | Local disk in GB for the deconvolution manifest. |
+| `scatter_cpu` | `Int` | `1` | CPU count for scatter validation and the QTL manifest. |
+| `scatter_memory` | `String` | `"4 GB"` | Memory for scatter validation and the QTL manifest. |
+| `scatter_disk_gb` | `Int` | `20` | Local disk in GB for scatter validation and the QTL manifest. |
+| `eqtl_cpu` | `Int` | `8` | CPU count for each scattered expression-QTL call. |
+| `eqtl_memory` | `Int` | `64` | Memory in GB for each scattered expression-QTL call. |
+| `eqtl_disk_gb` | `Int` | `200` | Local disk in GB for each scattered expression-QTL call. |
+
+The standalone workflow uses `covariates` for the optional TCA model matrix.
+The integrated workflow passes `deconvolution_covariates` to that input. It
+keeps this matrix separate from required `AdditionalCovariates`. The integrated
+workflow also has two image inputs because the deconvolution and QTL tasks use
+different dependency sets.
+
+Both workflows use one global `preemptible_attempts = 2` setting and one global
+`max_retries = 2` setting. The CPU, memory, and disk inputs are task-specific
+runtime settings.
+
 ## Expression input
 
 The `expression` input is a BED file with gene IDs and sample values:
@@ -26,9 +124,14 @@ The `expression` input is a BED file with gene IDs and sample values:
 #chr  start  end  gene_id  sample_1  sample_2
 ```
 
-The sample values must be linear CPM values. They must be finite and
-nonnegative. The workflow does not filter the input to protein-coding genes.
-It uses the GTF to map gene IDs to gene symbols for the LM22 intersection.
+The first four columns must be `#chr`, `start`, `end`, and `gene_id` in that
+order. The file must have at least one sample column. Chromosome values, gene
+IDs, and sample IDs must be non-empty. Gene IDs and sample IDs must be unique.
+`start` must be a nonnegative integer that is less than `end`. The sample
+values must be linear CPM values. They must be finite and nonnegative. The
+workflow does not filter the input to protein-coding genes. It uses the GTF to
+map gene IDs to gene symbols for the LM22 intersection. The input coordinates
+are preserved for every gene in an exported cell-type BED.
 
 `log2_pseudocount` defaults to `0`. When `log2_pseudocount` is `0`, all CPM
 values must be strictly positive. Zero CPM values are valid only when
@@ -53,11 +156,45 @@ both inputs.
 - Supply `precomputed_proportions` to use precomputed LM22 proportions and
   skip dtangle.
 
+### Precomputed LM22 schema
+
+The precomputed file must have `sample_id` as the first column. Sample IDs must
+be unique and non-empty. The values must be finite and nonnegative. Each row
+must sum to one within `1e-6`. The other columns must be exactly the 22 standard
+LM22 columns listed below. Their order in the input file can differ.
+
+```text
+B cells naive
+B cells memory
+Plasma cells
+T cells CD8
+T cells CD4 naive
+T cells CD4 memory resting
+T cells CD4 memory activated
+T cells follicular helper
+T cells regulatory (Tregs)
+T cells gamma delta
+NK cells resting
+NK cells activated
+Monocytes
+Macrophages M0
+Macrophages M1
+Macrophages M2
+Dendritic cells resting
+Dendritic cells activated
+Mast cells resting
+Mast cells activated
+Eosinophils
+Neutrophils
+```
+
 Both modes combine LM22 values into major lineages. The major lineages include
 separate CD4 T-cell and CD8 T-cell groups. The workflow removes a group when
 its cohort mean is less than `group_mean_threshold`. No cell type is forced to
-remain. It applies `zero_floor` to retained proportions and then normalizes the
-TCA weights by sample.
+remain. If fewer than two major groups pass `group_mean_threshold`, the
+workflow fails. `zero_floor` replaces exact zero values only in retained
+proportions. It does not clamp other small positive values. The workflow then
+normalizes the TCA weights by sample.
 
 This example runs the standalone workflow with dtangle:
 
