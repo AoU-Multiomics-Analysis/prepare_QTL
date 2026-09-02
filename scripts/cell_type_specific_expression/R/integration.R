@@ -29,6 +29,24 @@ validate_scatter_safe_slugs <- function(slugs) {
   invisible(TRUE)
 }
 
+validate_output_prefix_token <- function(output_prefix) {
+  safe_prefix_pattern <- "\\A[A-Za-z0-9][A-Za-z0-9._-]*\\z"
+  valid <- is.character(output_prefix) && length(output_prefix) == 1L &&
+    !is.na(output_prefix) &&
+    grepl(safe_prefix_pattern, output_prefix, perl = TRUE)
+  if (!valid) {
+    stop(
+      paste0(
+        "output_prefix must be one safe basename token that starts with an ",
+        "ASCII letter or number and contains only letters, numbers, dots, ",
+        "underscores, or hyphens"
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
 validate_scatter_inventory <- function(inventory) {
   if (!inherits(inventory, "data.frame") ||
       !identical(names(inventory), scatter_inventory_columns)) {
@@ -72,10 +90,7 @@ validate_scatter_bed_paths <- function(bed_paths, expected_paths) {
 prepare_scatter_contract <- function(inventory, bed_paths, output_prefix) {
   validate_scatter_inventory(inventory)
   validate_scatter_bed_paths(bed_paths, inventory$path)
-  if (!is.character(output_prefix) || length(output_prefix) != 1L ||
-      is.na(output_prefix) || !nzchar(output_prefix)) {
-    stop("output_prefix must be one non-empty string", call. = FALSE)
-  }
+  validate_output_prefix_token(output_prefix)
 
   tibble::tibble(
     cell_type = inventory$cell_group,

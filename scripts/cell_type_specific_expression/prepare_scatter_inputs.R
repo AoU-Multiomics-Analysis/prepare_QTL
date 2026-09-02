@@ -49,7 +49,15 @@ run_prepare_scatter_inputs <- function() {
       "--output-prefix",
       dest = "output_prefix",
       type = "character",
-      help = "Shared output prefix for the scattered eQTL calls."
+      default = NULL,
+      help = "Shared safe output token for direct command-line use."
+    ),
+    optparse::make_option(
+      "--output-prefix-file",
+      dest = "output_prefix_file",
+      type = "character",
+      default = NULL,
+      help = "File that contains one shared safe output token."
     ),
     optparse::make_option(
       "--output-dir",
@@ -66,7 +74,7 @@ run_prepare_scatter_inputs <- function() {
     )
   )
   options <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
-  required_options <- c("inventory", "bed_paths", "output_prefix", "output_dir")
+  required_options <- c("inventory", "bed_paths", "output_dir")
   missing_options <- required_options[vapply(
     options[required_options],
     function(value) is.null(value) || !nzchar(value),
@@ -77,6 +85,22 @@ run_prepare_scatter_inputs <- function() {
       sprintf("Missing required options: %s", paste(missing_options, collapse = ", ")),
       call. = FALSE
     )
+  }
+  prefix_sources <- c(
+    !is.null(options[["output_prefix"]]),
+    !is.null(options[["output_prefix_file"]])
+  )
+  if (sum(prefix_sources) != 1L) {
+    stop(
+      "Supply exactly one of --output-prefix or --output-prefix-file",
+      call. = FALSE
+    )
+  }
+  output_prefix <- if (!is.null(options[["output_prefix_file"]])) {
+    prefix_text <- readr::read_file(options[["output_prefix_file"]])
+    sub("\n\\z", "", prefix_text, perl = TRUE)
+  } else {
+    options[["output_prefix"]]
   }
 
   dir.create(options$output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -106,7 +130,7 @@ run_prepare_scatter_inputs <- function() {
   contract <- prepare_scatter_contract(
     inventory = inventory,
     bed_paths = bed_paths,
-    output_prefix = options$output_prefix
+    output_prefix = output_prefix
   )
   output_files <- write_scatter_contract(contract, options$output_dir)
   completion_message <- sprintf(

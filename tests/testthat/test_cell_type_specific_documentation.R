@@ -254,7 +254,7 @@ testthat::test_that("guide states the expression and proportion input contracts"
         "linear CPM",
         "first four columns.*#chr.*start.*end.*gene_id",
         "at least one sample column",
-        "coordinates.*preserved",
+        "modeled.*nonconstant gene.*preserves.*coordinate.*order",
         "finite.*nonnegative",
         "log2_pseudocount.*defaults to.*0",
         "log2_pseudocount.*0.*strictly positive",
@@ -269,6 +269,8 @@ testthat::test_that("guide states the expression and proportion input contracts"
         "sample IDs.*unique.*non-empty",
         "values.*finite.*nonnegative",
         "rows.*sum to one.*1e-6",
+        "sample row order.*expression BED sample-column order",
+        "does not reorder samples",
         "fewer than two major groups.*group_mean_threshold.*fails",
         "zero_floor.*exact zero values",
         "preemptible_attempts.*2",
@@ -298,6 +300,7 @@ testthat::test_that("guide states the scattered QTL preparation contract", {
 
     expect_documented(guide, c(
         "Log2CpmBed",
+        "OutputPrefix.*start.*ASCII letter or number.*only letters, numbers, dots, underscores, and hyphens",
         "does not apply.*second log2",
         "AdditionalCovariates.*required",
         "independent.*connectivity filtering",

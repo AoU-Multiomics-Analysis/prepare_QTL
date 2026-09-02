@@ -58,6 +58,30 @@ testthat::test_that("cell-type BED files preserve coordinates and sample order",
   testthat::expect_true(all(result$inventory$scale == "log2_cpm"))
 })
 
+testthat::test_that("the exported BED path list preserves non-lexical TCA order", {
+  coordinates <- tibble::tibble(
+    `#chr` = "chr1", start = 10L, end = 20L, gene_id = "g1"
+  )
+  tensor <- purrr::map(
+    c("Monocytes", "B cells", "CD4 T cells"),
+    ~ matrix(1, nrow = 1L, dimnames = list("g1", "S1"))
+  ) |>
+    stats::setNames(c("Monocytes", "B cells", "CD4 T cells"))
+  output_directory <- withr::local_tempdir()
+
+  result <- write_cell_type_beds(tensor, coordinates, output_directory)
+  ordered_paths <- readLines(result$path_list, warn = FALSE)
+
+  testthat::expect_identical(
+    basename(ordered_paths),
+    result$inventory$path
+  )
+  testthat::expect_identical(
+    basename(ordered_paths),
+    c("monocytes.bed.gz", "b_cells.bed.gz", "cd4_t_cells.bed.gz")
+  )
+})
+
 testthat::test_that("direct CPM BED coordinates align to filtered TCA genes", {
   source_coordinates <- tibble::tibble(
     `#chr` = c("chr2", "chr1", "chr3"),

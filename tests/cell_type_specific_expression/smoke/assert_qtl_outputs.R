@@ -132,6 +132,51 @@ authoritative_paths <- purrr::imap(array_outputs, function(output_name, column_n
   paths
 })
 
+scatter_prefixes <- paste(
+  as.character(input_value("OutputPrefix")),
+  manifest$cell_type_slug,
+  sep = "."
+)
+expected_manifest_files <- list(
+  int_bed = paste0(scatter_prefixes, ".expression.INT.bed.gz"),
+  scaled_bed = paste0(scatter_prefixes, ".expression.scaled.bed.gz"),
+  int_phenotype_pcs = paste0(scatter_prefixes, ".expression_phenotype_PCs.INT.tsv"),
+  int_phenotype_pcs_all = paste0(
+    scatter_prefixes,
+    ".expression_phenotype_PCs.INT.all.tsv"
+  ),
+  scaled_phenotype_pcs = paste0(
+    scatter_prefixes,
+    ".expression_phenotype_PCs.scaled.tsv"
+  ),
+  scaled_phenotype_pcs_all = paste0(
+    scatter_prefixes,
+    ".expression_phenotype_PCs.scaled.all.tsv"
+  ),
+  int_merged_covariates = paste0(
+    scatter_prefixes,
+    ".expression_QTL_covariates.INT.tsv"
+  ),
+  scaled_merged_covariates = paste0(
+    scatter_prefixes,
+    ".expression_QTL_covariates.scaled.tsv"
+  ),
+  int_connectivity_outliers = paste0(
+    scatter_prefixes,
+    ".expression.INT.connectivity_outliers.tsv"
+  ),
+  scaled_connectivity_outliers = paste0(
+    scatter_prefixes,
+    ".expression.scaled.connectivity_outliers.tsv"
+  )
+)
+purrr::iwalk(expected_manifest_files, function(expected_files, column_name) {
+  require_true(
+    identical(manifest[[column_name]], expected_files),
+    sprintf("The %s manifest basenames do not match the output contract", column_name)
+  )
+})
+
 read_qtl_bed <- function(path, label) {
   bed <- readr::read_tsv(
     path,
@@ -309,10 +354,18 @@ check_outlier_report <- function(path, bed, label) {
     all(table$SampleID %in% expected_samples) && all(is.finite(table$Z_score)),
     sprintf("The %s outlier report has invalid values", label)
   )
+  require_true(
+    anyDuplicated(table$SampleID) == 0L,
+    sprintf("The %s outlier report has duplicate sample IDs", label)
+  )
   retained_samples <- names(bed)[-(1:4)]
   require_true(
     length(intersect(table$SampleID, retained_samples)) == 0L,
     sprintf("The %s outlier report contains a retained sample", label)
+  )
+  require_true(
+    identical(sort(c(table$SampleID, retained_samples)), sort(expected_samples)),
+    sprintf("The %s retained and outlier samples do not partition the cohort", label)
   )
 }
 

@@ -80,6 +80,70 @@ testthat::test_that("migrated WDL scripts use the prepare_qtl runtime path", {
   testthat::expect_false(grepl("/opt/celltype", text, fixed = TRUE))
 })
 
+testthat::test_that("every container R command target is copied into the image", {
+  root <- testthat::test_path("..", "..", "..")
+  dockerfile <- paste(readLines(
+    file.path(root, "envs", "CellTypeSpecificExpression", "Dockerfile"),
+    warn = FALSE
+  ), collapse = "\n")
+  wdl_paths <- list.files(
+    file.path(root, "workflows", "cell_type_specific_expression"),
+    pattern = "[.]wdl$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
+  wdl <- paste(
+    unlist(purrr::map(wdl_paths, readLines, warn = FALSE), use.names = FALSE),
+    collapse = "\n"
+  )
+  runtime_prefix <- "/opt/prepare_qtl/scripts/cell_type_specific_expression/"
+  targets <- stringr::str_extract_all(
+    wdl,
+    paste0(stringr::fixed(runtime_prefix), "[A-Za-z0-9_./-]+[.]R")
+  )[[1L]] |>
+    unique()
+  source_targets <- file.path(
+    root,
+    "scripts",
+    "cell_type_specific_expression",
+    sub(runtime_prefix, "", targets, fixed = TRUE)
+  )
+
+  testthat::expect_true(length(targets) > 0L)
+  testthat::expect_match(
+    dockerfile,
+    paste(
+      "scripts/cell_type_specific_expression",
+      "/opt/prepare_qtl/scripts/cell_type_specific_expression"
+    ),
+    fixed = TRUE
+  )
+  testthat::expect_true(
+    all(file.exists(source_targets)),
+    info = paste(targets[!file.exists(source_targets)], collapse = ", ")
+  )
+  testthat::expect_true(any(grepl(
+    "build_deconvolution_manifest[.]R$",
+    targets
+  )))
+})
+
+testthat::test_that("TCA exports its BED array from an ordered path file", {
+  text <- wdl_text("tasks", "tca.wdl")
+
+  testthat::expect_match(
+    text,
+    'Array[File] cell_type_beds = read_lines("outputs/cell_type_bed_paths.txt")',
+    fixed = TRUE
+  )
+  testthat::expect_match(
+    text,
+    'File cell_type_bed_paths = "outputs/cell_type_bed_paths.txt"',
+    fixed = TRUE
+  )
+  testthat::expect_false(grepl('glob("outputs/*.bed.gz")', text, fixed = TRUE))
+})
+
 testthat::test_that("standalone environment artifacts are present", {
   root <- testthat::test_path("..", "..", "..")
   dockerfile <- file.path(root, "envs", "CellTypeSpecificExpression", "Dockerfile")

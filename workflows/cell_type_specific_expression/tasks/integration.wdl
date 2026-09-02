@@ -13,6 +13,8 @@ task PrepareScatterInputs {
     Int max_retries = 1
   }
 
+  File output_prefix_file = write_lines([output_prefix])
+
   command <<<
     set -euo pipefail
     stage="prepare_scatter_inputs"
@@ -27,7 +29,7 @@ CELL_TYPE_BED_PATHS
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/prepare_scatter_inputs.R \
       --inventory '~{cell_type_bed_inventory}' \
       --bed-paths scatter/cell_type_bed_paths.txt \
-      --output-prefix '~{output_prefix}' \
+      --output-prefix-file '~{output_prefix_file}' \
       --output-dir scatter \
       --log-file scatter/prepare_scatter_inputs.log 2>&1 | tee -a "$log"
     validated_cell_count="$(wc -l < scatter/cell_types.txt)"

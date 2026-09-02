@@ -71,7 +71,7 @@ a value.
 | `deconvolution_covariates` | `File?` | `None` | Optional TCA covariates. This is the integrated alias of standalone `covariates`. |
 | `SampleList` | `File` | Required | Sample list passed to every scattered expression-QTL call. |
 | `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
-| `OutputPrefix` | `String` | Required | Nonempty prefix. Each scatter call adds the cell-type slug. |
+| `OutputPrefix` | `String` | Required | Basename-safe token. It must start with an ASCII letter or number. It can contain only letters, numbers, dots, underscores, and hyphens. Each scatter call adds the cell-type slug. |
 | `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for deconvolution and integration tasks. |
 | `qtl_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl:main"` | Container for scattered expression-QTL tasks. |
 | `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for deconvolution and QTL tasks. |
@@ -130,8 +130,9 @@ IDs, and sample IDs must be non-empty. Gene IDs and sample IDs must be unique.
 `start` must be a nonnegative integer that is less than `end`. The sample
 values must be linear CPM values. They must be finite and nonnegative. The
 workflow does not filter the input to protein-coding genes. It uses the GTF to
-map gene IDs to gene symbols for the LM22 intersection. The input coordinates
-are preserved for every gene in an exported cell-type BED.
+map gene IDs to gene symbols for the LM22 intersection. The workflow removes
+constant genes before TCA. For each modeled, nonconstant gene, the exported
+cell-type BED preserves the input coordinate and modeled-gene order.
 
 `log2_pseudocount` defaults to `0`. When `log2_pseudocount` is `0`, all CPM
 values must be strictly positive. Zero CPM values are valid only when
@@ -161,7 +162,9 @@ both inputs.
 The precomputed file must have `sample_id` as the first column. Sample IDs must
 be unique and non-empty. The values must be finite and nonnegative. Each row
 must sum to one within `1e-6`. The other columns must be exactly the 22 standard
-LM22 columns listed below. Their order in the input file can differ.
+LM22 columns listed below. Their order in the input file can differ. The sample
+row order must be exactly the same as the expression BED sample-column order.
+The workflow does not reorder samples.
 
 ```text
 B cells naive

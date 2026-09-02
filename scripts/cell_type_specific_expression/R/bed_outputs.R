@@ -232,5 +232,7 @@ write_cell_type_beds <- function(tensor, coordinates, output_dir) {
     cell_group = names(paths),
     slug = slugify_cell_group(names(paths))
   )
-  list(paths = paths, inventory = inventory)
+  path_list <- file.path(output_dir, "cell_type_bed_paths.txt")
+  writeLines(unname(paths), path_list)
+  list(paths = paths, inventory = inventory, path_list = path_list)
 }

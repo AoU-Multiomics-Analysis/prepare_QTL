@@ -162,7 +162,7 @@ BED_OUTPUT_SOURCES
       '~{combined_proportions}' \
       '~{tca_weights}' \
       '~{filter_report}' > supporting_inputs.txt
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/build_manifest.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/build_deconvolution_manifest.R \
       --outputs "$checksum_inventory" \
       --export-qc-summary '~{export_qc_summary}' \
       --original-proportions '~{original_proportions}' \

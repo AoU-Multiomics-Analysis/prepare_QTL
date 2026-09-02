@@ -36,6 +36,26 @@ testthat::test_that("scatter contract preserves inventory order and display name
   )
 })
 
+testthat::test_that("scatter contract rejects unsafe output-prefix tokens", {
+  inventory <- make_scatter_inventory()
+  unsafe_prefixes <- c(
+    "../outside", "cohort name", "cohort\nname", "cohort\r", "cohort'name",
+    'cohort"name', "$(touch_x)", "cohort/name", "cohort\\name",
+    "cohort;name", ".", ".."
+  )
+
+  purrr::walk(unsafe_prefixes, function(unsafe_prefix) {
+    testthat::expect_error(
+      prepare_scatter_contract(inventory, inventory$path, unsafe_prefix),
+      "safe basename token",
+      info = encodeString(unsafe_prefix)
+    )
+  })
+  testthat::expect_silent(
+    prepare_scatter_contract(inventory, inventory$path, "cohort.v2-test_1")
+  )
+})
+
 testthat::test_that("scatter contract requires the exact inventory schema", {
   inventory <- make_scatter_inventory()
 
@@ -170,12 +190,14 @@ testthat::test_that("scatter-input CLI writes aligned metadata files", {
   temporary_directory <- withr::local_tempdir()
   inventory_path <- file.path(temporary_directory, "inventory.tsv")
   bed_paths_path <- file.path(temporary_directory, "bed_paths.txt")
+  output_prefix_path <- file.path(temporary_directory, "output_prefix.txt")
   output_directory <- file.path(temporary_directory, "scatter")
   readr::write_tsv(make_scatter_inventory(), inventory_path)
   writeLines(
     c("/localized/cd4_t_cells.bed.gz", "/localized/monocytes.bed.gz"),
     bed_paths_path
   )
+  writeLines("cohort", output_prefix_path)
 
   status <- system2(
     "Rscript",
@@ -183,7 +205,7 @@ testthat::test_that("scatter-input CLI writes aligned metadata files", {
       script,
       "--inventory", inventory_path,
       "--bed-paths", bed_paths_path,
-      "--output-prefix", "cohort",
+      "--output-prefix-file", output_prefix_path,
       "--output-dir", output_directory
     )
   )
@@ -208,6 +230,70 @@ testthat::test_that("scatter-input CLI writes aligned metadata files", {
     readLines(file.path(output_directory, "output_prefixes.txt")),
     c("cohort.cd4_t_cells", "cohort.monocytes")
   )
+})
+
+testthat::test_that("scatter-input CLI rejects a multiline output-prefix file", {
+  root <- testthat::test_path("..", "..", "..")
+  script <- file.path(
+    root,
+    "scripts",
+    "cell_type_specific_expression",
+    "prepare_scatter_inputs.R"
+  )
+  temporary_directory <- withr::local_tempdir()
+  inventory_path <- file.path(temporary_directory, "inventory.tsv")
+  bed_paths_path <- file.path(temporary_directory, "bed_paths.txt")
+  output_prefix_path <- file.path(temporary_directory, "output_prefix.txt")
+  readr::write_tsv(make_scatter_inventory(), inventory_path)
+  writeLines(make_scatter_inventory()$path, bed_paths_path)
+  writeLines(c("cohort", "injected"), output_prefix_path)
+
+  status <- suppressWarnings(system2(
+    "Rscript",
+    c(
+      script,
+      "--inventory", inventory_path,
+      "--bed-paths", bed_paths_path,
+      "--output-prefix-file", output_prefix_path,
+      "--output-dir", file.path(temporary_directory, "scatter")
+    ),
+    stdout = FALSE,
+    stderr = FALSE
+  ))
+
+  testthat::expect_identical(status, 1L)
+})
+
+testthat::test_that("scatter-input CLI preserves and rejects carriage returns", {
+  root <- testthat::test_path("..", "..", "..")
+  script <- file.path(
+    root,
+    "scripts",
+    "cell_type_specific_expression",
+    "prepare_scatter_inputs.R"
+  )
+  temporary_directory <- withr::local_tempdir()
+  inventory_path <- file.path(temporary_directory, "inventory.tsv")
+  bed_paths_path <- file.path(temporary_directory, "bed_paths.txt")
+  output_prefix_path <- file.path(temporary_directory, "output_prefix.txt")
+  readr::write_tsv(make_scatter_inventory(), inventory_path)
+  writeLines(make_scatter_inventory()$path, bed_paths_path)
+  writeBin(charToRaw("cohort\r\n"), output_prefix_path)
+
+  status <- suppressWarnings(system2(
+    "Rscript",
+    c(
+      script,
+      "--inventory", inventory_path,
+      "--bed-paths", bed_paths_path,
+      "--output-prefix-file", output_prefix_path,
+      "--output-dir", file.path(temporary_directory, "scatter")
+    ),
+    stdout = FALSE,
+    stderr = FALSE
+  ))
+
+  testthat::expect_identical(status, 1L)
 })
 
 testthat::test_that("scatter WDL returns aligned metadata without copying BEDs", {
@@ -248,5 +334,12 @@ testthat::test_that("scatter WDL returns aligned metadata without copying BEDs",
   )
   testthat::expect_match(text, "validated_cell_count", fixed = TRUE)
   testthat::expect_match(text, "output_paths", fixed = TRUE)
+  testthat::expect_match(
+    text,
+    "File output_prefix_file = write_lines([output_prefix])",
+    fixed = TRUE
+  )
+  testthat::expect_match(text, "--output-prefix-file", fixed = TRUE)
+  testthat::expect_false(grepl("--output-prefix '~{output_prefix}'", text, fixed = TRUE))
   testthat::expect_false(grepl("\\bcp\\b", text))
 })

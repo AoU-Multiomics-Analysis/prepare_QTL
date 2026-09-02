@@ -133,7 +133,7 @@ run_export_tca_beds <- function() {
   inventory_path <- file.path(options$output_dir, "cell_type_bed_inventory.tsv")
   readr::write_tsv(bed_result$inventory, inventory_path, na = "")
   output_paths <- c(
-    unname(bed_result$paths), inventory_path, unname(qc_paths)
+    unname(bed_result$paths), bed_result$path_list, inventory_path, unname(qc_paths)
   )
   complete_message <- sprintf(
     "stage=export_tca_beds event=stage_complete output_dimensions=genes:%d samples:%d groups:%d excluded_constant_genes:%d output_paths=%s scale=log2_cpm log2_pseudocount:%g",

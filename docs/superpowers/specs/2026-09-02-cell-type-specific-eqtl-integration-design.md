@@ -164,6 +164,12 @@ slugs. Before the scatter, validation will require:
 - The expected `log2_cpm` scale.
 - Positive gene and sample counts.
 
+`OutputPrefix` must be one basename-safe token. It must start with an ASCII
+letter or number and contain only letters, numbers, dots, underscores, and
+hyphens. The WDL writes the untrusted input to a file before the first command
+boundary. The validation task reads that file and rejects all other values
+before it constructs filenames.
+
 Each scatter call will use this prefix:
 
 ```text

@@ -84,6 +84,20 @@ testthat::test_that("QTL manifest requires nonempty unique names and slugs", {
     do.call(build_cell_type_qtl_manifest, duplicate_slug_inputs),
     "nonempty and unique"
   )
+
+  empty_slug_inputs <- inputs
+  empty_slug_inputs$cell_type_slugs[[1L]] <- ""
+  testthat::expect_error(
+    do.call(build_cell_type_qtl_manifest, empty_slug_inputs),
+    "nonempty and unique"
+  )
+
+  duplicate_name_inputs <- inputs
+  duplicate_name_inputs$cell_types[[2L]] <- duplicate_name_inputs$cell_types[[1L]]
+  testthat::expect_error(
+    do.call(build_cell_type_qtl_manifest, duplicate_name_inputs),
+    "nonempty and unique"
+  )
 })
 
 testthat::test_that("QTL manifest requires every input file to exist", {
@@ -193,5 +207,24 @@ testthat::test_that("QTL manifest WDL task accepts and forwards all aligned arra
     text,
     'File manifest = "outputs/cell_type_qtl_manifest.tsv"',
     fixed = TRUE
+  )
+  argument_files <- c(
+    "inputs/cell_types.txt", "inputs/cell_type_slugs.txt", "inputs/int_beds.txt",
+    "inputs/scaled_beds.txt", "inputs/int_phenotype_pcs.txt",
+    "inputs/int_phenotype_pcs_all.txt", "inputs/scaled_phenotype_pcs.txt",
+    "inputs/scaled_phenotype_pcs_all.txt", "inputs/int_merged_covariates.txt",
+    "inputs/scaled_merged_covariates.txt", "inputs/int_connectivity_outliers.txt",
+    "inputs/scaled_connectivity_outliers.txt"
+  )
+  purrr::walk(argument_files, function(argument_file) {
+    testthat::expect_match(text, paste0("cat > ", argument_file), fixed = TRUE)
+  })
+  manifest_task <- stringr::str_extract(
+    text,
+    "task BuildQtlManifest \\{[\\s\\S]*\\z"
+  )
+  testthat::expect_identical(
+    stringr::str_count(manifest_task, stringr::fixed("~{sep='\\n' ")),
+    length(argument_files)
   )
 })
