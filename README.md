@@ -28,7 +28,7 @@ prepare_QTL/
 
 ## Main Workflows
 
-- [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
+- [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files from raw counts or a pre-normalized log2-CPM BED, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/splicing/prepare_sQTL.wdl`](workflows/splicing/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/methylation/prepare_mQTL.wdl`](workflows/methylation/prepare_mQTL.wdl): Prepares an existing merged methylation BED as raw, INT, and scaled BED files. It filters and imputes features, removes connectivity outliers from the INT and scaled files, calculates phenotype PCs, and optionally merges additional covariates.
 - [`workflows/proteomics/prepare_pQTL.wdl`](workflows/proteomics/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
@@ -43,7 +43,7 @@ See the [workflow catalog](workflows/README.md) for public entry points, interna
 The prepare scripts and workflows for eQTL, pQTL, and sQTL share this output pattern:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
-- `.scaled`: Centered and scaled molecular phenotypes. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
+- `.scaled`: Centered and scaled molecular phenotypes. Raw-count expression mode transforms CPMs with `log2(CPM + 1)` before centering and scaling. Pre-normalized log2-CPM expression, proteomics, and splicing values are centered and scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting. Raw BEDs are emitted as workflow outputs but are not used for phenotype PCs or covariate merging.
 - Connectivity outliers: `.INT` and `.scaled` BEDs have WGCNA sample connectivity outliers removed before downstream PC, covariate, or residualization steps. Removed samples are written to `*.connectivity_outliers.tsv`; raw BEDs keep all samples after the initial sample-list filter.
 - `AdditionalCovariates`: Optional WDL input for eQTL, pQTL, and sQTL prepare workflows. When provided, the workflow runs [`workflows/common/MergeCovariates.wdl`](workflows/common/MergeCovariates.wdl) for both `.INT` and `.scaled` phenotype PCs.

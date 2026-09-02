@@ -49,6 +49,15 @@ jobs:
             "${{ fromJSON(steps.meta.outputs.json).tags[0] }}" \
             Rscript tests/test_prepare_methylation.R
 
+      - name: Smoke test pre-normalized expression preparation
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace:ro" \
+            -w /workspace \
+            -e PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
+            "${{ fromJSON(steps.meta.outputs.json).tags[0] }}" \
+            Rscript tests/test_prepare_expression_log2_cpm.R
+
   build_methylation_rust:
     runs-on: ubuntu-latest
     permissions:
