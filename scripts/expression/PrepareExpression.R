@@ -113,11 +113,22 @@ if (has_count_gct == has_log2_cpm_bed) {
 if (has_count_gct && (is.null(opt$AnnotationGTF) || !nzchar(opt$AnnotationGTF))) {
     stop('--AnnotationGTF is required with --CountGCT')
 }
+if (has_log2_cpm_bed && !is.null(opt$AnnotationGTF) && nzchar(opt$AnnotationGTF)) {
+    stop('--AnnotationGTF cannot be used with --Log2CpmBed')
+}
 
 
 ########### LOAD DATA #####################
 
-SampleList <- fread(opt$SampleList,header = FALSE) %>% dplyr::rename('ID' = 1) %>% pull(ID)
+SampleList <- fread(opt$SampleList, header = FALSE, colClasses = 'character') %>%
+    dplyr::rename('ID' = 1) %>%
+    pull(ID)
+if (any(is.na(SampleList)) || any(!nzchar(SampleList))) {
+    stop('Sample list contains a blank sample ID')
+}
+if (anyDuplicated(SampleList)) {
+    stop('Sample list contains duplicate sample IDs')
+}
 nSamples <- SampleList %>% length()
 message(paste0('Number of sample in sample list:',nSamples))
 
@@ -142,7 +153,7 @@ if (has_count_gct) {
         column_to_rownames('Name') %>%
         dplyr::select(any_of(SampleList)) %>%
         t() %>%
-        data.frame()
+        data.frame(check.names = FALSE)
 
     # filter to genes where the count is greater than 6
     # in atleast 20% of samples
@@ -150,7 +161,7 @@ if (has_count_gct) {
     CountDataFiltered <- CountDataTransposed %>%
             dplyr::select(where(~ mean(.x > 6) >= 0.2)) %>%
             t() %>%
-            data.frame()
+            data.frame(check.names = FALSE)
 
     message('Performing edgeR TMM normalization')
     # Convert filtered count data to DGE list for normalization
@@ -158,10 +169,15 @@ if (has_count_gct) {
     DataEdgeR <- edgeR::calcNormFactors(DataEdgeR)
 
     message('Computing CPMs')
-    DataCPM <- edgeR::cpm(DataEdgeR, log = FALSE) %>% data.frame()
+    DataCPM <- edgeR::cpm(DataEdgeR, log = FALSE) %>% data.frame(check.names = FALSE)
 } else {
     message('Loading pre-normalized log2 CPM BED')
-    Log2CpmBed <- fread(opt$Log2CpmBed, header = TRUE, check.names = FALSE)
+    Log2CpmBed <- fread(
+        opt$Log2CpmBed,
+        header = TRUE,
+        check.names = FALSE,
+        colClasses = list(character = c('#chr', 'gene_id'))
+    )
     metadata_columns <- c('#chr', 'start', 'end', 'gene_id')
     if (!identical(names(Log2CpmBed)[seq_along(metadata_columns)], metadata_columns)) {
         stop('Log2 CPM BED must start with #chr, start, end, and gene_id columns')
@@ -181,6 +197,20 @@ if (has_count_gct) {
     if (!all(vapply(DataCPM, is.numeric, logical(1))) || any(!is.finite(as.matrix(DataCPM)))) {
         stop('Log2 CPM BED sample values must be finite numeric values')
     }
+    zero_variance_genes <- DataCPM %>%
+        rownames_to_column('gene_id') %>%
+        rowwise() %>%
+        mutate(.gene_sd = sd(c_across(-gene_id))) %>%
+        ungroup() %>%
+        filter(is.na(.gene_sd) | .gene_sd == 0) %>%
+        pull(gene_id)
+    if (length(zero_variance_genes) > 0) {
+        displayed_genes <- head(zero_variance_genes, 10)
+        stop(paste0(
+            'Log2 CPM BED contains genes with zero variance: ',
+            paste(displayed_genes, collapse = ', ')
+        ))
+    }
 
     PositionTSS <- Log2CpmBed %>%
         dplyr::select(all_of(metadata_columns)) %>%
@@ -193,19 +223,17 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
     message(paste0('Preparing ', transform_label, ' CPM BED'))
     if (is.null(rank_normalize)) {
         NormalizedCPMsMatrix <- cpm_data %>%
-                        data.frame() %>%
-                        dplyr::rename_with(~str_remove(.,'^X'))
+                        data.frame(check.names = FALSE)
     } else {
         if (log2_transform) {
             message('Applying log2(CPM + 1) before centering and scaling')
         }
         NormalizedCPMsMatrix <- cpm_data %>%
                         t() %>%
-                        data.frame() %>%
+                        data.frame(check.names = FALSE) %>%
                         mutate(across(everything(),~transform_phenotype(., rank_normalize, log2_transform))) %>%
                         t() %>%
-                        data.frame() %>%
-                        dplyr::rename_with(~str_remove(.,'^X'))
+                        data.frame(check.names = FALSE)
     }
 
     if (remove_outliers) {

@@ -24,11 +24,11 @@ task eqtl_prepare_expression {
         set -euo pipefail
         echo "stage=eqtl_prepare_expression start_time=$(date -u +%Y-%m-%dT%H:%M:%SZ) dimensions=pending outputs=${OutputPrefix}.expression.*"
         Rscript /tmp/PrepareExpression.R \
-            ~{if defined(CountGCT) then "--CountGCT '" + select_first([CountGCT]) + "'" else ""} \
-            ~{if defined(AnnotationGTF) then "--AnnotationGTF '" + select_first([AnnotationGTF]) + "'" else ""} \
-            ~{if defined(Log2CpmBed) then "--Log2CpmBed '" + select_first([Log2CpmBed]) + "'" else ""} \
-            --SampleList '~{SampleList}' \
-            --OutputPrefix '~{OutputPrefix}'
+            ~{if defined(CountGCT) then "--CountGCT \"" + select_first([CountGCT]) + "\"" else ""} \
+            ~{if defined(AnnotationGTF) then "--AnnotationGTF \"" + select_first([AnnotationGTF]) + "\"" else ""} \
+            ~{if defined(Log2CpmBed) then "--Log2CpmBed \"" + select_first([Log2CpmBed]) + "\"" else ""} \
+            --SampleList "~{SampleList}" \
+            --OutputPrefix "~{OutputPrefix}"
         echo "stage=eqtl_prepare_expression completion_time=$(date -u +%Y-%m-%dT%H:%M:%SZ) dimensions=complete outputs=${OutputPrefix}.expression.*"
 
         }

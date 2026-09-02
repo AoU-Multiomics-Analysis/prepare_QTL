@@ -1,4 +1,4 @@
-testthat::test_that("the eQTL workflow offers mutually exclusive raw-count and log2 CPM inputs", {
+testthat::test_that("the eQTL workflow declares optional raw-count and log2 CPM inputs", {
     miniwdl <- Sys.which("miniwdl")
     testthat::skip_if(!nzchar(miniwdl), "miniwdl is not installed")
     workflow <- testthat::test_path(

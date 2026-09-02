@@ -9,7 +9,7 @@ These WDL workflows prepare molecular phenotype data for expression, splicing, a
 The eQTL, pQTL, and sQTL prepare workflows now compute both molecular phenotype transformations:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
-- `.scaled`: Centered and scaled molecular phenotypes. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
+- `.scaled`: Centered and scaled molecular phenotypes. Raw-count expression mode transforms CPMs with `log2(CPM + 1)` before centering and scaling. Pre-normalized log2-CPM expression, proteomics, and splicing values are centered and scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
 Each workflow computes phenotype PCs separately for the `.INT` and `.scaled` outputs only. For each transformed branch, the workflow emits both the existing Gavish-Donoho-selected phenotype-PC TSV and a matching `.all.tsv` file containing every available rotated PC from the same PCA run. Raw BED files are emitted as workflow outputs but are not used for phenotype PCs, covariate merging, or residualization. `AdditionalCovariates` is an optional TSV of covariates with a `sample_id` column. When provided, the workflow runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) twice to merge those covariates with the selected `.INT` and `.scaled` phenotype-PC TSVs.

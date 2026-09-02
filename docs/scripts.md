@@ -9,7 +9,7 @@ All scripts are written in R and are invoked from the command line with `Rscript
 [`PrepareExpression.R`](../scripts/expression/PrepareExpression.R), [`PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R), and [`PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) each write three BED files:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
-- `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`. Expression CPMs are transformed with `log2(CPM + 1)` before centering/scaling; proteomics and splicing values are centered/scaled directly.
+- `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`. Raw-count expression mode transforms CPMs with `log2(CPM + 1)` first. Pre-normalized log2-CPM expression, proteomics, and splicing values are scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
 For each `.INT` and `.scaled` matrix, the scripts compute WGCNA sample connectivity outliers from the feature-by-sample matrix before writing the BED. Raw BEDs keep all samples after the initial sample-list filter.
