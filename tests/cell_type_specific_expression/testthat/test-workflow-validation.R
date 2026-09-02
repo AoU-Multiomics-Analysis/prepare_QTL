@@ -225,7 +225,7 @@ testthat::test_that("generated numeric fixture text uses eight decimal places", 
   })
 })
 
-testthat::test_that("rounded proportions use the workflow row-sum tolerance", {
+testthat::test_that("rounded input and grouped proportions use workflow tolerance", {
   tolerance_name <- "workflow_input_proportion_row_sum_tolerance"
   testthat::expect_true(exists(tolerance_name, inherits = TRUE))
   testthat::expect_true(exists("require_row_sums_within_tolerance", mode = "function"))
@@ -265,6 +265,57 @@ testthat::test_that("rounded proportions use the workflow row-sum tolerance", {
     ),
     "LM22 proportion rows must sum to one within 1e-06"
   )
+
+  fixture_inputs <- jsonlite::read_json(
+    testthat::test_path("..", "fixtures", "precomputed-e2e.inputs.json"),
+    simplifyVector = TRUE
+  )
+  workflow_prefix <- "PrepareCellTypeEqtlWorkflow."
+  expected <- derive_expected_proportion_outputs(
+    proportions,
+    fixture_inputs[[paste0(workflow_prefix, "group_mean_threshold")]],
+    fixture_inputs[[paste0(workflow_prefix, "zero_floor")]]
+  )
+  combined_error <- max(abs(rowSums(expected$combined) - 1))
+  testthat::expect_gt(combined_error, 1e-8)
+  testthat::expect_lte(combined_error, row_sum_tolerance)
+  testthat::expect_invisible(require_row_sums_within_tolerance(
+    expected$combined,
+    row_sum_tolerance,
+    "combined proportion"
+  ))
+
+  invalid_combined <- expected$combined
+  invalid_combined[1L, 1L] <- invalid_combined[1L, 1L] +
+    (1 + 2 * row_sum_tolerance - sum(invalid_combined[1L, ]))
+  testthat::expect_error(
+    require_row_sums_within_tolerance(
+      invalid_combined,
+      row_sum_tolerance,
+      "combined proportion"
+    ),
+    "combined proportion rows must sum to one within 1e-06"
+  )
+  testthat::expect_lt(
+    max(abs(rowSums(expected$tca_weights) - 1)),
+    1e-8
+  )
+
+  assertion_text <- readLines(
+    testthat::test_path("..", "smoke", "assert_deconvolution_outputs.R"),
+    warn = FALSE
+  ) |>
+    paste(collapse = "\n")
+  row_sum_helper_calls <- gregexpr(
+    "require_row_sums_within_tolerance\\(",
+    assertion_text
+  )[[1L]]
+  row_sum_helper_call_count <- if (identical(row_sum_helper_calls, -1L)) {
+    0L
+  } else {
+    length(row_sum_helper_calls)
+  }
+  testthat::expect_identical(row_sum_helper_call_count, 2L)
 })
 
 testthat::test_that("smoke expectations derive canonical combined groups and weights", {

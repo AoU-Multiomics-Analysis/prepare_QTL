@@ -190,9 +190,10 @@ require_row_sums_within_tolerance(
   workflow_input_proportion_row_sum_tolerance,
   "LM22 proportion"
 )
-require_true(
-  max(abs(rowSums(combined) - 1)) < 1e-8,
-  "The combined proportion rows must sum to one"
+require_row_sums_within_tolerance(
+  combined,
+  workflow_input_proportion_row_sum_tolerance,
+  "combined proportion"
 )
 require_true(
   max(abs(rowSums(tca_weights) - 1)) < 1e-8,
