@@ -14,6 +14,30 @@ dir.create(output_directory, recursive = TRUE, showWarnings = FALSE)
 seed <- 20260901L
 set.seed(seed)
 
+# Eight digits after the decimal are more than 1,000 times coarser than the
+# observed cross-BLAS accumulation noise of approximately 7.3e-12. This
+# precision also keeps rounded 22-part proportion row sums within 1e-6.
+fixture_decimal_digits <- 8L
+format_fixture_numeric <- function(values) {
+  formatC(
+    values,
+    format = "f",
+    digits = fixture_decimal_digits,
+    decimal.mark = "."
+  )
+}
+stabilize_fixture_table <- function(table) {
+  table |>
+    dplyr::mutate(
+      dplyr::across(tidyselect::where(is.double), format_fixture_numeric)
+    )
+}
+write_fixture_tsv <- function(table, path) {
+  table |>
+    stabilize_fixture_table() |>
+    readr::write_tsv(path, na = "")
+}
+
 cell_types <- c(
   "B cells naive", "B cells memory", "Plasma cells", "T cells CD8",
   "T cells CD4 naive", "T cells CD4 memory resting",
@@ -85,7 +109,7 @@ write_matrix <- function(matrix_value, path, id_column) {
   matrix_value |>
     as.data.frame(check.names = FALSE) |>
     tibble::rownames_to_column(var = id_column) |>
-    readr::write_tsv(path, na = "")
+    write_fixture_tsv(path)
 }
 
 expression_cpm <- bulk_cpm
@@ -100,7 +124,7 @@ expression_bed <- dplyr::bind_cols(
   coordinates,
   tibble::as_tibble(expression_cpm, .name_repair = "minimal")
 )
-readr::write_tsv(
+write_fixture_tsv(
   expression_bed,
   file.path(output_directory, "synthetic_expression.bed")
 )
@@ -110,7 +134,7 @@ expression_with_zero_bed <- dplyr::bind_cols(
   coordinates,
   tibble::as_tibble(expression_with_zero, .name_repair = "minimal")
 )
-readr::write_tsv(
+write_fixture_tsv(
   expression_with_zero_bed,
   file.path(output_directory, "synthetic_expression_with_zero.bed")
 )
@@ -130,10 +154,9 @@ additional_covariates <- tibble::tibble(
   batch_indicator = rep(c(0, 1), each = 6L),
   genotype_pc1 = seq(-1.1, 1.1, length.out = length(sample_ids))
 )
-readr::write_tsv(
+write_fixture_tsv(
   additional_covariates,
-  file.path(output_directory, "additional_covariates.tsv"),
-  na = ""
+  file.path(output_directory, "additional_covariates.tsv")
 )
 writeLines(sample_ids, file.path(output_directory, "samples.tsv"))
 

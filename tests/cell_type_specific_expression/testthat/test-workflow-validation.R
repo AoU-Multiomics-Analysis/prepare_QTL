@@ -8,6 +8,13 @@ if (file.exists(validation_path)) {
   source(validation_path, local = .GlobalEnv)
 }
 
+assertion_helpers_path <- testthat::test_path(
+  "..", "smoke", "deconvolution_assertion_helpers.R"
+)
+if (file.exists(assertion_helpers_path)) {
+  source(assertion_helpers_path, local = .GlobalEnv)
+}
+
 testthat::test_that("proportion mode requires exactly one optional input", {
   testthat::expect_true(exists("validate_proportion_mode", mode = "function"))
   if (!exists("validate_proportion_mode", mode = "function")) {
@@ -174,6 +181,112 @@ testthat::test_that("integrated fixtures are deterministic and checked in", {
   }
   testthat::expect_identical(as.integer(checked_in_status), 0L)
   testthat::expect_length(checked_in_difference, 0L)
+})
+
+testthat::test_that("generated numeric fixture text uses eight decimal places", {
+  fixture_directory <- withr::local_tempdir(pattern = "fixture-precision-")
+  generation <- run_fixture_generator(fixture_directory)
+  testthat::expect_identical(generation$status, 0L, info = generation$output)
+
+  fixed_decimal_pattern <- "^-?[0-9]+[.][0-9]{8}$"
+  numeric_text <- list(
+    expression = readr::read_tsv(
+      file.path(fixture_directory, "synthetic_expression.bed"),
+      col_types = readr::cols(.default = readr::col_character()),
+      show_col_types = FALSE
+    )[-(1:4)],
+    expression_with_zero = readr::read_tsv(
+      file.path(fixture_directory, "synthetic_expression_with_zero.bed"),
+      col_types = readr::cols(.default = readr::col_character()),
+      show_col_types = FALSE
+    )[-(1:4)],
+    signature = readr::read_tsv(
+      file.path(fixture_directory, "synthetic_signature.tsv"),
+      col_types = readr::cols(.default = readr::col_character()),
+      show_col_types = FALSE
+    )[-1],
+    proportions = readr::read_tsv(
+      file.path(fixture_directory, "precomputed_proportions.tsv"),
+      col_types = readr::cols(.default = readr::col_character()),
+      show_col_types = FALSE
+    )[-1],
+    covariates = readr::read_tsv(
+      file.path(fixture_directory, "additional_covariates.tsv"),
+      col_types = readr::cols(.default = readr::col_character()),
+      show_col_types = FALSE
+    )[-1]
+  )
+  purrr::iwalk(numeric_text, function(table, label) {
+    values <- unlist(table, use.names = FALSE)
+    testthat::expect_true(
+      all(grepl(fixed_decimal_pattern, values)),
+      info = paste(label, "must use exactly eight digits after the decimal")
+    )
+  })
+})
+
+testthat::test_that("smoke expectations derive canonical combined groups and weights", {
+  required_helpers <- c(
+    "canonical_lm22_group_map", "derive_expected_proportion_outputs",
+    "require_matrix_equal"
+  )
+  purrr::walk(
+    required_helpers,
+    ~ testthat::expect_true(exists(.x, mode = "function"), info = .x)
+  )
+  if (!all(vapply(required_helpers, exists, logical(1), mode = "function"))) {
+    return(invisible(NULL))
+  }
+
+  cell_types <- unlist(canonical_lm22_group_map(), use.names = FALSE)
+  proportions <- matrix(
+    1 / 22,
+    nrow = 2L,
+    ncol = 22L,
+    dimnames = list(c("S1", "S2"), cell_types)
+  )
+  proportions["S2", ] <- 0
+  proportions["S2", "B cells naive"] <- 0.4
+  proportions["S2", "T cells CD4 naive"] <- 0.6
+
+  expected <- derive_expected_proportion_outputs(
+    proportions,
+    mean_threshold = 0.08,
+    zero_floor = 0.1
+  )
+  group_counts <- c(3, 5, 1, 1, 2, 4, 1, 1, 2, 2)
+  expected_combined <- rbind(
+    S1 = group_counts / 22,
+    S2 = c(0.4, 0.6, rep(0, 8L))
+  )
+  colnames(expected_combined) <- names(canonical_lm22_group_map())
+  expected_weights <- rbind(
+    S1 = c(3 / 12, 5 / 12, 4 / 12),
+    S2 = c(0.4 / 1.1, 0.6 / 1.1, 0.1 / 1.1)
+  )
+  colnames(expected_weights) <- c("B cells", "CD4 T cells", "Monocyte/myeloid")
+
+  testthat::expect_identical(colnames(expected$combined), colnames(expected_combined))
+  testthat::expect_equal(expected$combined, expected_combined, tolerance = 1e-12)
+  testthat::expect_identical(
+    expected$retained_groups,
+    c("B cells", "CD4 T cells", "Monocyte/myeloid")
+  )
+  testthat::expect_equal(expected$tca_weights, expected_weights, tolerance = 1e-12)
+  testthat::expect_invisible(
+    require_matrix_equal(expected$combined, expected_combined, 1e-12, "combined")
+  )
+  changed <- expected_combined
+  changed[[1L]] <- changed[[1L]] + 1e-4
+  testthat::expect_error(
+    require_matrix_equal(expected$combined, changed, 1e-8, "combined"),
+    "tolerance"
+  )
+  reordered <- expected_combined[, rev(seq_len(ncol(expected_combined))), drop = FALSE]
+  testthat::expect_error(
+    require_matrix_equal(expected$combined, reordered, 1e-8, "combined"),
+    "row or column order"
+  )
 })
 
 testthat::test_that("end-to-end fixtures cover both proportion and pseudocount modes", {

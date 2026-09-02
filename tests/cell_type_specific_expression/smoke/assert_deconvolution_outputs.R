@@ -11,6 +11,17 @@ if (length(arguments) < 2L || length(arguments) > 3L) {
   )
 }
 
+script_argument <- grep(
+  "^--file=",
+  commandArgs(trailingOnly = FALSE),
+  value = TRUE
+)
+if (length(script_argument) != 1L) {
+  stop("The assertion script path is unavailable", call. = FALSE)
+}
+script_path <- normalizePath(sub("^--file=", "", script_argument[[1L]]))
+source(file.path(dirname(script_path), "deconvolution_assertion_helpers.R"))
+
 outputs_path <- arguments[[1L]]
 inputs_path <- arguments[[2L]]
 fixture_directory <- if (length(arguments) == 3L) {
@@ -46,9 +57,9 @@ output_value <- function(name) {
   value
 }
 
-read_matrix_table <- function(name, id_column) {
+read_matrix_path <- function(path, id_column, label) {
   table <- readr::read_tsv(
-    output_value(name),
+    path,
     col_types = readr::cols(.default = readr::col_character()),
     name_repair = "minimal",
     show_col_types = FALSE,
@@ -56,14 +67,18 @@ read_matrix_table <- function(name, id_column) {
   )
   require_true(
     identical(names(table)[[1L]], id_column),
-    sprintf("The %s table must start with %s", name, id_column)
+    sprintf("The %s table must start with %s", label, id_column)
   )
   values <- table[-1L] |>
     dplyr::mutate(dplyr::across(dplyr::everything(), readr::parse_double)) |>
     as.matrix()
-  require_true(all(is.finite(values)), sprintf("The %s table must be finite", name))
+  require_true(all(is.finite(values)), sprintf("The %s table must be finite", label))
   rownames(values) <- table[[id_column]]
   values
+}
+
+read_matrix_table <- function(name, id_column) {
+  read_matrix_path(output_value(name), id_column, name)
 }
 
 expression_path <- input_value("expression")
@@ -122,6 +137,43 @@ expected_proportion_mode <- if (has_lm22) "dtangle" else "precomputed"
 proportions <- read_matrix_table("proportions_lm22", "sample_id")
 combined <- read_matrix_table("proportions_combined", "sample_id")
 tca_weights <- read_matrix_table("tca_weights", "sample_id")
+proportion_value_tolerance <- 1e-10
+derived_value_tolerance <- 1e-10
+authoritative_proportion_path <- if (identical(expected_proportion_mode, "dtangle")) {
+  output_value("estimated_proportions")
+} else {
+  input_value("precomputed_proportions")
+}
+authoritative_proportions <- read_matrix_path(
+  authoritative_proportion_path,
+  "sample_id",
+  paste(expected_proportion_mode, "authoritative proportions")
+)
+require_matrix_equal(
+  proportions,
+  authoritative_proportions,
+  proportion_value_tolerance,
+  "LM22 proportions"
+)
+mean_threshold <- as.numeric(input_value("group_mean_threshold"))
+zero_floor <- as.numeric(input_value("zero_floor"))
+expected_proportion_outputs <- derive_expected_proportion_outputs(
+  authoritative_proportions,
+  mean_threshold,
+  zero_floor
+)
+require_matrix_equal(
+  combined,
+  expected_proportion_outputs$combined,
+  derived_value_tolerance,
+  "combined proportions"
+)
+require_matrix_equal(
+  tca_weights,
+  expected_proportion_outputs$tca_weights,
+  derived_value_tolerance,
+  "TCA weights"
+)
 signature_columns <- readr::read_tsv(
   file.path(fixture_directory, "synthetic_signature.tsv"),
   n_max = 0L,
@@ -157,18 +209,45 @@ purrr::walk(
   )
 )
 require_true(
-  identical(colnames(combined), expected_groups),
-  "The combined group order does not match expected_groups.txt"
+  identical(colnames(combined), names(canonical_lm22_group_map())),
+  "The combined group order does not match the canonical LM22 mapping"
+)
+require_true(
+  identical(expected_proportion_outputs$retained_groups, expected_groups),
+  "The configured threshold did not retain the expected group order"
 )
 require_true(
   identical(colnames(tca_weights), expected_groups),
   "The TCA group order does not match expected_groups.txt"
+)
+require_true(
+  identical(colnames(combined), expected_groups),
+  "The combined group order does not match expected_groups.txt"
 )
 
 filter_report <- readr::read_tsv(
   output_value("cell_group_filter_report"),
   show_col_types = FALSE,
   progress = FALSE
+)
+require_true(
+  identical(filter_report$cell_group, names(canonical_lm22_group_map())),
+  "The filter report group order is not canonical"
+)
+require_true(
+  max(abs(filter_report$cohort_mean - expected_proportion_outputs$cohort_means)) <=
+    derived_value_tolerance,
+  "The filter report cohort means are incorrect"
+)
+require_true(
+  all(filter_report$threshold == mean_threshold) &&
+    identical(filter_report$retained, unname(expected_proportion_outputs$retained)) &&
+    identical(
+      as.integer(filter_report$zero_count_before),
+      as.integer(expected_proportion_outputs$zero_counts)
+    ) &&
+    all(filter_report$zero_floor == zero_floor),
+  "The filter report threshold or zero-floor values are incorrect"
 )
 retained_groups <- filter_report |>
   dplyr::filter(.data$retained) |>
