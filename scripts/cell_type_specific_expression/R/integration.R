@@ -84,3 +84,68 @@ prepare_scatter_contract <- function(inventory, bed_paths, output_prefix) {
     output_prefix = paste(output_prefix, inventory$slug, sep = ".")
   )
 }
+
+build_cell_type_qtl_manifest <- function(
+    cell_types,
+    cell_type_slugs,
+    int_beds,
+    scaled_beds,
+    int_pcs,
+    int_pcs_all,
+    scaled_pcs,
+    scaled_pcs_all,
+    int_covariates,
+    scaled_covariates,
+    int_outliers,
+    scaled_outliers) {
+  file_lists <- list(
+    int_bed = int_beds,
+    scaled_bed = scaled_beds,
+    int_phenotype_pcs = int_pcs,
+    int_phenotype_pcs_all = int_pcs_all,
+    scaled_phenotype_pcs = scaled_pcs,
+    scaled_phenotype_pcs_all = scaled_pcs_all,
+    int_merged_covariates = int_covariates,
+    scaled_merged_covariates = scaled_covariates,
+    int_connectivity_outliers = int_outliers,
+    scaled_connectivity_outliers = scaled_outliers
+  )
+  expected_length <- length(cell_types)
+  if (expected_length == 0L || length(cell_type_slugs) != expected_length ||
+      any(lengths(file_lists) != expected_length)) {
+    stop(
+      "Cell-type manifest arrays must have one equal nonzero length",
+      call. = FALSE
+    )
+  }
+  if (!is.character(cell_types) || anyNA(cell_types) || any(!nzchar(cell_types)) ||
+      anyDuplicated(cell_types) > 0L || !is.character(cell_type_slugs) ||
+      anyNA(cell_type_slugs) || any(!nzchar(cell_type_slugs)) ||
+      anyDuplicated(cell_type_slugs) > 0L) {
+    stop("Cell types and slugs must be nonempty and unique", call. = FALSE)
+  }
+  if (!all(vapply(file_lists, is.character, logical(1))) ||
+      any(!file.exists(unlist(file_lists, use.names = FALSE)))) {
+    stop("Every cell-type manifest file must exist", call. = FALSE)
+  }
+  duplicate_basenames <- vapply(
+    file_lists,
+    function(paths) anyDuplicated(basename(paths)) > 0L,
+    logical(1)
+  )
+  if (any(duplicate_basenames)) {
+    stop(
+      "Manifest file basenames must be unique within each output category",
+      call. = FALSE
+    )
+  }
+
+  file_columns <- file_lists |>
+    purrr::map(basename) |>
+    tibble::as_tibble()
+  tibble::tibble(
+    cell_type = cell_types,
+    cell_type_slug = cell_type_slugs
+  ) |>
+    dplyr::bind_cols(file_columns)
+}

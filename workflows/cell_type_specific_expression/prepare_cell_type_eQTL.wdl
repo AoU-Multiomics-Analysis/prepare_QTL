@@ -120,7 +120,65 @@ workflow PrepareCellTypeEqtlWorkflow {
     File scaled_merged_covariate = select_first([PrepareCellTypeEqtl.ScaledQtlCovariates])
   }
 
+  call integration.BuildQtlManifest as BuildQtlManifest {
+    input:
+      cell_types = PrepareScatterInputs.cell_types,
+      cell_type_slugs = PrepareScatterInputs.cell_type_slugs,
+      int_beds = PrepareCellTypeEqtl.IntBedFile,
+      scaled_beds = PrepareCellTypeEqtl.ScaledBedFile,
+      int_phenotype_pcs = PrepareCellTypeEqtl.IntPhenotypePCsOut,
+      int_phenotype_pcs_all = PrepareCellTypeEqtl.IntPhenotypePCsAllOut,
+      scaled_phenotype_pcs = PrepareCellTypeEqtl.ScaledPhenotypePCsOut,
+      scaled_phenotype_pcs_all = PrepareCellTypeEqtl.ScaledPhenotypePCsAllOut,
+      int_merged_covariates = int_merged_covariate,
+      scaled_merged_covariates = scaled_merged_covariate,
+      int_connectivity_outliers = PrepareCellTypeEqtl.IntConnectivityOutliers,
+      scaled_connectivity_outliers = PrepareCellTypeEqtl.ScaledConnectivityOutliers,
+      docker_image = deconvolution_docker_image,
+      cpu = scatter_cpu,
+      memory = scatter_memory,
+      disk_gb = scatter_disk_gb,
+      preemptible_attempts = preemptible_attempts,
+      max_retries = max_retries
+  }
+
   output {
+    File proportion_mode_validation_log = CellTypeDeconvolution.proportion_mode_validation_log
+
+    File? estimated_proportions = CellTypeDeconvolution.estimated_proportions
+    File? dtangle_markers = CellTypeDeconvolution.dtangle_markers
+    File? dtangle_metadata = CellTypeDeconvolution.dtangle_metadata
+    File? dtangle_overlap_report = CellTypeDeconvolution.dtangle_overlap_report
+    File? transformed_lm22 = CellTypeDeconvolution.transformed_lm22
+    File? dtangle_shared_bulk = CellTypeDeconvolution.dtangle_shared_bulk
+    File? dtangle_log = CellTypeDeconvolution.dtangle_log
+
+    File proportions_lm22 = CellTypeDeconvolution.proportions_lm22
+    File proportions_combined = CellTypeDeconvolution.proportions_combined
+    File tca_weights = CellTypeDeconvolution.tca_weights
+    File cell_group_filter_report = CellTypeDeconvolution.cell_group_filter_report
+    File proportions_log = CellTypeDeconvolution.proportions_log
+
+    File tca_model = CellTypeDeconvolution.tca_model
+    File tca_model_log = CellTypeDeconvolution.tca_model_log
+    File tca_expression = CellTypeDeconvolution.tca_expression
+    File tca_excluded_genes = CellTypeDeconvolution.tca_excluded_genes
+    File fit_tca_log = CellTypeDeconvolution.fit_tca_log
+
+    Array[File] cell_type_beds = CellTypeDeconvolution.cell_type_beds
+    File cell_type_bed_inventory = CellTypeDeconvolution.cell_type_bed_inventory
+    File reconstruction_by_sample = CellTypeDeconvolution.reconstruction_by_sample
+    File qc_summary = CellTypeDeconvolution.qc_summary
+    File qc_plots = CellTypeDeconvolution.qc_plots
+    File export_log = CellTypeDeconvolution.export_log
+    File export_detail_log = CellTypeDeconvolution.export_detail_log
+    File output_manifest = CellTypeDeconvolution.output_manifest
+    File output_inventory = CellTypeDeconvolution.output_inventory
+    File manifest_log = CellTypeDeconvolution.manifest_log
+    File effective_parameters_file = CellTypeDeconvolution.effective_parameters_file
+
+    File cell_type_qtl_manifest = BuildQtlManifest.manifest
+    File cell_type_qtl_manifest_log = BuildQtlManifest.log
     Array[String] cell_types = PrepareScatterInputs.cell_types
     Array[String] cell_type_slugs = PrepareScatterInputs.cell_type_slugs
     Array[File] int_beds = PrepareCellTypeEqtl.IntBedFile
