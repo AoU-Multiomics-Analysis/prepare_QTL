@@ -1,3 +1,13 @@
+validate_log2_pseudocount <- function(x) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x)) {
+    stop("log2_pseudocount must be one finite numeric value", call. = FALSE)
+  }
+  if (x < 0) {
+    stop("log2_pseudocount must be non-negative", call. = FALSE)
+  }
+  as.numeric(x)
+}
+
 validate_cpm_matrix <- function(cpm) {
   if (!is.matrix(cpm) || !is.numeric(cpm)) {
     stop("cpm must be a numeric matrix", call. = FALSE)
@@ -25,6 +35,9 @@ validate_cpm_matrix <- function(cpm) {
   }
   if (any(!is.finite(cpm))) {
     stop("CPM values must be finite", call. = FALSE)
+  }
+  if (any(cpm < 0)) {
+    stop("CPM values must be non-negative", call. = FALSE)
   }
 
   rownames(cpm) <- gene_ids
@@ -188,29 +201,47 @@ make_cpm_mapping_report <- function(cpm, annotation) {
   )
 }
 
-make_tca_expression <- function(expression) {
+make_tca_expression <- function(expression, log2_pseudocount = 0) {
   if (!is.list(expression) || !all(c("coordinates", "cpm") %in% names(expression))) {
     stop("expression must contain coordinates and cpm", call. = FALSE)
   }
+  log2_pseudocount <- validate_log2_pseudocount(log2_pseudocount)
   cpm <- validate_cpm_matrix(expression$cpm)
   if (!identical(rownames(cpm), expression$coordinates$gene_id)) {
     stop("Expression genes and BED coordinates must match exactly", call. = FALSE)
   }
-  log2(cpm)
+  if (log2_pseudocount == 0 && any(cpm == 0)) {
+    stop(
+      "strictly positive CPM values are required when log2_pseudocount is zero",
+      call. = FALSE
+    )
+  }
+  log2(cpm + log2_pseudocount)
 }
 
-make_dtangle_expression <- function(expression, annotation) {
+make_dtangle_expression <- function(expression, annotation, log2_pseudocount = 0) {
   if (!is.list(expression) || !all(c("coordinates", "cpm") %in% names(expression))) {
     stop("expression must contain coordinates and cpm", call. = FALSE)
   }
+  log2_pseudocount <- validate_log2_pseudocount(log2_pseudocount)
   cpm <- validate_cpm_matrix(expression$cpm)
   annotation <- validate_gtf_gene_annotation(annotation)
   mapping_report <- make_cpm_mapping_report(cpm, annotation)
   symbol_cpm <- collapse_cpm_to_gene_names(cpm, annotation)
-  if (nrow(symbol_cpm) == 0L || any(symbol_cpm <= 0)) {
-    stop("No positive CPM genes map to a usable gene symbol", call. = FALSE)
+  if (log2_pseudocount == 0 && any(cpm == 0)) {
+    stop(
+      "strictly positive CPM values are required when log2_pseudocount is zero",
+      call. = FALSE
+    )
   }
-  list(log_expression = log2(symbol_cpm), mapping_report = mapping_report)
+  if (nrow(symbol_cpm) == 0L) {
+    stop("No CPM genes map to a usable gene symbol", call. = FALSE)
+  }
+  list(
+    log_expression = log2(symbol_cpm + log2_pseudocount),
+    mapping_report = mapping_report,
+    log2_pseudocount = log2_pseudocount
+  )
 }
 
 make_excluded_genes <- function(mapping_report) {

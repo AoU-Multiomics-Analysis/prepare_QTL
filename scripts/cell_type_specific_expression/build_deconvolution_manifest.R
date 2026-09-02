@@ -184,19 +184,26 @@ run_build_manifest <- function() {
   }
   parameters <- if (is.null(options$parameters_json) ||
       !nzchar(options$parameters_json)) {
-    list(scale = "log2_cpm")
+    list(scale = "log2_cpm", log2_pseudocount = 0)
   } else {
     jsonlite::read_json(options$parameters_json, simplifyVector = FALSE)
   }
+  if (is.null(parameters$log2_pseudocount)) {
+    parameters$log2_pseudocount <- 0
+  }
+  parameters$log2_pseudocount <- validate_log2_pseudocount(
+    parameters$log2_pseudocount
+  )
   dimensions_message <- sprintf(
     paste0(
       "stage=manifest input_dimensions=outputs:%d samples:%d ",
-      "lm22_types:%d retained_groups:%d"
+      "lm22_types:%d retained_groups:%d log2_pseudocount:%g"
     ),
     nrow(outputs),
     nrow(original_proportions),
     ncol(original_proportions),
-    ncol(tca_weights)
+    ncol(tca_weights),
+    parameters$log2_pseudocount
   )
   paths_message <- sprintf(
     "stage=manifest input_paths=%s output_paths=%s",

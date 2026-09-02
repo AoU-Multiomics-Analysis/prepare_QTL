@@ -9,7 +9,10 @@ export_log_path <- NULL
 run_export_tca_beds <- function() {
   option_list <- list(
     optparse::make_option("--expression", type = "character",
-      help = "Coordinate-preserving BED of positive linear CPM values."),
+      help = "Coordinate-preserving BED of non-negative linear CPM values."),
+    optparse::make_option("--log2-pseudocount", dest = "log2_pseudocount",
+      type = "double", default = 0,
+      help = "Non-negative pseudocount added before the one log2 transform."),
     optparse::make_option("--tca-expression", dest = "tca_expression", type = "character",
       help = "Filtered gene-by-sample log2(CPM) TSV with gene_id first column."),
     optparse::make_option("--model", type = "character",
@@ -39,6 +42,7 @@ run_export_tca_beds <- function() {
       call. = FALSE
     )
   }
+  log2_pseudocount <- validate_log2_pseudocount(options$log2_pseudocount)
   dir.create(options$output_dir, recursive = TRUE, showWarnings = FALSE)
   export_log_path <<- if (is.null(options$log_file) || !nzchar(options$log_file)) {
     file.path(options$output_dir, "export_tca_beds.log")
@@ -46,12 +50,13 @@ run_export_tca_beds <- function() {
     options$log_file
   }
   append_tensor_log(export_log_path, sprintf(
-    "stage=export_tca_beds event=stage_start output_dir=%s",
+    "stage=export_tca_beds event=stage_start log2_pseudocount=%g output_dir=%s",
+    log2_pseudocount,
     normalizePath(options$output_dir)
   ))
 
   X <- read_numeric_matrix(options$tca_expression, "gene_id")
-  expression <- read_expression_bed(options$expression)
+  expression <- read_expression_bed(options$expression, log2_pseudocount)
   coordinates <- expression$coordinates
   weights <- read_numeric_matrix(options$weights, "sample_id")
   model <- readRDS(options$model)
@@ -85,8 +90,9 @@ run_export_tca_beds <- function() {
     stop("Coordinate gene order must match TCA expression exactly", call. = FALSE)
   }
   dimensions_message <- sprintf(
-    "stage=export_tca_beds input_dimensions=genes:%d samples:%d groups:%d covariates:%d scale=log2_cpm",
-    nrow(X), ncol(X), ncol(weights), if (is.null(C2)) 0L else ncol(C2)
+    "stage=export_tca_beds input_dimensions=genes:%d samples:%d groups:%d covariates:%d scale=log2_cpm log2_pseudocount:%g",
+    nrow(X), ncol(X), ncol(weights), if (is.null(C2)) 0L else ncol(C2),
+    log2_pseudocount
   )
   paths_message <- sprintf(
     "stage=export_tca_beds input_paths=%s output_dir=%s",
@@ -130,9 +136,9 @@ run_export_tca_beds <- function() {
     unname(bed_result$paths), inventory_path, unname(qc_paths)
   )
   complete_message <- sprintf(
-    "stage=export_tca_beds event=stage_complete output_dimensions=genes:%d samples:%d groups:%d excluded_constant_genes:%d output_paths=%s scale=log2_cpm",
+    "stage=export_tca_beds event=stage_complete output_dimensions=genes:%d samples:%d groups:%d excluded_constant_genes:%d output_paths=%s scale=log2_cpm log2_pseudocount:%g",
     nrow(X), ncol(X), ncol(weights), excluded_constant_genes,
-    paste(output_paths, collapse = ",")
+    paste(output_paths, collapse = ","), log2_pseudocount
   )
   message(sprintf("%s utc_complete=%s", complete_message, tensor_utc_time()))
   append_tensor_log(export_log_path, complete_message)

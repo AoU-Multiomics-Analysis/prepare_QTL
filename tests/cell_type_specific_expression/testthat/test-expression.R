@@ -2,6 +2,61 @@ source(testthat::test_path("helper-load.R"), local = .GlobalEnv)
 source(testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "R", "expression.R"), local = .GlobalEnv)
 source(testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "R", "expression_bed.R"), local = .GlobalEnv)
 
+testthat::test_that("log2 pseudocount validation accepts finite non-negative values", {
+  testthat::expect_equal(validate_log2_pseudocount(0), 0)
+  testthat::expect_equal(validate_log2_pseudocount(0.5), 0.5)
+  testthat::expect_error(validate_log2_pseudocount(-1), "non-negative")
+  testthat::expect_error(validate_log2_pseudocount(Inf), "finite")
+})
+
+testthat::test_that("pseudocount permits zero CPM and transforms the TCA view", {
+  expression <- list(
+    coordinates = tibble::tibble(
+      `#chr` = "chr1", start = 0L, end = 1L, gene_id = "g1"
+    ),
+    cpm = matrix(
+      c(0, 3),
+      nrow = 1L,
+      dimnames = list("g1", c("s1", "s2"))
+    )
+  )
+
+  testthat::expect_error(make_tca_expression(expression, 0), "strictly positive")
+  testthat::expect_equal(
+    unname(make_tca_expression(expression, 1)),
+    unname(log2(expression$cpm + 1))
+  )
+})
+
+testthat::test_that("dtangle adds the pseudocount after duplicate-symbol aggregation", {
+  expression <- list(
+    coordinates = tibble::tibble(
+      `#chr` = c("chr1", "chr1"),
+      start = c(0L, 1L),
+      end = c(1L, 2L),
+      gene_id = c("g1", "g2")
+    ),
+    cpm = matrix(
+      c(0, 3, 2, 4),
+      nrow = 2L,
+      byrow = TRUE,
+      dimnames = list(c("g1", "g2"), c("s1", "s2"))
+    )
+  )
+  annotation <- tibble::tibble(
+    gene_id = c("g1", "g2"),
+    gene_name = c("GENE1", "GENE1"),
+    gene_type = "protein_coding"
+  )
+
+  result <- make_dtangle_expression(expression, annotation, 1)
+
+  testthat::expect_equal(
+    result$log_expression["GENE1", ],
+    log2(colSums(expression$cpm) + 1)
+  )
+})
+
 testthat::test_that("GTF parsing retains all gene types and ignores non-gene records", {
   gtf <- tempfile(fileext = ".gtf")
   writeLines(c(
@@ -166,8 +221,8 @@ testthat::test_that("BED validation rejects a negative start", {
   testthat::expect_error(read_expression_bed(path), "non-negative.*less than.*end")
 })
 
-testthat::test_that("BED validation rejects non-positive, missing, and nonfinite CPM values", {
-  invalid_values <- c("0", "-1", "", "Inf")
+testthat::test_that("BED validation rejects negative, missing, and nonfinite CPM values", {
+  invalid_values <- c("-1", "", "Inf")
 
   for (invalid_value in invalid_values) {
     path <- tempfile(fileext = ".bed")
@@ -182,6 +237,22 @@ testthat::test_that("BED validation rejects non-positive, missing, and nonfinite
 
     testthat::expect_error(read_expression_bed(path), "CPM values")
   }
+})
+
+testthat::test_that("BED validation permits zero CPM only with a positive pseudocount", {
+  path <- tempfile(fileext = ".bed")
+  readr::write_tsv(
+    tibble::tibble(
+      `#chr` = "chr1", start = 0L, end = 10L, gene_id = "g1", S1 = 0
+    ),
+    path
+  )
+
+  testthat::expect_error(read_expression_bed(path), "strictly positive")
+  testthat::expect_equal(
+    unname(read_expression_bed(path, 1)$cpm),
+    matrix(0, nrow = 1L)
+  )
 })
 
 testthat::test_that("dtangle CPM must be strictly positive", {

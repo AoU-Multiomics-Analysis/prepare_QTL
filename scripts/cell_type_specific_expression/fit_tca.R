@@ -11,7 +11,14 @@ run_tca_stage <- function() {
     optparse::make_option(
       "--expression",
       type = "character",
-      help = "Coordinate-preserving BED of positive linear CPM values."
+      help = "Coordinate-preserving BED of non-negative linear CPM values."
+    ),
+    optparse::make_option(
+      "--log2-pseudocount",
+      dest = "log2_pseudocount",
+      type = "double",
+      default = 0,
+      help = "Non-negative pseudocount added before the one log2 transform."
     ),
     optparse::make_option(
       "--weights",
@@ -65,6 +72,7 @@ run_tca_stage <- function() {
       call. = FALSE
     )
   }
+  log2_pseudocount <- validate_log2_pseudocount(options$log2_pseudocount)
 
   dir.create(options$output_dir, recursive = TRUE, showWarnings = FALSE)
   output_paths <- list(
@@ -77,14 +85,19 @@ run_tca_stage <- function() {
   append_tca_log(
     tca_log_path,
     sprintf(
-      "stage=tca event=stage_start scale=log2_cpm output_dir=%s",
+      "stage=tca event=stage_start scale=log2_cpm log2_pseudocount=%g output_dir=%s",
+      log2_pseudocount,
       normalizePath(options$output_dir)
     )
   )
-  message(sprintf("stage=tca utc_start=%s scale=log2_cpm", tca_utc_time()))
+  message(sprintf(
+    "stage=tca utc_start=%s scale=log2_cpm log2_pseudocount=%g",
+    tca_utc_time(),
+    log2_pseudocount
+  ))
 
-  expression <- read_expression_bed(options$expression)
-  X <- make_tca_expression(expression)
+  expression <- read_expression_bed(options$expression, log2_pseudocount)
+  X <- make_tca_expression(expression, log2_pseudocount)
   W <- read_numeric_matrix(options$weights, "sample_id")
   C2 <- if (is.null(options$covariates) || !nzchar(options$covariates)) {
     NULL
@@ -94,20 +107,22 @@ run_tca_stage <- function() {
   dimension_message <- sprintf(
     paste0(
       "stage=tca input_dimensions=genes:%d samples:%d groups:%d covariates:%d ",
-      "scale=log2_cpm"
+      "scale=log2_cpm log2_pseudocount:%g"
     ),
     nrow(X),
     ncol(X),
     ncol(W),
-    if (is.null(C2)) 0L else ncol(C2)
+    if (is.null(C2)) 0L else ncol(C2),
+    log2_pseudocount
   )
   message(dimension_message)
   append_tca_log(tca_log_path, dimension_message)
   settings_message <- sprintf(
-    "stage=tca settings=num_cores:%d max_iters:%d random_seed:%d",
+    "stage=tca settings=num_cores:%d max_iters:%d random_seed:%d log2_pseudocount:%g",
     options$num_cores,
     options$max_iters,
-    options$random_seed
+    options$random_seed,
+    log2_pseudocount
   )
   message(settings_message)
   append_tca_log(tca_log_path, settings_message)
@@ -127,18 +142,20 @@ run_tca_stage <- function() {
     random_seed = options$random_seed,
     log_file = output_paths$model_log
   )
+  result$model$log2_pseudocount <- log2_pseudocount
   saveRDS(result$model, output_paths$model)
   write_numeric_matrix(result$X, output_paths$expression, "gene_id")
   readr::write_tsv(result$excluded_genes, output_paths$excluded_genes, na = "")
   complete_message <- sprintf(
     paste0(
       "stage=tca event=stage_complete output_dimensions=genes:%d samples:%d ",
-      "retained_groups:%d excluded_constant_genes:%d scale=log2_cpm"
+      "retained_groups:%d excluded_constant_genes:%d scale=log2_cpm log2_pseudocount:%g"
     ),
     nrow(result$X),
     ncol(result$X),
     ncol(W),
-    nrow(result$excluded_genes)
+    nrow(result$excluded_genes),
+    log2_pseudocount
   )
   message(sprintf("%s utc_complete=%s", complete_message, tca_utc_time()))
   append_tca_log(tca_log_path, complete_message)

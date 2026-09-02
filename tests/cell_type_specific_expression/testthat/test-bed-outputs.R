@@ -89,7 +89,12 @@ testthat::test_that("TCA export reads a direct CPM BED", {
     warn = FALSE
   ), collapse = "\n")
   testthat::expect_match(text, '"--expression"', fixed = TRUE)
-  testthat::expect_match(text, "read_expression_bed(options$expression)", fixed = TRUE)
+  testthat::expect_match(text, '"--log2-pseudocount"', fixed = TRUE)
+  testthat::expect_match(
+    text,
+    "read_expression_bed(options$expression, log2_pseudocount)",
+    fixed = TRUE
+  )
 })
 
 testthat::test_that("tensor validation rejects group and identifier mismatches", {

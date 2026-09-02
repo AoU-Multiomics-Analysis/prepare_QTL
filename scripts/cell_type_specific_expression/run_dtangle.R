@@ -11,7 +11,14 @@ run_dtangle_stage <- function() {
     optparse::make_option(
       "--expression",
       type = "character",
-      help = "Coordinate-preserving BED of positive linear CPM values."
+      help = "Coordinate-preserving BED of non-negative linear CPM values."
+    ),
+    optparse::make_option(
+      "--log2-pseudocount",
+      dest = "log2_pseudocount",
+      type = "double",
+      default = 0,
+      help = "Non-negative pseudocount added before the one log2 transform."
     ),
     optparse::make_option(
       "--gtf",
@@ -73,9 +80,16 @@ run_dtangle_stage <- function() {
   }
 
   message(sprintf("stage=dtangle utc_start=%s", utc_time()))
-  expression <- read_expression_bed(options$expression)
+  expression <- read_expression_bed(
+    options$expression,
+    options$log2_pseudocount
+  )
   annotation <- read_gtf_gene_annotation(options$gtf)
-  dtangle_expression <- make_dtangle_expression(expression, annotation)
+  dtangle_expression <- make_dtangle_expression(
+    expression,
+    annotation,
+    options$log2_pseudocount
+  )
   bulk_log <- dtangle_expression$log_expression
   lm22_linear <- read_numeric_matrix(options$lm22, "gene_symbol")
   message(sprintf(
@@ -85,12 +99,13 @@ run_dtangle_stage <- function() {
   message(sprintf(
     paste0(
       "stage=dtangle settings=min_overlap:%.3f marker_fraction:%.3f ",
-      "marker_method:%s quantile_normalize:%s"
+      "marker_method:%s quantile_normalize:%s log2_pseudocount:%g"
     ),
     options$min_overlap,
     options$marker_fraction,
     options$marker_method,
-    options$quantile_normalize
+    options$quantile_normalize,
+    dtangle_expression$log2_pseudocount
   ))
   inputs <- prepare_dtangle_inputs(
     bulk_log = bulk_log,
@@ -108,6 +123,7 @@ run_dtangle_stage <- function() {
     marker_fraction = options$marker_fraction,
     marker_method = options$marker_method
   )
+  fit$metadata$log2_pseudocount <- dtangle_expression$log2_pseudocount
   marker_counts <- unlist(fit$metadata$marker_counts, use.names = TRUE)
   message(sprintf("stage=dtangle package=dtangle version=%s", fit$metadata$dtangle_version))
   message(sprintf(
