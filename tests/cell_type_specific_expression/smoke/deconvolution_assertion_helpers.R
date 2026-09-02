@@ -1,3 +1,29 @@
+workflow_input_proportion_row_sum_tolerance <- 1e-6
+
+require_row_sums_within_tolerance <- function(values, tolerance, label) {
+  if (!is.matrix(values) || !is.numeric(values) || nrow(values) == 0L ||
+      ncol(values) == 0L || any(!is.finite(values))) {
+    stop(sprintf("The %s values must be a finite numeric matrix", label), call. = FALSE)
+  }
+  if (!is.numeric(tolerance) || length(tolerance) != 1L ||
+      !is.finite(tolerance) || tolerance < 0) {
+    stop("The row-sum tolerance must be non-negative", call. = FALSE)
+  }
+  maximum_error <- max(abs(rowSums(values) - 1))
+  if (maximum_error > tolerance + .Machine$double.eps) {
+    stop(
+      sprintf(
+        "The %s rows must sum to one within %.3g; maximum error is %.17g",
+        label,
+        tolerance,
+        maximum_error
+      ),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
 canonical_lm22_group_map <- function() {
   list(
     "B cells" = c("B cells naive", "B cells memory", "Plasma cells"),

@@ -225,6 +225,48 @@ testthat::test_that("generated numeric fixture text uses eight decimal places", 
   })
 })
 
+testthat::test_that("rounded proportions use the workflow row-sum tolerance", {
+  tolerance_name <- "workflow_input_proportion_row_sum_tolerance"
+  testthat::expect_true(exists(tolerance_name, inherits = TRUE))
+  testthat::expect_true(exists("require_row_sums_within_tolerance", mode = "function"))
+  if (!exists(tolerance_name, inherits = TRUE) ||
+      !exists("require_row_sums_within_tolerance", mode = "function")) {
+    return(invisible(NULL))
+  }
+
+  row_sum_tolerance <- get(tolerance_name, inherits = TRUE)
+  fixture_path <- testthat::test_path("..", "fixtures", "precomputed_proportions.tsv")
+  proportions <- readr::read_tsv(
+    fixture_path,
+    show_col_types = FALSE,
+    progress = FALSE
+  ) |>
+    tibble::column_to_rownames("sample_id") |>
+    as.matrix()
+  testthat::expect_identical(row_sum_tolerance, 1e-6)
+  testthat::expect_lte(
+    max(abs(rowSums(proportions) - 1)),
+    row_sum_tolerance
+  )
+  testthat::expect_invisible(require_row_sums_within_tolerance(
+    proportions,
+    row_sum_tolerance,
+    "LM22 proportion"
+  ))
+
+  invalid_proportions <- proportions
+  invalid_proportions[1L, 1L] <- invalid_proportions[1L, 1L] +
+    (1 + 2 * row_sum_tolerance - sum(invalid_proportions[1L, ]))
+  testthat::expect_error(
+    require_row_sums_within_tolerance(
+      invalid_proportions,
+      row_sum_tolerance,
+      "LM22 proportion"
+    ),
+    "LM22 proportion rows must sum to one within 1e-06"
+  )
+})
+
 testthat::test_that("smoke expectations derive canonical combined groups and weights", {
   required_helpers <- c(
     "canonical_lm22_group_map", "derive_expected_proportion_outputs",

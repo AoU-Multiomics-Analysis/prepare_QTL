@@ -185,9 +185,10 @@ expected_lm22_types <- signature_columns[-1L]
 require_true(all(proportions >= 0), "The LM22 proportions must be non-negative")
 require_true(all(combined >= 0), "The combined proportions must be non-negative")
 require_true(all(tca_weights > 0), "The TCA weights must be positive")
-require_true(
-  max(abs(rowSums(proportions) - 1)) < 1e-8,
-  "The LM22 proportion rows must sum to one"
+require_row_sums_within_tolerance(
+  proportions,
+  workflow_input_proportion_row_sum_tolerance,
+  "LM22 proportion"
 )
 require_true(
   max(abs(rowSums(combined) - 1)) < 1e-8,
