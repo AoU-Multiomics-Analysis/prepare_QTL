@@ -8,8 +8,9 @@ import "../common/ResidualizePhenotypes.wdl" as Residualize
 
 task eqtl_prepare_expression {
     input {
-        File CountGCT
-        File AnnotationGTF
+        File? CountGCT
+        File? AnnotationGTF
+        File? Log2CpmBed
         File SampleList
         String OutputPrefix
 
@@ -20,11 +21,15 @@ task eqtl_prepare_expression {
 
         }
     command {
+        set -euo pipefail
+        echo "stage=eqtl_prepare_expression start_time=$(date -u +%Y-%m-%dT%H:%M:%SZ) dimensions=pending outputs=${OutputPrefix}.expression.*"
         Rscript /tmp/PrepareExpression.R \
-            --CountGCT ${CountGCT} \
-            --AnnotationGTF ${AnnotationGTF} \
-            --SampleList ${SampleList} \
-            --OutputPrefix ${OutputPrefix}
+            ~{if defined(CountGCT) then "--CountGCT '" + select_first([CountGCT]) + "'" else ""} \
+            ~{if defined(AnnotationGTF) then "--AnnotationGTF '" + select_first([AnnotationGTF]) + "'" else ""} \
+            ~{if defined(Log2CpmBed) then "--Log2CpmBed '" + select_first([Log2CpmBed]) + "'" else ""} \
+            --SampleList '~{SampleList}' \
+            --OutputPrefix '~{OutputPrefix}'
+        echo "stage=eqtl_prepare_expression completion_time=$(date -u +%Y-%m-%dT%H:%M:%SZ) dimensions=complete outputs=${OutputPrefix}.expression.*"
 
         }
 
@@ -47,8 +52,9 @@ task eqtl_prepare_expression {
 workflow eQTLPrepareData {
     input {
         String OutputPrefix
-        File CountGCT
-        File AnnotationGTF
+        File? CountGCT
+        File? AnnotationGTF
+        File? Log2CpmBed
         File SampleList
         File? AdditionalCovariates
         Boolean ResidualizeNormalizedInputs = false
@@ -66,6 +72,7 @@ workflow eQTLPrepareData {
             num_threads = num_threads,
             CountGCT  = CountGCT,
             AnnotationGTF = AnnotationGTF,
+            Log2CpmBed = Log2CpmBed,
             SampleList = SampleList
     }
 

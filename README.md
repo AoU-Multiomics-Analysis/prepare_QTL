@@ -28,7 +28,7 @@ prepare_QTL/
 
 ## Main Workflows
 
-- [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
+- [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files from raw counts or a pre-normalized log2-CPM BED, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/splicing/prepare_sQTL.wdl`](workflows/splicing/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/methylation/prepare_mQTL.wdl`](workflows/methylation/prepare_mQTL.wdl): Prepares an existing merged methylation BED as raw, INT, and scaled BED files. It filters and imputes features, removes connectivity outliers from the INT and scaled files, calculates phenotype PCs, and optionally merges additional covariates.
 - [`workflows/proteomics/prepare_pQTL.wdl`](workflows/proteomics/prepare_pQTL.wdl): Prepares INT, scaled, and raw proteomics BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.

@@ -23,12 +23,12 @@ Set `ResidualizeNormalizedInputs` to `true` to run [`ResidualizePhenotypes.wdl`]
 End-to-end workflow for preparing gene expression data for eQTL analysis.
 
 **Steps:**
-1. Runs `PrepareExpression.R` to produce `.INT`, `.scaled`, and `.raw` expression BED files. The `.scaled` expression branch applies `log2(CPM + 1)` before centering/scaling; the `.INT` branch rank-normalizes unlogged CPMs.
+1. Runs `PrepareExpression.R` to produce `.INT`, `.scaled`, and `.raw` expression BED files. Raw-count mode applies TMM and CPM; its `.scaled` branch applies `log2(CPM + 1)` before centering/scaling. Alternatively, `Log2CpmBed` accepts pre-normalized log2 CPM values, skips count and CPM processing, rank-normalizes those values for `.INT`, and centers/scales them directly for `.scaled`.
 2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/common/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` expression BED files.
 3. Optionally runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
 4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/common/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
 
-**Inputs:** Raw count GCT file, GENCODE GTF, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
+**Inputs:** Either a raw-count GCT plus GENCODE GTF or a pre-normalized log2-CPM BED, sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters.
 
 **Outputs:** `.expression.INT.bed.gz`, `.expression.scaled.bed.gz`, `.expression.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, selected phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, full phenotype-PC matrices ending in `.INT.all.tsv` and `.scaled.all.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv` that continue to use the selected PC files, and optionally residualized BEDs ending in `.residualized.bed.gz`.
 

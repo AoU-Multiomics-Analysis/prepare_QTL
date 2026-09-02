@@ -35,17 +35,16 @@ Prepares an existing merged methylation BED. It accepts a headerless one-column 
 Prepares RNA-seq gene expression data for eQTL analysis.
 
 **What it does:**
-1. Loads raw count data from a GCT-formatted file (`.gct` or tab-separated).
-2. Loads a GENCODE GTF annotation file and extracts transcription start site (TSS) positions for each gene.
-3. Filters to a specified list of samples.
-4. Filters genes by expression count, retaining genes with counts > 6 in at least 20% of samples.
-5. Normalizes counts using edgeR TMM normalization followed by CPM transformation.
-6. Creates rank-based inverse normal transformed, `log2(CPM + 1)` centered/scaled, and raw CPM matrices. The log2 transform is only applied to the centered/scaled expression branch, not the INT branch.
-7. Merges each matrix with TSS locations and writes compressed BED files.
+1. Loads either raw count data from a GCT-formatted file or a coordinate-preserving BED of pre-normalized log2 CPM values.
+2. In raw-count mode, extracts TSS positions from a GENCODE GTF, filters genes, and applies edgeR TMM and CPM normalization.
+3. Filters and orders samples using the supplied sample list.
+4. Creates rank-based inverse normal transformed, centered/scaled, and untransformed matrices. Raw-count mode applies `log2(CPM + 1)` before scaling. Log2-CPM BED mode scales the supplied values directly.
+5. Removes connectivity outliers from the transformed matrices and writes compressed BED files.
 
 **Inputs:**
-- `--CountGCT`: GCT or TSV file of raw RNA-seq count data.
-- `--AnnotationGTF`: GENCODE GTF file used to extract TSS locations.
+- Exactly one expression mode:
+  - `--CountGCT`: GCT or TSV file of raw RNA-seq count data. This mode also requires `--AnnotationGTF` to extract TSS locations.
+  - `--Log2CpmBed`: BED with `#chr`, `start`, `end`, `gene_id`, and sample columns containing pre-normalized log2 CPM values. This mode preserves the supplied coordinates and does not apply count filtering, TMM, CPM calculation, GTF mapping, or another log transform.
 - `--SampleList`: File containing the list of sample IDs to include.
 - `--OutputPrefix`: Prefix for the output file.
 - `--RankNormalize`: Deprecated compatibility option. Both `.INT` and `.scaled` outputs are always written.

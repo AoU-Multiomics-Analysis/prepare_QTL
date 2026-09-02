@@ -45,6 +45,8 @@ Expression preparation is implemented in [`scripts/expression/PrepareExpression.
 - `.INT`: applies `RNOmni::RankNorm()` to each gene across samples using unlogged CPM values.
 - `.scaled`: applies `log2(CPM + 1)` to each gene across samples, then centers and scales with `scale(..., center = TRUE, scale = TRUE)`.
 
+As an alternative, `Log2CpmBed` accepts a BED with leading columns `#chr`, `start`, `end`, and `gene_id`, followed by sample columns in log2-CPM space. This mode preserves the supplied coordinates and gene order. It skips count filtering, TMM normalization, CPM calculation, GTF mapping, and the `log2(CPM + 1)` transform. The workflow rank-normalizes these values for `.INT`, centers and scales them directly for `.scaled`, and writes the supplied log2-CPM values to `.raw`.
+
 ## Proteomics
 
 Proteomics has an optional Olink preprocessing workflow in [`scripts/proteomics/NormalizeProteomics.R`](../scripts/proteomics/NormalizeProteomics.R), followed by pQTL BED preparation in [`scripts/proteomics/PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R) and [`workflows/proteomics/prepare_pQTL.wdl`](../workflows/proteomics/prepare_pQTL.wdl).

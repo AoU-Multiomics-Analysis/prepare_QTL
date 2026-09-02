@@ -89,8 +89,8 @@ remove_connectivity_outliers <- function(phenotype_matrix, output_file, transfor
 option_list <- list(
     optparse::make_option(c("--CountGCT"), type="character", default=NULL,
                         help="Parquet or TSV of normalzied protein expression data", metavar = "type"),
- #   optparse::make_option(c("--TPMGCT"), type="character", default=NULL,
-                        #help="Parquet or TSV of normalzied protein expression data", metavar = "type"),
+    optparse::make_option(c("--Log2CpmBed"), type="character", default=NULL,
+                        help="Coordinate-preserving BED of pre-normalized log2 CPM values", metavar = "type"),
     optparse::make_option(c("--OutputPrefix"), type="character", default=NULL,
                         help="Prefix for output data", metavar = "type"),
     optparse::make_option(c("--AnnotationGTF"), type="character", default=NULL,
@@ -104,14 +104,18 @@ option_list <- list(
 opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 
 
+has_count_gct <- !is.null(opt$CountGCT) && nzchar(opt$CountGCT)
+has_log2_cpm_bed <- !is.null(opt$Log2CpmBed) && nzchar(opt$Log2CpmBed)
+
+if (has_count_gct == has_log2_cpm_bed) {
+    stop('Provide exactly one of --CountGCT or --Log2CpmBed')
+}
+if (has_count_gct && (is.null(opt$AnnotationGTF) || !nzchar(opt$AnnotationGTF))) {
+    stop('--AnnotationGTF is required with --CountGCT')
+}
+
+
 ########### LOAD DATA #####################
-
-message('Loading count data')
-CountData <-  fread(opt$CountGCT,skip  =2 ,header = TRUE)
-
-#TPMData <- fread(opt$TPMGCT,skip  =2 ,header = TRUE)
-
-PositionTSS <- extract_TSS_pos(opt$AnnotationGTF)
 
 SampleList <- fread(opt$SampleList,header = FALSE) %>% dplyr::rename('ID' = 1) %>% pull(ID)
 nSamples <- SampleList %>% length()
@@ -125,31 +129,65 @@ message(paste0('Writing INT bed file to: ', IntOutputFile ))
 message(paste0('Writing scaled bed file to: ', ScaledOutputFile ))
 message(paste0('Writing raw bed file to: ', RawOutputFile ))
 ############# PROCESS DATA ###########
-# transpose read count data such that
-# genes are column and rows are samples
-message('Transposing data')
-CountDataTransposed <- CountData %>%
-    dplyr::select(-Description) %>%
-    column_to_rownames('Name') %>%
-    dplyr::select(any_of(SampleList)) %>%
-    t() %>%
-    data.frame()
+if (has_count_gct) {
+    message('Loading count data')
+    CountData <- fread(opt$CountGCT, skip = 2, header = TRUE)
+    PositionTSS <- extract_TSS_pos(opt$AnnotationGTF)
 
-# filter to genes where the count is greater than 6
-# in atleast 20% of samples
-message('Filtering expression by counts')
-CountDataFiltered <- CountDataTransposed %>%
-        dplyr::select(where(~ mean(.x > 6) >= 0.2)) %>%
+    # transpose read count data such that
+    # genes are column and rows are samples
+    message('Transposing data')
+    CountDataTransposed <- CountData %>%
+        dplyr::select(-Description) %>%
+        column_to_rownames('Name') %>%
+        dplyr::select(any_of(SampleList)) %>%
         t() %>%
         data.frame()
 
-message('Performing edgeR TMM normalization')
-# Convert filtered count data to DGE list for normalization
-DataEdgeR <- edgeR::DGEList(CountDataFiltered)
-DataEdgeR <- edgeR::calcNormFactors(DataEdgeR)
+    # filter to genes where the count is greater than 6
+    # in atleast 20% of samples
+    message('Filtering expression by counts')
+    CountDataFiltered <- CountDataTransposed %>%
+            dplyr::select(where(~ mean(.x > 6) >= 0.2)) %>%
+            t() %>%
+            data.frame()
 
-message('Computing CPMs')
-DataCPM <- edgeR::cpm(DataEdgeR, log=FALSE) %>% data.frame()
+    message('Performing edgeR TMM normalization')
+    # Convert filtered count data to DGE list for normalization
+    DataEdgeR <- edgeR::DGEList(CountDataFiltered)
+    DataEdgeR <- edgeR::calcNormFactors(DataEdgeR)
+
+    message('Computing CPMs')
+    DataCPM <- edgeR::cpm(DataEdgeR, log = FALSE) %>% data.frame()
+} else {
+    message('Loading pre-normalized log2 CPM BED')
+    Log2CpmBed <- fread(opt$Log2CpmBed, header = TRUE, check.names = FALSE)
+    metadata_columns <- c('#chr', 'start', 'end', 'gene_id')
+    if (!identical(names(Log2CpmBed)[seq_along(metadata_columns)], metadata_columns)) {
+        stop('Log2 CPM BED must start with #chr, start, end, and gene_id columns')
+    }
+    if (anyDuplicated(Log2CpmBed$gene_id)) {
+        stop('Log2 CPM BED gene_id values must be unique')
+    }
+    missing_samples <- setdiff(SampleList, names(Log2CpmBed))
+    if (length(missing_samples) > 0) {
+        stop(paste0('Samples missing from log2 CPM BED: ', paste(missing_samples, collapse = ', ')))
+    }
+
+    DataCPM <- Log2CpmBed %>%
+        dplyr::select(gene_id, all_of(SampleList)) %>%
+        column_to_rownames('gene_id') %>%
+        data.frame(check.names = FALSE)
+    if (!all(vapply(DataCPM, is.numeric, logical(1))) || any(!is.finite(as.matrix(DataCPM)))) {
+        stop('Log2 CPM BED sample values must be finite numeric values')
+    }
+
+    PositionTSS <- Log2CpmBed %>%
+        dplyr::select(all_of(metadata_columns)) %>%
+        dplyr::rename(seqnames = '#chr') %>%
+        dplyr::mutate(.input_order = dplyr::row_number())
+    message('Skipping count filtering, TMM normalization, CPM calculation, and GTF mapping')
+}
 
 write_expression_bed <- function(cpm_data, tss_positions, output_file, transform_label, rank_normalize = NULL, log2_transform = FALSE, remove_outliers = TRUE){
     message(paste0('Preparing ', transform_label, ' CPM BED'))
@@ -183,8 +221,16 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
 
     message('Merging quantifications with TSS locations')
     BedNormalizedCPMs <- tss_positions %>%
-                inner_join(NormalizedCPMs,by = 'gene_id') %>%
-                dplyr::select(seqnames,start,end,gene_id,everything())
+                inner_join(NormalizedCPMs,by = 'gene_id')
+    if ('.input_order' %in% names(BedNormalizedCPMs)) {
+        BedNormalizedCPMs <- BedNormalizedCPMs %>%
+            arrange(.input_order) %>%
+            dplyr::select(-.input_order)
+    } else {
+        BedNormalizedCPMs <- BedNormalizedCPMs %>% arrange(seqnames, start)
+    }
+    BedNormalizedCPMs <- BedNormalizedCPMs %>%
+        dplyr::select(seqnames,start,end,gene_id,everything())
 
     LengthBedCPMs <- BedNormalizedCPMs %>% nrow
     message(paste0('Number of genes found after merge: ',LengthBedCPMs))
@@ -199,11 +245,10 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
 
     message(paste0('Writing ', transform_label, ' data to ', output_file))
     BedNormalizedCPMs %>%
-        arrange(seqnames,start) %>%
         dplyr::rename('#chr' = 'seqnames') %>%
         fwrite(output_file,sep='\t')
 }
 
 write_expression_bed(DataCPM, PositionTSS, IntOutputFile, 'rank-normalized', TRUE)
-write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = TRUE)
+write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = has_count_gct)
 write_expression_bed(DataCPM, PositionTSS, RawOutputFile, 'raw', remove_outliers = FALSE)
