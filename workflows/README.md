@@ -9,6 +9,7 @@ implementation modules.
 | Directory | Contents |
 | --- | --- |
 | `common/` | Phenotype-PC calculation, covariate merging, and phenotype residualization shared across modalities. |
+| `cell_type_specific_expression/` | Whole-blood dtangle and TCA deconvolution and cell-type-specific expression-QTL preparation. |
 | `expression/` | Expression-QTL preparation. |
 | `proteomics/` | Olink normalization and protein-QTL preparation. |
 | `splicing/` | Splicing-QTL preparation. |
@@ -19,6 +20,8 @@ implementation modules.
 
 | Area | WDL | Use |
 | --- | --- | --- |
+| Cell-type expression | `cell_type_specific_expression/deconvolution.wdl` | Create cell-type-specific log2-CPM BED files from whole-blood linear CPM data. |
+| Cell-type expression | `cell_type_specific_expression/prepare_cell_type_eQTL.wdl` | Deconvolve whole blood and prepare INT and scaled QTL inputs for each retained cell type. |
 | Expression | `expression/prepare_eQTL.wdl` | Prepare expression QTL phenotypes. |
 | Proteomics | `proteomics/normalize_pQTL.wdl`, `proteomics/prepare_pQTL.wdl` | Normalize Olink data and prepare protein QTL phenotypes. |
 | Splicing | `splicing/prepare_sQTL.wdl` | Prepare splice QTL phenotypes. |
@@ -30,6 +33,8 @@ implementation modules.
 
 Every public entry point and the independently callable common helpers are
 registered in [`.dockstore.yml`](../.dockstore.yml) and checked in CI.
+See the [cell-type-specific expression guide](../docs/cell-type-specific-expression.md)
+for inputs, proportion modes, output arrays, and the manifest schema.
 
 ## Internal methylation stages
 

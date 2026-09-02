@@ -18,26 +18,34 @@ task eqtl_prepare_expression {
         Int memory
         Int disk_space
         Int num_threads
+        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        Int preemptible_attempts = 2
+        Int max_retries = 2
 
         }
     command {
         set -euo pipefail
-        echo "stage=eqtl_prepare_expression start_time=$(date -u +%Y-%m-%dT%H:%M:%SZ) dimensions=pending outputs=${OutputPrefix}.expression.*"
+        stage="eqtl_prepare_expression"
+        printf 'stage=%s start_time=%s dimensions=pending outputs=%s\n' \
+            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
         Rscript /tmp/PrepareExpression.R \
             ~{if defined(CountGCT) then "--CountGCT \"" + select_first([CountGCT]) + "\"" else ""} \
             ~{if defined(AnnotationGTF) then "--AnnotationGTF \"" + select_first([AnnotationGTF]) + "\"" else ""} \
             ~{if defined(Log2CpmBed) then "--Log2CpmBed \"" + select_first([Log2CpmBed]) + "\"" else ""} \
             --SampleList "~{SampleList}" \
             --OutputPrefix "~{OutputPrefix}"
-        echo "stage=eqtl_prepare_expression completion_time=$(date -u +%Y-%m-%dT%H:%M:%SZ) dimensions=complete outputs=${OutputPrefix}.expression.*"
+        printf 'stage=%s completion_time=%s dimensions=complete outputs=%s\n' \
+            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
 
         }
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: DockerImage
         memory: "${memory}GB"
         disks: "local-disk ${disk_space} HDD"
         cpu: "${num_threads}"
+        preemptible: preemptible_attempts
+        maxRetries: max_retries
     }
 
     output {
@@ -62,6 +70,9 @@ workflow eQTLPrepareData {
         Int memory
         Int disk_space
         Int num_threads
+        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        Int preemptible_attempts = 2
+        Int max_retries = 2
 
             }
     call eqtl_prepare_expression {
@@ -70,6 +81,9 @@ workflow eQTLPrepareData {
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
+            DockerImage = DockerImage,
+            preemptible_attempts = preemptible_attempts,
+            max_retries = max_retries,
             CountGCT  = CountGCT,
             AnnotationGTF = AnnotationGTF,
             Log2CpmBed = Log2CpmBed,
@@ -83,7 +97,10 @@ workflow eQTLPrepareData {
             OutputSuffix = ".INT",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads
+            num_threads = num_threads,
+            DockerImage = DockerImage,
+            preemptible_attempts = preemptible_attempts,
+            max_retries = max_retries
     }
 
     call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
@@ -93,7 +110,10 @@ workflow eQTLPrepareData {
             OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads
+            num_threads = num_threads,
+            DockerImage = DockerImage,
+            preemptible_attempts = preemptible_attempts,
+            max_retries = max_retries
     }
 
     if (defined(AdditionalCovariates)) {
@@ -102,7 +122,10 @@ workflow eQTLPrepareData {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".expression",
-                OutputSuffix = ".INT"
+                OutputSuffix = ".INT",
+                DockerImage = DockerImage,
+                preemptible_attempts = preemptible_attempts,
+                max_retries = max_retries
         }
 
         call CovariateMerge.MergeCovariates as MergeScaledAdditionalCovariates {
@@ -110,7 +133,10 @@ workflow eQTLPrepareData {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".expression",
-                OutputSuffix = ".scaled"
+                OutputSuffix = ".scaled",
+                DockerImage = DockerImage,
+                preemptible_attempts = preemptible_attempts,
+                max_retries = max_retries
         }
     }
 
@@ -122,7 +148,10 @@ workflow eQTLPrepareData {
                 OutputFileName = OutputPrefix + ".expression.INT.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
-                num_threads = num_threads
+                num_threads = num_threads,
+                DockerImage = DockerImage,
+                preemptible_attempts = preemptible_attempts,
+                max_retries = max_retries
         }
 
         call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
@@ -132,7 +161,10 @@ workflow eQTLPrepareData {
                 OutputFileName = OutputPrefix + ".expression.scaled.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
-                num_threads = num_threads
+                num_threads = num_threads,
+                DockerImage = DockerImage,
+                preemptible_attempts = preemptible_attempts,
+                max_retries = max_retries
         }
     }
 

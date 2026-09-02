@@ -1,6 +1,12 @@
 
 version: 1.2
 workflows:
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/cell_type_specific_expression/deconvolution.wdl
+    name: cell_type_deconvolution
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    name: prepare_cell_type_eQTL
   - subclass: WDL 
     primaryDescriptorPath: /workflows/expression/prepare_eQTL.wdl
     name: prepare_eQTL

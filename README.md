@@ -8,6 +8,7 @@ Pipeline for preparing molecular phenotype and genotype data for QTL (Quantitati
 prepare_QTL/
 ├── scripts/
 │   ├── common/     # Shared phenotype-PC, covariate, and residualization utilities
+│   ├── cell_type_specific_expression/ # Whole-blood deconvolution and TCA utilities
 │   ├── expression/ # eQTL phenotype preparation
 │   ├── methylation/ # PacBio 5mC filtering, aggregation, annotation, and correlation QC
 │   ├── proteomics/ # Olink normalization and pQTL preparation
@@ -22,12 +23,15 @@ prepare_QTL/
 - [R scripts](docs/scripts.md): Command-line script inputs, outputs, and processing behavior.
 - [Phenotype normalization and filtering](docs/phenotype-normalization-filtering.md): Modality-specific filtering, normalization, transformations, and WGCNA outlier removal.
 - [Molecular QTL workflows](docs/molecular-qtl-workflows.md): eQTL, sQTL, pQTL, methylation, proteomics normalization, phenotype PC, and covariate merge WDLs.
+- [Cell-type-specific expression](docs/cell-type-specific-expression.md): Whole-blood dtangle and TCA deconvolution, cell-type eQTL preparation, and output contracts.
 - [PacBio 5mC QTL workflow](docs/methylation-qtl.md): pb-CpG-tools inputs, QC, sharding, site metadata, and TensorQTL phenotype output.
 - [Genotype workflows](docs/genotype-workflows.md): VCF, PLINK, genotype PC, allele frequency, and dosage WDLs.
 - [Docker environment](docs/docker.md): Docker image location and included R package dependencies.
 
 ## Main Workflows
 
+- [`workflows/cell_type_specific_expression/deconvolution.wdl`](workflows/cell_type_specific_expression/deconvolution.wdl): Estimates or accepts LM22 proportions and uses TCA to create one log2-CPM BED for each retained major cell type.
+- [`workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl`](workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl): Runs deconvolution and prepares an independent set of INT and scaled QTL inputs for each retained cell type.
 - [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files from raw counts or a pre-normalized log2-CPM BED, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/splicing/prepare_sQTL.wdl`](workflows/splicing/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/methylation/prepare_mQTL.wdl`](workflows/methylation/prepare_mQTL.wdl): Prepares an existing merged methylation BED as raw, INT, and scaled BED files. It filters and imputes features, removes connectivity outliers from the INT and scaled files, calculates phenotype PCs, and optionally merges additional covariates.
