@@ -104,6 +104,16 @@ readr::write_tsv(
   expression_bed,
   file.path(output_directory, "synthetic_expression.bed")
 )
+expression_with_zero <- expression_cpm
+expression_with_zero[signature_gene_ids[[1L]], sample_ids[[1L]]] <- 0
+expression_with_zero_bed <- dplyr::bind_cols(
+  coordinates,
+  tibble::as_tibble(expression_with_zero, .name_repair = "minimal")
+)
+readr::write_tsv(
+  expression_with_zero_bed,
+  file.path(output_directory, "synthetic_expression_with_zero.bed")
+)
 write_matrix(
   signature,
   file.path(output_directory, "synthetic_signature.tsv"),
@@ -115,15 +125,17 @@ write_matrix(
   "sample_id"
 )
 
-batch_indicator <- tibble::tibble(
+additional_covariates <- tibble::tibble(
   sample_id = sample_ids,
-  batch_indicator = rep(c(0, 1), each = 6L)
+  batch_indicator = rep(c(0, 1), each = 6L),
+  genotype_pc1 = seq(-1.1, 1.1, length.out = length(sample_ids))
 )
 readr::write_tsv(
-  batch_indicator,
-  file.path(output_directory, "batch_indicator.tsv"),
+  additional_covariates,
+  file.path(output_directory, "additional_covariates.tsv"),
   na = ""
 )
+writeLines(sample_ids, file.path(output_directory, "samples.tsv"))
 
 gene_types <- ifelse(
   seq_along(all_gene_ids) %% 5L == 0L,
@@ -155,70 +167,82 @@ gtf_lines <- purrr::pmap_chr(
 )
 writeLines(gtf_lines, file.path(output_directory, "synthetic.gtf"))
 
-writeLines(sample_ids, file.path(output_directory, "expected_samples.txt"))
-writeLines(all_gene_ids, file.path(output_directory, "expected_gene_ids.txt"))
-readr::write_tsv(
-  coordinates,
-  file.path(output_directory, "expected_coordinates.tsv")
-)
 writeLines(cell_groups, file.path(output_directory, "expected_groups.txt"))
 
+fixture_root <- "tests/cell_type_specific_expression/fixtures"
 common_inputs <- list(
-  "cell_type_deconvolution.expression" = "tests/fixtures/synthetic_expression.bed",
-  "cell_type_deconvolution.gtf" = "tests/fixtures/synthetic.gtf",
-  "cell_type_deconvolution.docker_image" = "celltype-deconvolution:test",
-  "cell_type_deconvolution.preemptible_attempts" = 2L,
-  "cell_type_deconvolution.max_retries" = 2L,
-  "cell_type_deconvolution.min_lm22_overlap" = 0.80,
-  "cell_type_deconvolution.dtangle_marker_fraction" = 0.10,
-  "cell_type_deconvolution.dtangle_quantile_normalize" = FALSE,
-  "cell_type_deconvolution.group_mean_threshold" = 0.0001,
-  "cell_type_deconvolution.zero_floor" = 0.000001,
-  "cell_type_deconvolution.tca_max_iters" = 10L,
-  "cell_type_deconvolution.random_seed" = seed,
-  "cell_type_deconvolution.dtangle_cpu" = 4L,
-  "cell_type_deconvolution.dtangle_memory" = "32 GB",
-  "cell_type_deconvolution.dtangle_disk_gb" = 100L,
-  "cell_type_deconvolution.proportions_cpu" = 2L,
-  "cell_type_deconvolution.proportions_memory" = "16 GB",
-  "cell_type_deconvolution.proportions_disk_gb" = 50L,
-  "cell_type_deconvolution.fit_cpu" = 16L,
-  "cell_type_deconvolution.fit_memory" = "192 GB",
-  "cell_type_deconvolution.fit_disk_gb" = 750L,
-  "cell_type_deconvolution.export_cpu" = 8L,
-  "cell_type_deconvolution.export_memory" = "128 GB",
-  "cell_type_deconvolution.export_disk_gb" = 500L,
-  "cell_type_deconvolution.manifest_cpu" = 4L,
-  "cell_type_deconvolution.manifest_memory" = "32 GB",
-  "cell_type_deconvolution.manifest_disk_gb" = 100L
+  "PrepareCellTypeEqtlWorkflow.gtf" = file.path(fixture_root, "synthetic.gtf"),
+  "PrepareCellTypeEqtlWorkflow.SampleList" =
+    file.path(fixture_root, "samples.tsv"),
+  "PrepareCellTypeEqtlWorkflow.AdditionalCovariates" =
+    file.path(fixture_root, "additional_covariates.tsv"),
+  "PrepareCellTypeEqtlWorkflow.deconvolution_docker_image" =
+    "cell-type-specific-expression:test",
+  "PrepareCellTypeEqtlWorkflow.qtl_docker_image" = "prepare-qtl:test",
+  "PrepareCellTypeEqtlWorkflow.preemptible_attempts" = 0L,
+  "PrepareCellTypeEqtlWorkflow.max_retries" = 0L,
+  "PrepareCellTypeEqtlWorkflow.min_lm22_overlap" = 0.80,
+  "PrepareCellTypeEqtlWorkflow.dtangle_marker_fraction" = 0.10,
+  "PrepareCellTypeEqtlWorkflow.dtangle_quantile_normalize" = FALSE,
+  "PrepareCellTypeEqtlWorkflow.group_mean_threshold" = 0.0001,
+  "PrepareCellTypeEqtlWorkflow.zero_floor" = 0.000001,
+  "PrepareCellTypeEqtlWorkflow.tca_max_iters" = 10L,
+  "PrepareCellTypeEqtlWorkflow.random_seed" = seed,
+  "PrepareCellTypeEqtlWorkflow.dtangle_cpu" = 2L,
+  "PrepareCellTypeEqtlWorkflow.dtangle_memory" = "8 GB",
+  "PrepareCellTypeEqtlWorkflow.dtangle_disk_gb" = 20L,
+  "PrepareCellTypeEqtlWorkflow.proportions_cpu" = 1L,
+  "PrepareCellTypeEqtlWorkflow.proportions_memory" = "4 GB",
+  "PrepareCellTypeEqtlWorkflow.proportions_disk_gb" = 10L,
+  "PrepareCellTypeEqtlWorkflow.fit_cpu" = 2L,
+  "PrepareCellTypeEqtlWorkflow.fit_memory" = "8 GB",
+  "PrepareCellTypeEqtlWorkflow.fit_disk_gb" = 20L,
+  "PrepareCellTypeEqtlWorkflow.export_cpu" = 2L,
+  "PrepareCellTypeEqtlWorkflow.export_memory" = "8 GB",
+  "PrepareCellTypeEqtlWorkflow.export_disk_gb" = 20L,
+  "PrepareCellTypeEqtlWorkflow.manifest_cpu" = 1L,
+  "PrepareCellTypeEqtlWorkflow.manifest_memory" = "4 GB",
+  "PrepareCellTypeEqtlWorkflow.manifest_disk_gb" = 10L,
+  "PrepareCellTypeEqtlWorkflow.scatter_cpu" = 1L,
+  "PrepareCellTypeEqtlWorkflow.scatter_memory" = "4 GB",
+  "PrepareCellTypeEqtlWorkflow.scatter_disk_gb" = 10L,
+  "PrepareCellTypeEqtlWorkflow.eqtl_cpu" = 2L,
+  "PrepareCellTypeEqtlWorkflow.eqtl_memory" = 8L,
+  "PrepareCellTypeEqtlWorkflow.eqtl_disk_gb" = 20L
 )
 dtangle_inputs <- append(
   common_inputs,
   list(
-    "cell_type_deconvolution.lm22" =
-      "tests/fixtures/synthetic_signature.tsv",
-    "cell_type_deconvolution.covariates" =
-      "tests/fixtures/batch_indicator.tsv"
+    "PrepareCellTypeEqtlWorkflow.expression" =
+      file.path(fixture_root, "synthetic_expression.bed"),
+    "PrepareCellTypeEqtlWorkflow.lm22" =
+      file.path(fixture_root, "synthetic_signature.tsv"),
+    "PrepareCellTypeEqtlWorkflow.OutputPrefix" = "synthetic.dtangle",
+    "PrepareCellTypeEqtlWorkflow.log2_pseudocount" = 0.0
   ),
-  after = 2L
+  after = 0L
 )
-restart_inputs <- append(
+precomputed_inputs <- append(
   common_inputs,
   list(
-    "cell_type_deconvolution.precomputed_proportions" =
-      "tests/fixtures/precomputed_proportions.tsv"
+    "PrepareCellTypeEqtlWorkflow.expression" =
+      file.path(fixture_root, "synthetic_expression_with_zero.bed"),
+    "PrepareCellTypeEqtlWorkflow.precomputed_proportions" =
+      file.path(fixture_root, "precomputed_proportions.tsv"),
+    "PrepareCellTypeEqtlWorkflow.OutputPrefix" = "synthetic.precomputed",
+    "PrepareCellTypeEqtlWorkflow.log2_pseudocount" = 1.0
   ),
-  after = 2L
+  after = 0L
 )
 jsonlite::write_json(
   dtangle_inputs,
-  file.path(output_directory, "dtangle.inputs.json"),
+  file.path(output_directory, "dtangle-e2e.inputs.json"),
   auto_unbox = TRUE,
   pretty = TRUE
 )
 jsonlite::write_json(
-  restart_inputs,
-  file.path(output_directory, "restart.inputs.json"),
+  precomputed_inputs,
+  file.path(output_directory, "precomputed-e2e.inputs.json"),
   auto_unbox = TRUE,
   pretty = TRUE
 )

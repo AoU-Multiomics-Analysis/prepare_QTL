@@ -493,8 +493,11 @@ validate_manifest_outputs <- function(outputs) {
 }
 
 validate_container_image <- function(container_image) {
-  local_smoke_image <- "celltype-deconvolution:test"
-  default_image <- "ghcr.io/aou-multiomics-analysis/celltypedeconvolution:latest"
+  local_smoke_image <- "cell-type-specific-expression:test"
+  default_image <- paste0(
+    "ghcr.io/aou-multiomics-analysis/",
+    "prepare_qtl-cell-type-specific-expression:main"
+  )
   digest_pattern <- "^[^[:space:]@]+@sha256:[0-9a-f]{64}$"
   valid <- is.character(container_image) && length(container_image) == 1L &&
     !is.na(container_image) &&

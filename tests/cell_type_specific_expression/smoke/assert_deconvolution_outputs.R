@@ -1,0 +1,453 @@
+#!/usr/bin/env Rscript
+
+arguments <- commandArgs(trailingOnly = TRUE)
+if (length(arguments) < 2L || length(arguments) > 3L) {
+  stop(
+    paste(
+      "Usage: assert_deconvolution_outputs.R",
+      "OUTPUTS_JSON INPUTS_JSON [FIXTURE_DIRECTORY]"
+    ),
+    call. = FALSE
+  )
+}
+
+outputs_path <- arguments[[1L]]
+inputs_path <- arguments[[2L]]
+fixture_directory <- if (length(arguments) == 3L) {
+  arguments[[3L]]
+} else {
+  "tests/cell_type_specific_expression/fixtures"
+}
+workflow_name <- "PrepareCellTypeEqtlWorkflow"
+outputs <- jsonlite::read_json(outputs_path, simplifyVector = TRUE)
+inputs <- jsonlite::read_json(inputs_path, simplifyVector = TRUE)
+
+require_true <- function(condition, message) {
+  if (!isTRUE(condition)) {
+    stop(message, call. = FALSE)
+  }
+}
+
+input_value <- function(name) {
+  key <- paste(workflow_name, name, sep = ".")
+  value <- inputs[[key]]
+  if (is.null(value) || length(value) == 0L) {
+    stop(sprintf("The required workflow input is absent: %s", key), call. = FALSE)
+  }
+  value
+}
+
+output_value <- function(name) {
+  key <- paste(workflow_name, name, sep = ".")
+  value <- outputs[[key]]
+  if (is.null(value) || length(value) == 0L) {
+    stop(sprintf("The required workflow output is absent: %s", key), call. = FALSE)
+  }
+  value
+}
+
+read_matrix_table <- function(name, id_column) {
+  table <- readr::read_tsv(
+    output_value(name),
+    col_types = readr::cols(.default = readr::col_character()),
+    name_repair = "minimal",
+    show_col_types = FALSE,
+    progress = FALSE
+  )
+  require_true(
+    identical(names(table)[[1L]], id_column),
+    sprintf("The %s table must start with %s", name, id_column)
+  )
+  values <- table[-1L] |>
+    dplyr::mutate(dplyr::across(dplyr::everything(), readr::parse_double)) |>
+    as.matrix()
+  require_true(all(is.finite(values)), sprintf("The %s table must be finite", name))
+  rownames(values) <- table[[id_column]]
+  values
+}
+
+expression_path <- input_value("expression")
+expression <- readr::read_tsv(
+  expression_path,
+  col_types = readr::cols(
+    `#chr` = readr::col_character(),
+    start = readr::col_integer(),
+    end = readr::col_integer(),
+    gene_id = readr::col_character(),
+    .default = readr::col_double()
+  ),
+  name_repair = "minimal",
+  show_col_types = FALSE,
+  progress = FALSE
+)
+metadata_columns <- c("#chr", "start", "end", "gene_id")
+require_true(
+  identical(names(expression)[seq_along(metadata_columns)], metadata_columns),
+  "The fixture expression BED has an invalid schema"
+)
+expected_samples <- readLines(
+  file.path(fixture_directory, "samples.tsv"),
+  warn = FALSE
+)
+expected_gene_ids <- expression$gene_id
+expected_coordinates <- expression |>
+  dplyr::select(dplyr::all_of(metadata_columns))
+expected_groups <- readLines(
+  file.path(fixture_directory, "expected_groups.txt"),
+  warn = FALSE
+)
+expression_values <- expression |>
+  dplyr::select(-dplyr::all_of(metadata_columns)) |>
+  as.matrix()
+log2_pseudocount <- as.numeric(input_value("log2_pseudocount"))
+require_true(
+  identical(names(expression)[-seq_along(metadata_columns)], expected_samples),
+  "The expression sample order does not match samples.tsv"
+)
+require_true(all(is.finite(expression_values)), "The input CPM values must be finite")
+require_true(all(expression_values >= 0), "The input CPM values must be non-negative")
+if (log2_pseudocount == 0) {
+  require_true(all(expression_values > 0), "Pseudocount zero requires positive CPM")
+} else {
+  require_true(any(expression_values == 0), "The positive-pseudocount fixture needs zero CPM")
+}
+
+lm22_key <- paste(workflow_name, "lm22", sep = ".")
+precomputed_key <- paste(workflow_name, "precomputed_proportions", sep = ".")
+has_lm22 <- !is.null(inputs[[lm22_key]])
+has_precomputed <- !is.null(inputs[[precomputed_key]])
+require_true(xor(has_lm22, has_precomputed), "The fixture must select one proportion mode")
+expected_proportion_mode <- if (has_lm22) "dtangle" else "precomputed"
+
+proportions <- read_matrix_table("proportions_lm22", "sample_id")
+combined <- read_matrix_table("proportions_combined", "sample_id")
+tca_weights <- read_matrix_table("tca_weights", "sample_id")
+signature_columns <- readr::read_tsv(
+  file.path(fixture_directory, "synthetic_signature.tsv"),
+  n_max = 0L,
+  show_col_types = FALSE,
+  progress = FALSE
+) |>
+  names()
+expected_lm22_types <- signature_columns[-1L]
+require_true(all(proportions >= 0), "The LM22 proportions must be non-negative")
+require_true(all(combined >= 0), "The combined proportions must be non-negative")
+require_true(all(tca_weights > 0), "The TCA weights must be positive")
+require_true(
+  max(abs(rowSums(proportions) - 1)) < 1e-8,
+  "The LM22 proportion rows must sum to one"
+)
+require_true(
+  max(abs(rowSums(combined) - 1)) < 1e-8,
+  "The combined proportion rows must sum to one"
+)
+require_true(
+  max(abs(rowSums(tca_weights) - 1)) < 1e-8,
+  "The TCA weight rows must sum to one"
+)
+require_true(
+  identical(colnames(proportions), expected_lm22_types),
+  "The LM22 columns are not authoritative"
+)
+purrr::walk(
+  list(proportions, combined, tca_weights),
+  ~ require_true(
+    identical(rownames(.x), expected_samples),
+    "The proportion sample order does not match samples.tsv"
+  )
+)
+require_true(
+  identical(colnames(combined), expected_groups),
+  "The combined group order does not match expected_groups.txt"
+)
+require_true(
+  identical(colnames(tca_weights), expected_groups),
+  "The TCA group order does not match expected_groups.txt"
+)
+
+filter_report <- readr::read_tsv(
+  output_value("cell_group_filter_report"),
+  show_col_types = FALSE,
+  progress = FALSE
+)
+retained_groups <- filter_report |>
+  dplyr::filter(.data$retained) |>
+  dplyr::pull(.data$cell_group)
+require_true(
+  identical(retained_groups, expected_groups),
+  "The retained groups do not match expected_groups.txt"
+)
+
+tca_expression <- read_matrix_table("tca_expression", "gene_id")
+require_true(
+  identical(rownames(tca_expression), expected_gene_ids),
+  "The TCA gene order does not match the expression BED"
+)
+require_true(
+  identical(colnames(tca_expression), expected_samples),
+  "The TCA sample order does not match the expression BED"
+)
+require_true(
+  all(c("ENSGSYN000001", "ENSGDUP000001") %in% rownames(tca_expression)),
+  "The TCA expression is missing required synthetic genes"
+)
+require_true(
+  any(grepl("^ENSGEXTRA", rownames(tca_expression))),
+  "The TCA expression is missing a non-signature gene"
+)
+
+if (identical(expected_proportion_mode, "dtangle")) {
+  shared_bulk <- read_matrix_table("dtangle_shared_bulk", "gene_symbol")
+  require_true(
+    sum(rownames(shared_bulk) == "SYN_GENE_001") == 1L,
+    "dtangle must aggregate the duplicate synthetic symbol once"
+  )
+}
+
+reconstruction <- readr::read_tsv(
+  output_value("reconstruction_by_sample"),
+  show_col_types = FALSE,
+  progress = FALSE
+)
+require_true(
+  identical(reconstruction$sample_id, expected_samples),
+  "The reconstruction sample order does not match samples.tsv"
+)
+require_true(
+  all(reconstruction$gene_count == length(expected_gene_ids)),
+  "The reconstruction gene count is incorrect"
+)
+require_true(
+  all(is.finite(reconstruction$correlation)) && all(is.finite(reconstruction$rmse)),
+  "The reconstruction metrics must be finite"
+)
+
+cell_type_bed_paths <- normalizePath(output_value("cell_type_beds"))
+require_true(
+  length(cell_type_bed_paths) == length(expected_groups),
+  "The cell-type BED count is incorrect"
+)
+require_true(
+  all(grepl("[.]bed[.]gz$", cell_type_bed_paths)) &&
+    anyDuplicated(cell_type_bed_paths) == 0L,
+  "The cell-type BED paths must be unique BED gzip files"
+)
+purrr::walk(cell_type_bed_paths, function(path) {
+  bed <- readr::read_tsv(
+    path,
+    col_types = readr::cols(
+      `#chr` = readr::col_character(),
+      start = readr::col_integer(),
+      end = readr::col_integer(),
+      gene_id = readr::col_character(),
+      .default = readr::col_double()
+    ),
+    name_repair = "minimal",
+    show_col_types = FALSE,
+    progress = FALSE
+  )
+  require_true(
+    identical(names(bed)[seq_along(metadata_columns)], metadata_columns),
+    sprintf("The cell-type BED has an invalid schema: %s", basename(path))
+  )
+  require_true(
+    identical(bed$gene_id, expected_gene_ids) &&
+      identical(names(bed)[-seq_along(metadata_columns)], expected_samples),
+    sprintf("The cell-type BED has an invalid identity order: %s", basename(path))
+  )
+  require_true(
+    identical(bed[["#chr"]], expected_coordinates[["#chr"]]) &&
+      identical(bed$start, expected_coordinates$start) &&
+      identical(bed$end, expected_coordinates$end) &&
+      identical(bed$gene_id, expected_coordinates$gene_id),
+    sprintf("The cell-type BED has changed coordinates: %s", basename(path))
+  )
+  values <- bed |>
+    dplyr::select(-dplyr::all_of(metadata_columns)) |>
+    as.matrix()
+  require_true(
+    all(is.finite(values)),
+    sprintf("The cell-type BED contains a non-finite value: %s", basename(path))
+  )
+})
+
+inventory <- readr::read_tsv(
+  output_value("cell_type_bed_inventory"),
+  show_col_types = FALSE,
+  progress = FALSE
+)
+inventory_basenames <- inventory$path
+require_true(nrow(inventory) == length(expected_groups), "The BED inventory row count is incorrect")
+require_true(
+  identical(inventory$cell_group, expected_groups),
+  "The BED inventory group order is incorrect"
+)
+require_true(
+  all(inventory$n_genes == length(expected_gene_ids)) &&
+    all(inventory$n_samples == length(expected_samples)) &&
+    all(inventory$scale == "log2_cpm"),
+  "The BED inventory dimensions or scale are incorrect"
+)
+require_true(
+  all(nzchar(inventory$slug)) && anyDuplicated(inventory$slug) == 0L,
+  "The BED inventory slugs must be non-empty and unique"
+)
+require_true(
+  all(grepl("^[^/]+[.]bed[.]gz$", inventory_basenames)) &&
+    anyDuplicated(inventory_basenames) == 0L,
+  "The BED inventory paths must be stable unique basenames"
+)
+require_true(
+  identical(basename(cell_type_bed_paths), inventory_basenames),
+  "The BED output array does not match the authoritative inventory"
+)
+public_inventory <- readr::read_tsv(
+  output_value("output_inventory"),
+  show_col_types = FALSE,
+  progress = FALSE
+)
+require_true(
+  isTRUE(all.equal(
+    as.data.frame(public_inventory),
+    as.data.frame(inventory),
+    check.attributes = FALSE
+  )),
+  "The public inventory differs from the BED inventory"
+)
+
+manifest <- jsonlite::read_json(output_value("output_manifest"), simplifyVector = FALSE)
+parameters <- manifest$parameters
+required_parameter_names <- c(
+  "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
+  "dtangle_marker_fraction", "dtangle_marker_method",
+  "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
+  "tca_max_iters", "random_seed", "scale"
+)
+numeric_parameter <- function(name) as.numeric(parameters[[name]])
+require_true(
+  setequal(names(parameters), required_parameter_names),
+  "The deconvolution manifest has an invalid parameter schema"
+)
+require_true(
+  identical(parameters$proportion_mode, expected_proportion_mode),
+  "The deconvolution manifest has an incorrect proportion mode"
+)
+require_true(
+  numeric_parameter("log2_pseudocount") == log2_pseudocount,
+  "The deconvolution manifest has an incorrect log2 pseudocount"
+)
+require_true(
+  numeric_parameter("min_lm22_overlap") == 0.80 &&
+    numeric_parameter("dtangle_marker_fraction") == 0.10 &&
+    identical(parameters$dtangle_marker_method, "ratio") &&
+    identical(parameters$dtangle_quantile_normalize, FALSE) &&
+    numeric_parameter("group_mean_threshold") == 0.0001 &&
+    numeric_parameter("zero_floor") == 0.000001 &&
+    numeric_parameter("tca_max_iters") == 10 &&
+    numeric_parameter("random_seed") == 20260901 &&
+    identical(parameters$scale, "log2_cpm") &&
+    identical(manifest$tca_version, "1.2.1"),
+  "The deconvolution manifest parameters are incorrect"
+)
+require_true(
+  identical(manifest$container_image, "cell-type-specific-expression:test"),
+  "The manifest did not record the dedicated test image"
+)
+require_true(
+  length(manifest$outputs) == nrow(inventory),
+  "The deconvolution manifest output count is incorrect"
+)
+purrr::walk(manifest$outputs, function(entry) {
+  require_true(
+    identical(entry$path, entry$file_name) &&
+      grepl("^[^/]+[.]bed[.]gz$", entry$path) &&
+      identical(entry$scale, "log2_cpm") &&
+      length(entry$sha256) == 1L && grepl("^[0-9a-f]{64}$", entry$sha256),
+    "A deconvolution manifest output is not portable"
+  )
+})
+
+effective_parameters <- jsonlite::read_json(
+  output_value("effective_parameters_file"),
+  simplifyVector = TRUE
+)
+require_true(
+  identical(sort(names(effective_parameters)), sort(required_parameter_names)),
+  "The effective-parameter file has an invalid schema"
+)
+require_true(
+  identical(effective_parameters$proportion_mode, expected_proportion_mode) &&
+    as.numeric(effective_parameters$log2_pseudocount) == log2_pseudocount,
+  "The effective-parameter file does not match the fixture"
+)
+
+qc_summary <- readr::read_tsv(
+  output_value("qc_summary"),
+  show_col_types = FALSE,
+  progress = FALSE
+)
+required_qc_metrics <- c(
+  "gene_count", "sample_count", "cell_group_count",
+  "excluded_constant_gene_count", "correlation_min", "correlation_median",
+  "correlation_mean", "correlation_max", "rmse_min", "rmse_median",
+  "rmse_mean", "rmse_max", "lm22_gene_count", "lm22_cell_type_count",
+  "lm22_value_validation", "lm22_value_min", "lm22_value_max",
+  "input_proportion_max_row_sum_error",
+  "combined_proportion_max_row_sum_error", "adjusted_weight_max_row_sum_error",
+  "normalization_adjustment_max_abs", "zero_values_adjusted",
+  "tca_internal_iterations", "tca_max_internal_iterations", "tca_convergence",
+  "tca_tau_hat"
+)
+require_true(
+  setequal(required_qc_metrics, qc_summary$metric),
+  "The deconvolution QC summary has an invalid metric set"
+)
+qc_status <- stats::setNames(qc_summary$status, qc_summary$metric)
+expected_lm22_status <- if (expected_proportion_mode == "dtangle") {
+  "passed"
+} else {
+  "not_applicable_precomputed_mode"
+}
+require_true(
+  identical(qc_status[["lm22_value_validation"]], expected_lm22_status),
+  "The LM22 QC status does not match the proportion mode"
+)
+require_true(
+  qc_status[["tca_convergence"]] %in% c("converged", "max_iterations_reached"),
+  "The TCA convergence status is invalid"
+)
+
+required_file_outputs <- c(
+  "proportion_mode_validation_log", "proportions_lm22",
+  "proportions_combined", "tca_weights", "cell_group_filter_report",
+  "proportions_log", "tca_model", "tca_model_log", "tca_expression",
+  "tca_excluded_genes", "fit_tca_log", "cell_type_bed_inventory",
+  "reconstruction_by_sample", "qc_summary", "qc_plots", "export_log",
+  "export_detail_log", "output_manifest", "output_inventory", "manifest_log",
+  "effective_parameters_file"
+)
+if (identical(expected_proportion_mode, "dtangle")) {
+  required_file_outputs <- c(
+    required_file_outputs,
+    "estimated_proportions", "dtangle_markers", "dtangle_metadata",
+    "dtangle_overlap_report", "transformed_lm22", "dtangle_shared_bulk",
+    "dtangle_log"
+  )
+}
+purrr::walk(required_file_outputs, function(name) {
+  path <- output_value(name)
+  require_true(file.exists(path), sprintf("The required output file is absent: %s", name))
+  require_true(file.info(path)$size > 0, sprintf("The required output file is empty: %s", name))
+})
+
+message(sprintf(
+  paste(
+    "Deconvolution smoke assertions passed:",
+    "mode=%s genes=%d samples=%d groups=%d pseudocount=%g"
+  ),
+  expected_proportion_mode,
+  length(expected_gene_ids),
+  length(expected_samples),
+  length(expected_groups),
+  log2_pseudocount
+))

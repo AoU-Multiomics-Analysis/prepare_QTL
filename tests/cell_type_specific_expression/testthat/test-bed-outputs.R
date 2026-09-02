@@ -385,14 +385,20 @@ testthat::test_that("manifest provenance accepts digests and approved image tags
   )
   testthat::expect_identical(validate_container_image(valid_digest), valid_digest)
   testthat::expect_identical(
-    validate_container_image("celltype-deconvolution:test"),
-    "celltype-deconvolution:test"
+    validate_container_image("cell-type-specific-expression:test"),
+    "cell-type-specific-expression:test"
   )
   testthat::expect_identical(
     validate_container_image(
-      "ghcr.io/aou-multiomics-analysis/celltypedeconvolution:latest"
+      paste0(
+        "ghcr.io/aou-multiomics-analysis/",
+        "prepare_qtl-cell-type-specific-expression:main"
+      )
     ),
-    "ghcr.io/aou-multiomics-analysis/celltypedeconvolution:latest"
+    paste0(
+      "ghcr.io/aou-multiomics-analysis/",
+      "prepare_qtl-cell-type-specific-expression:main"
+    )
   )
   purrr::walk(
     c(
@@ -603,7 +609,7 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     "--model", model_path,
     "--model-log", model_log_path,
     "--tca-version", "1.2.1",
-    "--container-image", "celltype-deconvolution:test",
+    "--container-image", "cell-type-specific-expression:test",
     "--output", manifest_path,
     "--qc-output", qc_path,
     "--log-file", log_path

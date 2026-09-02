@@ -1,0 +1,185 @@
+name: Cell-Type-Specific Expression CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install MiniWDL 1.15.0
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "miniwdl==1.15.0"
+          miniwdl --version
+
+      - name: Check WDL and logging contracts
+        run: |
+          set -euo pipefail
+          miniwdl check workflows/cell_type_specific_expression/deconvolution.wdl
+          miniwdl check workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+          python3 scripts/check_wdl_logging.py \
+            workflows/cell_type_specific_expression \
+            workflows/expression/prepare_eQTL.wdl \
+            workflows/common/calculate_phenotypePCs.wdl \
+            workflows/common/MergeCovariates.wdl \
+            workflows/common/ResidualizePhenotypes.wdl
+
+      - name: Build the standard QTL test image
+        run: |
+          set -euo pipefail
+          docker build \
+            --file envs/PhenotypePCs/Dockerfile \
+            --tag prepare-qtl:test \
+            .
+
+      - name: Build the cell-type-specific test image
+        run: |
+          set -euo pipefail
+          docker build \
+            --file envs/CellTypeSpecificExpression/Dockerfile \
+            --tag cell-type-specific-expression:test \
+            .
+
+      - name: Run the cell-type-specific R suite
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            cell-type-specific-expression:test \
+            Rscript scripts/cell_type_specific_expression/lint_r.R
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            cell-type-specific-expression:test \
+            Rscript tests/cell_type_specific_expression/testthat.R
+
+      - name: Test pre-normalized expression in the standard image
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
+            prepare-qtl:test \
+            Rscript tests/test_prepare_expression_log2_cpm.R
+
+      - name: Run the dtangle end-to-end smoke workflow
+        run: |
+          set -euo pipefail
+          run_directory="$PWD/ci-runs/dtangle"
+          mkdir -p "$run_directory"
+          miniwdl run \
+            workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl \
+            --input tests/cell_type_specific_expression/fixtures/dtangle-e2e.inputs.json \
+            --dir "$run_directory/." \
+            --verbose \
+            --no-color
+
+      - name: Assert the dtangle deconvolution outputs
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --group-add "$(id -g)" \
+            --volume "$PWD:$PWD" \
+            --workdir "$PWD" \
+            cell-type-specific-expression:test \
+            Rscript tests/cell_type_specific_expression/smoke/assert_deconvolution_outputs.R \
+            "$PWD/ci-runs/dtangle/outputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures/dtangle-e2e.inputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures"
+
+      - name: Assert the dtangle QTL outputs
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --group-add "$(id -g)" \
+            --volume "$PWD:$PWD" \
+            --workdir "$PWD" \
+            prepare-qtl:test \
+            Rscript tests/cell_type_specific_expression/smoke/assert_qtl_outputs.R \
+            "$PWD/ci-runs/dtangle/outputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures/dtangle-e2e.inputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures"
+
+      - name: Run the precomputed end-to-end smoke workflow
+        run: |
+          set -euo pipefail
+          run_directory="$PWD/ci-runs/precomputed"
+          mkdir -p "$run_directory"
+          miniwdl run \
+            workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl \
+            --input tests/cell_type_specific_expression/fixtures/precomputed-e2e.inputs.json \
+            --dir "$run_directory/." \
+            --verbose \
+            --no-color
+
+      - name: Assert the precomputed deconvolution outputs
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --group-add "$(id -g)" \
+            --volume "$PWD:$PWD" \
+            --workdir "$PWD" \
+            cell-type-specific-expression:test \
+            Rscript tests/cell_type_specific_expression/smoke/assert_deconvolution_outputs.R \
+            "$PWD/ci-runs/precomputed/outputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures/precomputed-e2e.inputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures"
+
+      - name: Assert the precomputed QTL outputs
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --group-add "$(id -g)" \
+            --volume "$PWD:$PWD" \
+            --workdir "$PWD" \
+            prepare-qtl:test \
+            Rscript tests/cell_type_specific_expression/smoke/assert_qtl_outputs.R \
+            "$PWD/ci-runs/precomputed/outputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures/precomputed-e2e.inputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures"
+
+      - name: Upload failure logs, manifests, and QC files
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cell-type-specific-expression-failure-${{ github.run_id }}
+          path: |
+            ci-runs/**/*.log
+            ci-runs/**/stdout.txt
+            ci-runs/**/stderr.txt
+            ci-runs/**/error.json
+            ci-runs/**/outputs.json
+            ci-runs/**/*manifest*.json
+            ci-runs/**/*manifest*.tsv
+            ci-runs/**/*inventory*.tsv
+            ci-runs/**/qc*.tsv
+            ci-runs/**/qc*.pdf
+            ci-runs/**/*outliers*.tsv
+          if-no-files-found: warn
