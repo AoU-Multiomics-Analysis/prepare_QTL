@@ -82,6 +82,24 @@ testthat::test_that("scatter contract rejects duplicate public identifiers", {
   )
 })
 
+testthat::test_that("scatter contract requires canonical safe slug tokens", {
+  inventory <- make_scatter_inventory()
+  unsafe_slugs <- c(
+    "cd4/t_cells", "../unsafe", "..", "cd4 t cells", "cd4$t_cells"
+  )
+
+  purrr::walk(unsafe_slugs, function(unsafe_slug) {
+    testthat::expect_error(
+      prepare_scatter_contract(
+        dplyr::mutate(inventory, slug = c(unsafe_slug, "monocytes")),
+        inventory$path,
+        "cohort"
+      ),
+      "safe filename tokens"
+    )
+  })
+})
+
 testthat::test_that("scatter contract validates scale and dimensions", {
   inventory <- make_scatter_inventory()
 

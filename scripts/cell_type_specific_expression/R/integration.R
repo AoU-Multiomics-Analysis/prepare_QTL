@@ -21,6 +21,14 @@ validate_scatter_positive_dimension <- function(values, label) {
   invisible(TRUE)
 }
 
+validate_scatter_safe_slugs <- function(slugs) {
+  canonical_slug_pattern <- "^[a-z0-9]+(_[a-z0-9]+)*$"
+  if (!all(grepl(canonical_slug_pattern, slugs))) {
+    stop("Inventory slugs must be safe filename tokens", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 validate_scatter_inventory <- function(inventory) {
   if (!inherits(inventory, "data.frame") ||
       !identical(names(inventory), scatter_inventory_columns)) {
@@ -32,6 +40,7 @@ validate_scatter_inventory <- function(inventory) {
 
   validate_scatter_nonempty_unique(inventory$cell_group, "cell types")
   validate_scatter_nonempty_unique(inventory$slug, "slugs")
+  validate_scatter_safe_slugs(inventory$slug)
   validate_scatter_nonempty_unique(inventory$path, "paths")
   validate_scatter_nonempty_unique(inventory$logical_name, "logical names")
   if (!is.character(inventory$scale) || anyNA(inventory$scale) ||
