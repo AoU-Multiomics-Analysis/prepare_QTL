@@ -174,12 +174,12 @@ testthat::test_that("TCA fit reads a direct CPM BED", {
     warn = FALSE
   ), collapse = "\n")
   testthat::expect_match(text, '"--expression"', fixed = TRUE)
-  testthat::expect_match(text, '"--log2-pseudocount"', fixed = TRUE)
   testthat::expect_match(
     text,
-    "make_tca_expression(expression, log2_pseudocount)",
+    "make_tca_expression(expression)",
     fixed = TRUE
   )
+  testthat::expect_false(grepl('"--log2-pseudocount"', text, fixed = TRUE))
 })
 
 testthat::test_that("one model fits all genes without refitting weights", {

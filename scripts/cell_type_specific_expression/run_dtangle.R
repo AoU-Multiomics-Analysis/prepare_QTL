@@ -18,7 +18,10 @@ run_dtangle_stage <- function() {
       dest = "log2_pseudocount",
       type = "double",
       default = 0,
-      help = "Non-negative pseudocount added before the one log2 transform."
+      help = paste(
+        "Non-negative pseudocount added to bulk CPM and LM22 before",
+        "their dtangle log2 transforms."
+      )
     ),
     optparse::make_option(
       "--gtf",
@@ -84,10 +87,7 @@ run_dtangle_stage <- function() {
 
   message(sprintf("stage=dtangle utc_start=%s", utc_time()))
   lm22_linear <- standardize_lm22(read_lm22_matrix(options$lm22))
-  expression <- read_expression_bed(
-    options$expression,
-    options$log2_pseudocount
-  )
+  expression <- read_expression_bed(options$expression)
   annotation <- read_gtf_gene_annotation(options$gtf)
   dtangle_expression <- make_dtangle_expression(
     expression,
@@ -114,7 +114,8 @@ run_dtangle_stage <- function() {
     bulk_log = bulk_log,
     lm22_linear = lm22_linear,
     min_overlap = options$min_overlap,
-    quantile_normalize = options$quantile_normalize
+    quantile_normalize = options$quantile_normalize,
+    log2_pseudocount = dtangle_expression$log2_pseudocount
   )
   message(sprintf(
     "stage=dtangle overlap=shared_genes:%d overlap_fraction:%.3f",

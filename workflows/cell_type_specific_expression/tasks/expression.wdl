@@ -19,7 +19,7 @@ task FilterExpressionGenes {
     stage="filter_expression_genes"
     log="$stage.log"
     status=0
-    printf 'stage=%s start_time=%s gene_types=%s\n' \
+    printf 'stage=%s start_time=%s dimensions=pending gene_types=%s\n' \
       "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '~{sep="," gene_type}' | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs

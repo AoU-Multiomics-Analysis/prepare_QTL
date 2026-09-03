@@ -110,7 +110,6 @@ workflow CellTypeDeconvolution {
   call tca_tasks.FitTca {
     input:
       expression = FilterExpressionGenes.expression,
-      log2_pseudocount = log2_pseudocount,
       tca_weights = ProcessProportions.tca_weights,
       covariates = covariates,
       max_iters = tca_max_iters,
@@ -127,7 +126,6 @@ workflow CellTypeDeconvolution {
   call tca_tasks.ExportTcaBeds {
     input:
       expression = FilterExpressionGenes.expression,
-      log2_pseudocount = log2_pseudocount,
       model = FitTca.model,
       tca_weights = ProcessProportions.tca_weights,
       covariates = covariates,
@@ -143,7 +141,6 @@ workflow CellTypeDeconvolution {
   call qc_tasks.BuildManifest {
     input:
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
-      cell_type_beds = ExportTcaBeds.cell_type_beds,
       export_qc_summary = ExportTcaBeds.qc_summary,
       export_qc_plots = ExportTcaBeds.qc_plots,
       model = FitTca.model,
@@ -165,7 +162,7 @@ workflow CellTypeDeconvolution {
       tca_parallel = tca_parallel,
       gene_type = gene_type,
       random_seed = random_seed,
-      scale = "log2_cpm",
+      scale = "cpm",
       tca_version = tca_version,
       container_image = deconvolution_docker_image,
       docker_image = deconvolution_docker_image,

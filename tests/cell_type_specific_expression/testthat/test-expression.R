@@ -9,7 +9,7 @@ testthat::test_that("log2 pseudocount validation accepts finite non-negative val
   testthat::expect_error(validate_log2_pseudocount(Inf), "finite")
 })
 
-testthat::test_that("pseudocount permits zero CPM and transforms the TCA view", {
+testthat::test_that("TCA uses linear CPM and accepts zero values", {
   expression <- list(
     coordinates = tibble::tibble(
       `#chr` = "chr1", start = 0L, end = 1L, gene_id = "g1"
@@ -21,11 +21,7 @@ testthat::test_that("pseudocount permits zero CPM and transforms the TCA view", 
     )
   )
 
-  testthat::expect_error(make_tca_expression(expression, 0), "strictly positive")
-  testthat::expect_equal(
-    unname(make_tca_expression(expression, 1)),
-    unname(log2(expression$cpm + 1))
-  )
+  testthat::expect_equal(make_tca_expression(expression), expression$cpm)
 })
 
 testthat::test_that("dtangle adds the pseudocount after duplicate-symbol aggregation", {
@@ -246,7 +242,7 @@ testthat::test_that("direct CPM views separate TCA genes from dtangle symbols", 
   dtangle_expression <- make_dtangle_expression(expression, annotation)
 
   testthat::expect_identical(rownames(tca_expression), c("ENSG1", "ENSG2", "ENSG3"))
-  testthat::expect_equal(unname(tca_expression[, "S1"]), log2(c(4, 16, 64)))
+  testthat::expect_equal(unname(tca_expression[, "S1"]), c(4, 16, 64))
   testthat::expect_identical(rownames(dtangle_expression$log_expression), "MARKER")
   testthat::expect_equal(unname(dtangle_expression$log_expression[1, ]), log2(c(20, 40)))
 })
@@ -331,7 +327,7 @@ testthat::test_that("BED validation rejects negative, missing, and nonfinite CPM
   }
 })
 
-testthat::test_that("BED validation permits zero CPM only with a positive pseudocount", {
+testthat::test_that("BED validation accepts zero CPM without a pseudocount", {
   path <- tempfile(fileext = ".bed")
   readr::write_tsv(
     tibble::tibble(
@@ -340,9 +336,8 @@ testthat::test_that("BED validation permits zero CPM only with a positive pseudo
     path
   )
 
-  testthat::expect_error(read_expression_bed(path), "strictly positive")
   testthat::expect_equal(
-    unname(read_expression_bed(path, 1)$cpm),
+    unname(read_expression_bed(path)$cpm),
     matrix(0, nrow = 1L)
   )
 })

@@ -1,5 +1,6 @@
 scatter_inventory_columns <- c(
-  "logical_name", "path", "n_genes", "n_samples", "scale", "cell_group", "slug"
+  "logical_name", "path", "sha256", "n_genes", "n_samples", "scale",
+  "cell_group", "slug"
 )
 
 validate_scatter_nonempty_unique <- function(values, label) {
@@ -61,9 +62,13 @@ validate_scatter_inventory <- function(inventory) {
   validate_scatter_safe_slugs(inventory$slug)
   validate_scatter_nonempty_unique(inventory$path, "paths")
   validate_scatter_nonempty_unique(inventory$logical_name, "logical names")
+  if (!is.character(inventory$sha256) || anyNA(inventory$sha256) ||
+      any(!grepl("^[0-9a-f]{64}$", inventory$sha256))) {
+    stop("Inventory sha256 values must be lowercase SHA-256 checksums", call. = FALSE)
+  }
   if (!is.character(inventory$scale) || anyNA(inventory$scale) ||
-      any(inventory$scale != "log2_cpm")) {
-    stop("Inventory scale must be log2_cpm", call. = FALSE)
+      any(inventory$scale != "cpm")) {
+    stop("Inventory scale must be cpm", call. = FALSE)
   }
   validate_scatter_positive_dimension(inventory$n_genes, "n_genes")
   validate_scatter_positive_dimension(inventory$n_samples, "n_samples")
@@ -81,15 +86,17 @@ validate_scatter_bed_paths <- function(bed_paths, expected_paths) {
   if (length(bed_paths) != length(expected_paths)) {
     stop("BED path count must match inventory row count", call. = FALSE)
   }
-  if (!identical(basename(bed_paths), expected_paths)) {
-    stop("BED basenames must match inventory paths in order", call. = FALSE)
+  bed_basenames <- basename(bed_paths)
+  if (anyDuplicated(bed_basenames) > 0L ||
+      !setequal(bed_basenames, expected_paths)) {
+    stop("BED basenames must match inventory paths", call. = FALSE)
   }
-  invisible(TRUE)
+  bed_paths[match(expected_paths, bed_basenames)]
 }
 
 prepare_scatter_contract <- function(inventory, bed_paths, output_prefix) {
   validate_scatter_inventory(inventory)
-  validate_scatter_bed_paths(bed_paths, inventory$path)
+  bed_paths <- validate_scatter_bed_paths(bed_paths, inventory$path)
   validate_output_prefix_token(output_prefix)
 
   tibble::tibble(

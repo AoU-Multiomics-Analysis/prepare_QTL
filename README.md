@@ -30,7 +30,7 @@ prepare_QTL/
 
 ## Main Workflows
 
-- [`workflows/cell_type_specific_expression/deconvolution.wdl`](workflows/cell_type_specific_expression/deconvolution.wdl): Estimates or accepts LM22 proportions and uses TCA to create one log2-CPM BED for each retained major cell type.
+- [`workflows/cell_type_specific_expression/deconvolution.wdl`](workflows/cell_type_specific_expression/deconvolution.wdl): Estimates or accepts LM22 proportions and uses TCA on linear CPM to create one BED for each retained major cell type.
 - [`workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl`](workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl): Runs deconvolution and prepares an independent set of INT and scaled QTL inputs for each retained cell type.
 - [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files from raw counts or a pre-normalized log2-CPM BED, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.
 - [`workflows/splicing/prepare_sQTL.wdl`](workflows/splicing/prepare_sQTL.wdl): Prepares INT, scaled, and raw splice BED files, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.

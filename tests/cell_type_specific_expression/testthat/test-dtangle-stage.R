@@ -1,5 +1,10 @@
 source(testthat::test_path("helper-load.R"), local = .GlobalEnv)
 
+expression_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "R", "expression.R")
+if (file.exists(expression_path)) {
+  source(expression_path, local = .GlobalEnv)
+}
+
 dtangle_stage_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "R", "dtangle_stage.R")
 if (file.exists(dtangle_stage_path)) {
   source(dtangle_stage_path, local = .GlobalEnv)
@@ -30,6 +35,26 @@ testthat::test_that("standard LM22 is logged without a pseudocount", {
   observed <- transform_lm22(lm22)
 
   testthat::expect_equal(observed, log2(lm22))
+})
+
+testthat::test_that("LM22 uses the same log2 pseudocount as bulk CPM", {
+  lm22 <- matrix(
+    rep(c(1, 3, 7), each = 22), nrow = 3, byrow = TRUE,
+    dimnames = list(c("G1", "G2", "G3"), lm22_cell_types())
+  )
+  bulk_log <- matrix(
+    log2(c(5, 9, 17)), ncol = 1L,
+    dimnames = list(rownames(lm22), "S1")
+  )
+
+  inputs <- prepare_dtangle_inputs(
+    bulk_log,
+    lm22,
+    min_overlap = 1,
+    log2_pseudocount = 1
+  )
+
+  testthat::expect_equal(inputs$transformed_lm22, log2(lm22 + 1))
 })
 
 testthat::test_that("LM22 rejects zero and missing cell types", {

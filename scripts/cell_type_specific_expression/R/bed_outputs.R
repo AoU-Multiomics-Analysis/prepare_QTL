@@ -163,7 +163,7 @@ extract_full_tensor <- function(
   append_tensor_log(
     log_file,
     sprintf(
-      "stage=tensor_extract event=extract_start genes=%d samples=%d sources=%d num_cores=%d parallel=%s scale=log2_cpm tca_version=%s",
+      "stage=tensor_extract event=extract_start genes=%d samples=%d sources=%d num_cores=%d parallel=%s scale=cpm tca_version=%s",
       nrow(X), ncol(X), ncol(model$W), num_cores,
       tolower(as.character(parallel)), tca_version
     )
@@ -199,7 +199,7 @@ extract_full_tensor <- function(
   validate_tensor_contract(tensor, rownames(X), colnames(X), colnames(model$W))
   append_tensor_log(
     log_file,
-    "stage=tensor_extract event=extract_complete scale=log2_cpm"
+    "stage=tensor_extract event=extract_complete scale=cpm"
   )
   tensor
 }
@@ -227,12 +227,20 @@ write_cell_type_beds <- function(tensor, coordinates, output_dir) {
   purrr::iwalk(paths, function(path, cell_group) {
     write_expression_bed(path, coordinates, tensor[[cell_group]])
   })
+  if (!requireNamespace("digest", quietly = TRUE)) {
+    stop("The digest package is required for SHA-256 checksums", call. = FALSE)
+  }
+  sha256 <- purrr::map_chr(
+    unname(paths),
+    ~ digest::digest(file = .x, algo = "sha256", serialize = FALSE)
+  )
   inventory <- tibble::tibble(
     logical_name = paste0(slugify_cell_group(names(paths)), "_expression"),
     path = basename(unname(paths)),
+    sha256 = sha256,
     n_genes = nrow(tensor[[1L]]),
     n_samples = ncol(tensor[[1L]]),
-    scale = "log2_cpm",
+    scale = "cpm",
     cell_group = names(paths),
     slug = slugify_cell_group(names(paths))
   )

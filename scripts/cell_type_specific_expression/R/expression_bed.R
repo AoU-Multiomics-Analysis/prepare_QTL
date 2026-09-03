@@ -1,7 +1,6 @@
 expression_bed_columns <- function() c("#chr", "start", "end", "gene_id")
 
-read_expression_bed <- function(path, log2_pseudocount = 0) {
-  log2_pseudocount <- validate_log2_pseudocount(log2_pseudocount)
+read_expression_bed <- function(path) {
   table <- readr::read_tsv(
     path,
     col_types = readr::cols(.default = readr::col_character()),
@@ -54,16 +53,9 @@ read_expression_bed <- function(path, log2_pseudocount = 0) {
     as.matrix()
   rownames(cpm) <- coordinates$gene_id
   cpm <- validate_cpm_matrix(cpm)
-  if (log2_pseudocount == 0 && any(cpm == 0)) {
-    stop(
-      "strictly positive CPM values are required when log2_pseudocount is zero",
-      call. = FALSE
-    )
-  }
   list(
     coordinates = coordinates,
-    cpm = cpm,
-    log2_pseudocount = log2_pseudocount
+    cpm = cpm
   )
 }
 

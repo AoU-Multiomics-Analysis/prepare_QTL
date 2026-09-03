@@ -447,7 +447,7 @@ build_pipeline_qc_summary <- function(
 
 validate_manifest_outputs <- function(outputs) {
   required_columns <- c(
-    "logical_name", "path", "n_genes", "n_samples", "scale",
+    "logical_name", "path", "sha256", "n_genes", "n_samples", "scale",
     "cell_group"
   )
   if (!inherits(outputs, "data.frame") ||
@@ -461,22 +461,33 @@ validate_manifest_outputs <- function(outputs) {
     )
   }
   outputs <- tibble::as_tibble(outputs)
-  character_fields <- c("logical_name", "path", "scale", "cell_group")
+  character_fields <- c(
+    "logical_name", "path", "sha256", "scale", "cell_group"
+  )
   valid_character_fields <- purrr::map_lgl(
     outputs[character_fields],
     ~ is.character(.x) && !anyNA(.x) && all(nzchar(trimws(.x)))
   )
   if (!all(valid_character_fields)) {
     stop(
-      "Manifest logical names, paths, scales, and cell groups must be non-empty",
+      paste0(
+        "Manifest logical names, paths, hashes, scales, and cell groups ",
+        "must be non-empty"
+      ),
       call. = FALSE
     )
   }
   if (nrow(outputs) == 0L || anyDuplicated(outputs$logical_name) > 0L ||
       anyDuplicated(outputs$path) > 0L ||
-      anyDuplicated(outputs$cell_group) > 0L ||
-      any(!file.exists(outputs$path))) {
-    stop("Manifest outputs must be unique existing files", call. = FALSE)
+      anyDuplicated(outputs$cell_group) > 0L) {
+    stop("Manifest outputs must be unique", call. = FALSE)
+  }
+  if (any(basename(outputs$path) != outputs$path) ||
+      any(!grepl("^[0-9a-f]{64}$", outputs$sha256))) {
+    stop(
+      "Manifest outputs require stable basenames and valid SHA-256 checksums",
+      call. = FALSE
+    )
   }
   dimensions <- c(outputs$n_genes, outputs$n_samples)
   if (!is.numeric(dimensions) || anyNA(dimensions) ||
@@ -522,9 +533,6 @@ build_output_manifest <- function(
     parameters,
     container_image) {
   outputs <- validate_manifest_outputs(outputs)
-  if (!requireNamespace("digest", quietly = TRUE)) {
-    stop("The digest package is required for SHA-256 checksums", call. = FALSE)
-  }
   if (!is.list(parameters)) {
     stop("parameters must be a named list", call. = FALSE)
   }
@@ -532,6 +540,7 @@ build_output_manifest <- function(
   output_entries <- purrr::pmap(outputs, function(
       logical_name,
       path,
+      sha256,
       n_genes,
       n_samples,
       scale,
@@ -541,11 +550,7 @@ build_output_manifest <- function(
       logical_name = as.character(logical_name),
       file_name = basename(path),
       path = basename(path),
-      sha256 = digest::digest(
-        file = path,
-        algo = "sha256",
-        serialize = FALSE
-      ),
+      sha256 = as.character(sha256),
       dimensions = c(as.integer(n_genes), as.integer(n_samples)),
       scale = as.character(scale),
       cell_group = as.character(cell_group)

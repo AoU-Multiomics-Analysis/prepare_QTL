@@ -20,7 +20,7 @@ implementation modules.
 
 | Area | WDL | Use |
 | --- | --- | --- |
-| Cell-type expression | `cell_type_specific_expression/deconvolution.wdl` | Create cell-type-specific log2-CPM BED files from whole-blood linear CPM data. |
+| Cell-type expression | `cell_type_specific_expression/deconvolution.wdl` | Estimate proportions in log2 space and create cell-type-specific linear-CPM BED files with TCA. |
 | Cell-type expression | `cell_type_specific_expression/prepare_cell_type_eQTL.wdl` | Deconvolve whole blood and prepare INT and scaled QTL inputs for each retained cell type. |
 | Expression | `expression/prepare_eQTL.wdl` | Prepare expression QTL phenotypes. |
 | Proteomics | `proteomics/normalize_pQTL.wdl`, `proteomics/prepare_pQTL.wdl` | Normalize Olink data and prepare protein QTL phenotypes. |

@@ -42,8 +42,9 @@ standardize_lm22 <- function(lm22_linear) {
   lm22_linear
 }
 
-transform_lm22 <- function(lm22_linear) {
-  log2(standardize_lm22(lm22_linear))
+transform_lm22 <- function(lm22_linear, log2_pseudocount = 0) {
+  log2_pseudocount <- validate_log2_pseudocount(log2_pseudocount)
+  log2(standardize_lm22(lm22_linear) + log2_pseudocount)
 }
 
 validate_dtangle_version <- function() {
@@ -102,7 +103,8 @@ prepare_dtangle_inputs <- function(
     bulk_log,
     lm22_linear,
     min_overlap = pipeline_defaults()$min_lm22_overlap,
-    quantile_normalize = FALSE) {
+    quantile_normalize = FALSE,
+    log2_pseudocount = 0) {
   if (!is.numeric(min_overlap) || length(min_overlap) != 1L ||
       !is.finite(min_overlap) || min_overlap <= 0 || min_overlap > 1) {
     stop("min_overlap must be a finite value in (0, 1]", call. = FALSE)
@@ -112,6 +114,7 @@ prepare_dtangle_inputs <- function(
     stop("quantile_normalize must be one non-missing logical value", call. = FALSE)
   }
 
+  log2_pseudocount <- validate_log2_pseudocount(log2_pseudocount)
   lm22_linear <- standardize_lm22(lm22_linear)
   lm22_qc <- list(
     gene_count = nrow(lm22_linear),
@@ -120,7 +123,7 @@ prepare_dtangle_inputs <- function(
     value_max = max(lm22_linear),
     validation_status = "passed"
   )
-  transformed_lm22 <- log2(lm22_linear)
+  transformed_lm22 <- log2(lm22_linear + log2_pseudocount)
   bulk_log <- standardize_bulk_log(bulk_log)
   overlap_report <- tibble::tibble(
     gene_symbol = rownames(transformed_lm22),
