@@ -6,6 +6,8 @@ These WDL workflows prepare molecular phenotype data for expression, splicing, a
 
 ## Shared Prepare Workflow Outputs
 
+For individual RNA-SeQC outputs, first use [`rnaseqc2_aggregate_batched.wdl`](../workflows/expression/rnaseqc2_aggregate_batched.wdl) to build cohort GCT and metrics files from one sample manifest. See the [RNA-SeQC aggregation guide](rnaseqc2-aggregation.md) for file naming, batch settings, and validation.
+
 The eQTL, pQTL, and sQTL prepare workflows now compute both molecular phenotype transformations:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
