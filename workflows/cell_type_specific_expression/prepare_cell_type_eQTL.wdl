@@ -36,10 +36,10 @@ workflow PrepareCellTypeEqtlWorkflow {
     String proportions_memory = "16 GB"
     Int proportions_disk_gb = 50
     Int fit_cpu = 16
-    String fit_memory = "192 GB"
+    String fit_memory = "256 GB"
     Int fit_disk_gb = 750
     Int export_cpu = 8
-    String export_memory = "128 GB"
+    String export_memory = "256 GB"
     Int export_disk_gb = 500
     Int manifest_cpu = 4
     String manifest_memory = "32 GB"

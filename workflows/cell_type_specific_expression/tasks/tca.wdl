@@ -10,7 +10,7 @@ task FitTca {
     Int random_seed = 20260901
     String docker_image
     Int cpu = 16
-    String memory = "192 GB"
+    String memory = "256 GB"
     Int disk_gb = 750
     Int preemptible_attempts = 0
     Int max_retries = 1
@@ -77,7 +77,7 @@ task ExportTcaBeds {
     File? covariates
     String docker_image
     Int cpu = 8
-    String memory = "128 GB"
+    String memory = "256 GB"
     Int disk_gb = 500
     Int preemptible_attempts = 0
     Int max_retries = 1

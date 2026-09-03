@@ -28,6 +28,46 @@ testthat::test_that("standalone deconvolution sources use WDL 1.0", {
   })
 })
 
+testthat::test_that("TCA task memory defaults are 256 GB", {
+  text <- wdl_text("tasks", "tca.wdl")
+  task_names <- c("FitTca", "ExportTcaBeds")
+
+  purrr::walk(task_names, function(task_name) {
+    input_block <- stringr::str_extract(
+      text,
+      paste0("task ", task_name, " \\{\\n  input \\{[\\s\\S]*?\\n  \\}")
+    )
+    testthat::expect_false(is.na(input_block), info = task_name)
+    testthat::expect_match(
+      input_block,
+      'String memory = "256 GB"',
+      fixed = TRUE,
+      info = task_name
+    )
+  })
+})
+
+testthat::test_that("TCA smoke fixtures retain 8 GB overrides", {
+  fixture_names <- c("dtangle-e2e.inputs.json", "precomputed-e2e.inputs.json")
+
+  purrr::walk(fixture_names, function(fixture_name) {
+    inputs <- jsonlite::read_json(
+      testthat::test_path("..", "fixtures", fixture_name),
+      simplifyVector = TRUE
+    )
+    testthat::expect_identical(
+      inputs[["PrepareCellTypeEqtlWorkflow.fit_memory"]],
+      "8 GB",
+      info = fixture_name
+    )
+    testthat::expect_identical(
+      inputs[["PrepareCellTypeEqtlWorkflow.export_memory"]],
+      "8 GB",
+      info = fixture_name
+    )
+  })
+})
+
 testthat::test_that("workflow records and forwards the log2 pseudocount", {
   text <- wdl_text("deconvolution.wdl")
 

@@ -51,10 +51,10 @@ a value.
 | `proportions_memory` | `String` | `"16 GB"` | Memory for proportion processing. |
 | `proportions_disk_gb` | `Int` | `50` | Local disk in GB for proportion processing. |
 | `fit_cpu` | `Int` | `16` | CPU count for TCA fitting. |
-| `fit_memory` | `String` | `"192 GB"` | Memory for TCA fitting. |
+| `fit_memory` | `String` | `"256 GB"` | Memory for TCA fitting. |
 | `fit_disk_gb` | `Int` | `750` | Local disk in GB for TCA fitting. |
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
-| `export_memory` | `String` | `"128 GB"` | Memory for TCA BED export. |
+| `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
@@ -91,10 +91,10 @@ a value.
 | `proportions_memory` | `String` | `"16 GB"` | Memory for proportion processing. |
 | `proportions_disk_gb` | `Int` | `50` | Local disk in GB for proportion processing. |
 | `fit_cpu` | `Int` | `16` | CPU count for TCA fitting. |
-| `fit_memory` | `String` | `"192 GB"` | Memory for TCA fitting. |
+| `fit_memory` | `String` | `"256 GB"` | Memory for TCA fitting. |
 | `fit_disk_gb` | `Int` | `750` | Local disk in GB for TCA fitting. |
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
-| `export_memory` | `String` | `"128 GB"` | Memory for TCA BED export. |
+| `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
