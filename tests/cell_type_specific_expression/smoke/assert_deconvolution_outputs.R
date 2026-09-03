@@ -169,18 +169,15 @@ require_true(
 )
 require_true(all(is.finite(expression_values)), "The input CPM values must be finite")
 require_true(all(expression_values >= 0), "The input CPM values must be non-negative")
-if (log2_pseudocount == 0) {
-  require_true(all(expression_values > 0), "Pseudocount zero requires positive CPM")
-} else {
-  require_true(any(expression_values == 0), "The positive-pseudocount fixture needs zero CPM")
-}
-
 lm22_key <- paste(workflow_name, "lm22", sep = ".")
 precomputed_key <- paste(workflow_name, "precomputed_proportions", sep = ".")
 has_lm22 <- !is.null(inputs[[lm22_key]])
 has_precomputed <- !is.null(inputs[[precomputed_key]])
 require_true(has_lm22, "The fixture must provide the required LM22 reference")
 expected_proportion_mode <- if (has_precomputed) "precomputed" else "dtangle"
+if (identical(expected_proportion_mode, "dtangle") && log2_pseudocount == 0) {
+  require_true(all(expression_values > 0), "Pseudocount zero requires positive CPM")
+}
 
 proportions <- read_matrix_table("proportions_lm22", "sample_id")
 combined <- read_matrix_table("proportions_combined", "sample_id")
@@ -388,7 +385,7 @@ require_true(
 require_true(
   all(inventory$n_genes == length(expected_gene_ids)) &&
     all(inventory$n_samples == length(expected_samples)) &&
-    all(inventory$scale == "log2_cpm"),
+    all(inventory$scale == "cpm"),
   "The BED inventory dimensions or scale are incorrect"
 )
 require_true(
@@ -453,7 +450,7 @@ require_true(
       input_value("gene_type")
     ) &&
     numeric_parameter("random_seed") == 20260901 &&
-    identical(parameters$scale, "log2_cpm") &&
+    identical(parameters$scale, "cpm") &&
     identical(manifest$tca_version, "1.2.1"),
   "The deconvolution manifest parameters are incorrect"
 )
@@ -469,7 +466,7 @@ purrr::walk(manifest$outputs, function(entry) {
   require_true(
     identical(entry$path, entry$file_name) &&
       grepl("^[^/]+[.]bed[.]gz$", entry$path) &&
-      identical(entry$scale, "log2_cpm") &&
+      identical(entry$scale, "cpm") &&
       length(entry$sha256) == 1L && grepl("^[0-9a-f]{64}$", entry$sha256),
     "A deconvolution manifest output is not portable"
   )

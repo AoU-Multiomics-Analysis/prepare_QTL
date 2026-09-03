@@ -62,8 +62,8 @@ validate_scatter_inventory <- function(inventory) {
   validate_scatter_nonempty_unique(inventory$path, "paths")
   validate_scatter_nonempty_unique(inventory$logical_name, "logical names")
   if (!is.character(inventory$scale) || anyNA(inventory$scale) ||
-      any(inventory$scale != "log2_cpm")) {
-    stop("Inventory scale must be log2_cpm", call. = FALSE)
+      any(inventory$scale != "cpm")) {
+    stop("Inventory scale must be cpm", call. = FALSE)
   }
   validate_scatter_positive_dimension(inventory$n_genes, "n_genes")
   validate_scatter_positive_dimension(inventory$n_samples, "n_samples")

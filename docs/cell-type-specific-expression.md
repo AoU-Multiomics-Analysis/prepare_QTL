@@ -44,7 +44,7 @@ a value.
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
 | `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
-| `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
+| `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value added to bulk CPM and LM22 before their dtangle-only log2 transforms. |
 | `gene_type` | `Array[String]` | `["protein_coding", "lncRNA"]` | Exact GTF gene types to retain before dtangle and TCA. Values must be non-empty and unique. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
 | `dtangle_memory` | `String` | `"32 GB"` | Memory for the dtangle task. |
@@ -86,7 +86,7 @@ a value.
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
 | `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
-| `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
+| `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value added to bulk CPM and LM22 before their dtangle-only log2 transforms. |
 | `gene_type` | `Array[String]` | `["protein_coding", "lncRNA"]` | Exact GTF gene types to retain before dtangle and TCA. Values must be non-empty and unique. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
 | `dtangle_memory` | `String` | `"32 GB"` | Memory for the dtangle task. |
@@ -148,21 +148,24 @@ intersection. It removes constant genes before TCA. For each modeled,
 nonconstant gene, the exported cell-type BED preserves the input coordinate and
 modeled-gene order.
 
-`log2_pseudocount` defaults to `0`. When `log2_pseudocount` is `0`, all CPM
-values must be strictly positive. Zero CPM values are valid only when
-`log2_pseudocount` is greater than zero. Negative CPM values are always
-invalid. The pseudocount must be finite and nonnegative.
+`log2_pseudocount` defaults to `0` and applies only to dtangle. In dtangle
+mode, zero bulk CPM requires a positive pseudocount. Negative CPM values are
+always invalid. The pseudocount must be finite and nonnegative. TCA accepts
+zero CPM and does not use this pseudocount.
 
-dtangle and TCA apply `log2(CPM + log2_pseudocount)` exactly once. Duplicate
-gene symbols are first combined in linear CPM for the dtangle view. TCA uses
-valid, nonconstant gene-ID rows. Each exported cell-type BED is in log2-CPM
-space. The workflow does not store a separate transformed bulk-expression
-matrix. The export task rebuilds the TCA view from `filtered_expression` and
-removes the same constant genes before tensor extraction.
+For proportion estimation, dtangle uses `log2(CPM + log2_pseudocount)` for the
+bulk matrix and `log2(LM22 + log2_pseudocount)` for the reference matrix.
+Duplicate gene symbols are combined in linear CPM before the bulk transform.
+TCA uses valid, nonconstant gene-ID rows directly in linear CPM. Each exported
+cell-type BED is on the linear-CPM model scale. The workflow does not store a
+separate transformed bulk-expression matrix. The export task rebuilds the
+linear TCA view from `filtered_expression` and removes the same constant genes
+before tensor extraction.
 
-The integrated workflow sends each TCA BED to the `Log2CpmBed` input of
-`prepare_eQTL.wdl`. The QTL step does not apply a second log2 transform. It
-applies INT to one branch and direct centering and scaling to the other branch.
+For compatibility, the integrated workflow sends each linear-scale TCA BED to
+the `Log2CpmBed` input of `prepare_eQTL.wdl`. That input skips count
+normalization and transformation. The QTL step applies INT to one branch and
+direct centering and scaling to the other branch.
 
 ## Proportion modes
 

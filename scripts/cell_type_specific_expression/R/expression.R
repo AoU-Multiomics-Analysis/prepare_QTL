@@ -167,9 +167,6 @@ filter_expression_by_gene_types <- function(expression, annotation, gene_types) 
     coordinates = coordinates[retained, , drop = FALSE],
     cpm = cpm[retained, , drop = FALSE]
   )
-  if ("log2_pseudocount" %in% names(expression)) {
-    filtered_expression$log2_pseudocount <- expression$log2_pseudocount
-  }
   list(expression = filtered_expression, report = report)
 }
 
@@ -287,22 +284,15 @@ make_cpm_mapping_report <- function(cpm, annotation) {
   )
 }
 
-make_tca_expression <- function(expression, log2_pseudocount = 0) {
+make_tca_expression <- function(expression) {
   if (!is.list(expression) || !all(c("coordinates", "cpm") %in% names(expression))) {
     stop("expression must contain coordinates and cpm", call. = FALSE)
   }
-  log2_pseudocount <- validate_log2_pseudocount(log2_pseudocount)
   cpm <- validate_cpm_matrix(expression$cpm)
   if (!identical(rownames(cpm), expression$coordinates$gene_id)) {
     stop("Expression genes and BED coordinates must match exactly", call. = FALSE)
   }
-  if (log2_pseudocount == 0 && any(cpm == 0)) {
-    stop(
-      "strictly positive CPM values are required when log2_pseudocount is zero",
-      call. = FALSE
-    )
-  }
-  log2(cpm + log2_pseudocount)
+  cpm
 }
 
 make_dtangle_expression <- function(expression, annotation, log2_pseudocount = 0) {

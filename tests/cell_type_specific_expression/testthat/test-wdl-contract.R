@@ -182,24 +182,29 @@ testthat::test_that("TCA smoke fixtures retain 8 GB overrides", {
   })
 })
 
-testthat::test_that("workflow records and forwards the log2 pseudocount", {
+testthat::test_that("workflow applies the log2 pseudocount only to dtangle", {
   text <- wdl_text("deconvolution.wdl")
 
   testthat::expect_match(text, "workflow CellTypeDeconvolution", fixed = TRUE)
   testthat::expect_match(text, "Float log2_pseudocount = 0.0", fixed = TRUE)
   testthat::expect_match(text, "log2_pseudocount = log2_pseudocount", fixed = TRUE)
 
-  calls <- c("RunDtangle", "FitTca", "ExportTcaBeds")
-  purrr::walk(calls, function(call_name) {
+  dtangle_call <- stringr::str_extract(
+    text,
+    "call [^{]+RunDtangle \\{[\\s\\S]*?\\n  \\}"
+  )
+  testthat::expect_match(
+    dtangle_call,
+    "log2_pseudocount = log2_pseudocount",
+    fixed = TRUE
+  )
+  purrr::walk(c("FitTca", "ExportTcaBeds"), function(call_name) {
     call_block <- stringr::str_extract(
       text,
       paste0("call [^{]+", call_name, " \\{[\\s\\S]*?\\n  \\}")
     )
-    testthat::expect_false(is.na(call_block), info = call_name)
-    testthat::expect_match(
-      call_block,
-      "log2_pseudocount = log2_pseudocount",
-      fixed = TRUE,
+    testthat::expect_false(
+      grepl("log2_pseudocount", call_block, fixed = TRUE),
       info = call_name
     )
   })
@@ -227,17 +232,23 @@ testthat::test_that("effective parameters are materialized inside BuildManifest"
   )
 })
 
-testthat::test_that("expression tasks forward the log2 pseudocount to scripts", {
-  task_paths <- c("dtangle.wdl", "tca.wdl")
-  purrr::walk(task_paths, function(path) {
-    text <- wdl_text("tasks", path)
-    testthat::expect_match(text, "Float log2_pseudocount", fixed = TRUE)
-    testthat::expect_match(
-      text,
-      "--log2-pseudocount '~{log2_pseudocount}'",
-      fixed = TRUE
-    )
-  })
+testthat::test_that("filter validation and dtangle receive the log2 pseudocount", {
+  dtangle_text <- wdl_text("tasks", "dtangle.wdl")
+  expression_text <- wdl_text("tasks", "expression.wdl")
+  tca_text <- wdl_text("tasks", "tca.wdl")
+  testthat::expect_match(dtangle_text, "Float log2_pseudocount", fixed = TRUE)
+  testthat::expect_match(
+    dtangle_text,
+    "--log2-pseudocount '~{log2_pseudocount}'",
+    fixed = TRUE
+  )
+  testthat::expect_match(expression_text, "Float log2_pseudocount", fixed = TRUE)
+  testthat::expect_match(
+    expression_text,
+    "--log2-pseudocount '~{log2_pseudocount}'",
+    fixed = TRUE
+  )
+  testthat::expect_false(grepl("log2_pseudocount", tca_text, fixed = TRUE))
 })
 
 testthat::test_that("migrated WDL scripts use the prepare_qtl runtime path", {

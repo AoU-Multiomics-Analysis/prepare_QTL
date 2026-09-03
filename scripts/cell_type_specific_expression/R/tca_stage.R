@@ -196,7 +196,7 @@ fit_tca_stage <- function(
     log_file,
     sprintf(
       paste0(
-        "stage=tca event=fit_start scale=log2_cpm genes=%d samples=%d ",
+        "stage=tca event=fit_start scale=cpm genes=%d samples=%d ",
         "groups=%d covariates=%d excluded_constant_genes=%d ",
         "num_cores=%d parallel=%s max_iters=%d random_seed=%d tca_version=%s"
       ),

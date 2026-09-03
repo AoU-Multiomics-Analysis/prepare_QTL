@@ -3,7 +3,6 @@ version 1.0
 task FitTca {
   input {
     File expression
-    Float log2_pseudocount
     File tca_weights
     File? covariates
     Int max_iters = 10
@@ -25,7 +24,7 @@ task FitTca {
     stage="fit_tca"
     log="$stage.log"
     status=0
-    printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
+    printf 'stage=%s start_time=%s dimensions=pending\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     covariates_path="~{covariates_path}"
     covariates_arguments=()
@@ -40,7 +39,6 @@ task FitTca {
       ~{parallel_argument} \
       --max-iters '~{max_iters}' \
       --random-seed '~{random_seed}' \
-      --log2-pseudocount '~{log2_pseudocount}' \
       --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s outputs=%s completion_time=%s\n' \
       "$stage" "model,model_log,excluded_genes" \
@@ -67,7 +65,6 @@ task FitTca {
 task ExportTcaBeds {
   input {
     File expression
-    Float log2_pseudocount
     File model
     File tca_weights
     File? covariates
@@ -102,7 +99,6 @@ task ExportTcaBeds {
       "${covariates_arguments[@]}" \
       --num-cores '~{cpu}' \
       ~{parallel_argument} \
-      --log2-pseudocount '~{log2_pseudocount}' \
       --output-dir outputs \
       --log-file outputs/export_tca_beds.log 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=%s outputs=%s completion_time=%s\n' \

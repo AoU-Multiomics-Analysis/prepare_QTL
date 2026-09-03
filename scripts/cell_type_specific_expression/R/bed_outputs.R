@@ -163,7 +163,7 @@ extract_full_tensor <- function(
   append_tensor_log(
     log_file,
     sprintf(
-      "stage=tensor_extract event=extract_start genes=%d samples=%d sources=%d num_cores=%d parallel=%s scale=log2_cpm tca_version=%s",
+      "stage=tensor_extract event=extract_start genes=%d samples=%d sources=%d num_cores=%d parallel=%s scale=cpm tca_version=%s",
       nrow(X), ncol(X), ncol(model$W), num_cores,
       tolower(as.character(parallel)), tca_version
     )
@@ -199,7 +199,7 @@ extract_full_tensor <- function(
   validate_tensor_contract(tensor, rownames(X), colnames(X), colnames(model$W))
   append_tensor_log(
     log_file,
-    "stage=tensor_extract event=extract_complete scale=log2_cpm"
+    "stage=tensor_extract event=extract_complete scale=cpm"
   )
   tensor
 }
@@ -232,7 +232,7 @@ write_cell_type_beds <- function(tensor, coordinates, output_dir) {
     path = basename(unname(paths)),
     n_genes = nrow(tensor[[1L]]),
     n_samples = ncol(tensor[[1L]]),
-    scale = "log2_cpm",
+    scale = "cpm",
     cell_group = names(paths),
     slug = slugify_cell_group(names(paths))
   )

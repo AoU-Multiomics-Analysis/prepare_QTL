@@ -18,7 +18,10 @@ run_dtangle_stage <- function() {
       dest = "log2_pseudocount",
       type = "double",
       default = 0,
-      help = "Non-negative pseudocount added before the one log2 transform."
+      help = paste(
+        "Non-negative pseudocount added to bulk CPM and LM22 before",
+        "their dtangle log2 transforms."
+      )
     ),
     optparse::make_option(
       "--gtf",
@@ -114,7 +117,8 @@ run_dtangle_stage <- function() {
     bulk_log = bulk_log,
     lm22_linear = lm22_linear,
     min_overlap = options$min_overlap,
-    quantile_normalize = options$quantile_normalize
+    quantile_normalize = options$quantile_normalize,
+    log2_pseudocount = dtangle_expression$log2_pseudocount
   )
   message(sprintf(
     "stage=dtangle overlap=shared_genes:%d overlap_fraction:%.3f",

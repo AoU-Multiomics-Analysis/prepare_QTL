@@ -4,7 +4,7 @@ make_scatter_inventory <- function() {
     path = c("cd4_t_cells.bed.gz", "monocytes.bed.gz"),
     n_genes = c(120L, 120L),
     n_samples = c(80L, 80L),
-    scale = c("log2_cpm", "log2_cpm"),
+    scale = c("cpm", "cpm"),
     cell_group = c("CD4 T cells", "Monocytes"),
     slug = c("cd4_t_cells", "monocytes")
   )
@@ -129,7 +129,7 @@ testthat::test_that("scatter contract validates scale and dimensions", {
       inventory$path,
       "cohort"
     ),
-    "log2_cpm"
+    "cpm"
   )
   testthat::expect_error(
     prepare_scatter_contract(
