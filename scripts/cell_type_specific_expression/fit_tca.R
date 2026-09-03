@@ -39,6 +39,12 @@ run_tca_stage <- function() {
       help = "Number of CPU cores for the cohort-wide TCA fit."
     ),
     optparse::make_option(
+      "--parallel",
+      action = "store_true",
+      default = FALSE,
+      help = "Enable parallel execution in TCA."
+    ),
+    optparse::make_option(
       "--max-iters",
       dest = "max_iters",
       type = "integer",
@@ -73,6 +79,7 @@ run_tca_stage <- function() {
     )
   }
   log2_pseudocount <- validate_log2_pseudocount(options$log2_pseudocount)
+  tca_parallel <- validate_boolean_flag(options$parallel, "parallel")
 
   dir.create(options$output_dir, recursive = TRUE, showWarnings = FALSE)
   output_paths <- list(
@@ -118,8 +125,9 @@ run_tca_stage <- function() {
   message(dimension_message)
   append_tca_log(tca_log_path, dimension_message)
   settings_message <- sprintf(
-    "stage=tca settings=num_cores:%d max_iters:%d random_seed:%d log2_pseudocount:%g",
+    "stage=tca settings=num_cores:%d parallel:%s max_iters:%d random_seed:%d log2_pseudocount:%g",
     options$num_cores,
+    tolower(as.character(tca_parallel)),
     options$max_iters,
     options$random_seed,
     log2_pseudocount
@@ -138,11 +146,13 @@ run_tca_stage <- function() {
     W = W,
     C2 = C2,
     num_cores = options$num_cores,
+    parallel = tca_parallel,
     max_iters = options$max_iters,
     random_seed = options$random_seed,
     log_file = output_paths$model_log
   )
   result$model$log2_pseudocount <- log2_pseudocount
+  result$model$tca_parallel <- tca_parallel
   saveRDS(result$model, output_paths$model)
   write_numeric_matrix(result$X, output_paths$expression, "gene_id")
   readr::write_tsv(result$excluded_genes, output_paths$excluded_genes, na = "")

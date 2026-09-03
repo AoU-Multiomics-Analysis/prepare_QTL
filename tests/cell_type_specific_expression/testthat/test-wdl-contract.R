@@ -47,6 +47,44 @@ testthat::test_that("TCA task memory defaults are 256 GB", {
   })
 })
 
+testthat::test_that("TCA parallel execution is explicit and disabled by default", {
+  task_text <- wdl_text("tasks", "tca.wdl")
+  workflow_text <- wdl_text("deconvolution.wdl")
+  integrated_text <- wdl_text("prepare_cell_type_eQTL.wdl")
+
+  testthat::expect_equal(
+    stringr::str_count(task_text, stringr::fixed("Boolean parallel = false")),
+    2L
+  )
+  testthat::expect_equal(
+    stringr::str_count(task_text, stringr::fixed('if parallel then "--parallel" else ""')),
+    2L
+  )
+  testthat::expect_equal(
+    stringr::str_count(task_text, stringr::fixed("~{parallel_argument}")),
+    2L
+  )
+  testthat::expect_match(
+    workflow_text,
+    "Boolean tca_parallel = false",
+    fixed = TRUE
+  )
+  testthat::expect_equal(
+    stringr::str_count(workflow_text, stringr::fixed("parallel = tca_parallel")),
+    3L
+  )
+  testthat::expect_match(
+    integrated_text,
+    "Boolean tca_parallel = false",
+    fixed = TRUE
+  )
+  testthat::expect_match(
+    integrated_text,
+    "tca_parallel = tca_parallel",
+    fixed = TRUE
+  )
+})
+
 testthat::test_that("TCA smoke fixtures retain 8 GB overrides", {
   fixture_names <- c("dtangle-e2e.inputs.json", "precomputed-e2e.inputs.json")
 

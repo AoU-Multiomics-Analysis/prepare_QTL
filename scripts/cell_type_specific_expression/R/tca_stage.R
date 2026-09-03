@@ -148,6 +148,29 @@ validate_tca_version <- function() {
   observed_version
 }
 
+build_tca_fit_arguments <- function(
+    X,
+    W,
+    C2,
+    num_cores,
+    max_iters,
+    log_file,
+    parallel) {
+  list(
+    X = X,
+    W = W,
+    C2 = C2,
+    refit_W = FALSE,
+    vars.mle = FALSE,
+    constrain_mu = FALSE,
+    parallel = parallel,
+    num_cores = num_cores,
+    max_iters = max_iters,
+    log_file = log_file,
+    verbose = TRUE
+  )
+}
+
 fit_tca_stage <- function(
     X,
     W,
@@ -155,9 +178,11 @@ fit_tca_stage <- function(
     num_cores = 1L,
     max_iters = 10L,
     random_seed = 20260901L,
-    log_file) {
+    log_file,
+    parallel = FALSE) {
   validate_tca_inputs(X, W, C2)
   num_cores <- validate_positive_integer(num_cores, "num_cores")
+  parallel <- validate_boolean_flag(parallel, "parallel")
   max_iters <- validate_positive_integer(max_iters, "max_iters")
   random_seed <- validate_positive_integer(random_seed, "random_seed")
   filtered <- remove_constant_features(X)
@@ -173,7 +198,7 @@ fit_tca_stage <- function(
       paste0(
         "stage=tca event=fit_start scale=log2_cpm genes=%d samples=%d ",
         "groups=%d covariates=%d excluded_constant_genes=%d ",
-        "num_cores=%d max_iters=%d random_seed=%d tca_version=%s"
+        "num_cores=%d parallel=%s max_iters=%d random_seed=%d tca_version=%s"
       ),
       nrow(X),
       ncol(X),
@@ -181,6 +206,7 @@ fit_tca_stage <- function(
       if (is.null(C2)) 0L else ncol(C2),
       nrow(filtered$report),
       num_cores,
+      tolower(as.character(parallel)),
       max_iters,
       random_seed,
       tca_version
@@ -188,20 +214,17 @@ fit_tca_stage <- function(
   )
 
   set.seed(random_seed)
+  tca_arguments <- build_tca_fit_arguments(
+    X = X,
+    W = W,
+    C2 = C2,
+    num_cores = num_cores,
+    max_iters = max_iters,
+    log_file = log_file,
+    parallel = parallel
+  )
   model <- tryCatch(
-    TCA::tca(
-      X = X,
-      W = W,
-      C2 = C2,
-      refit_W = FALSE,
-      vars.mle = FALSE,
-      constrain_mu = FALSE,
-      parallel = num_cores > 1L,
-      num_cores = num_cores,
-      max_iters = max_iters,
-      log_file = log_file,
-      verbose = TRUE
-    ),
+    do.call(TCA::tca, tca_arguments),
     error = function(error) {
       append_tca_log(
         log_file,

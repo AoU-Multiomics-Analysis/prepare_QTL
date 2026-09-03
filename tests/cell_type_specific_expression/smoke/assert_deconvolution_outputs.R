@@ -57,6 +57,14 @@ output_value <- function(name) {
   value
 }
 
+expected_tca_parallel <- input_value("tca_parallel")
+require_true(
+  is.logical(expected_tca_parallel) &&
+    length(expected_tca_parallel) == 1L &&
+    !is.na(expected_tca_parallel),
+  "The tca_parallel workflow input must be true or false"
+)
+
 read_matrix_path <- function(path, id_column, label) {
   table <- readr::read_tsv(
     path,
@@ -394,7 +402,7 @@ required_parameter_names <- c(
   "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
   "dtangle_marker_fraction", "dtangle_marker_method",
   "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
-  "tca_max_iters", "random_seed", "scale"
+  "tca_max_iters", "tca_parallel", "random_seed", "scale"
 )
 numeric_parameter <- function(name) as.numeric(parameters[[name]])
 require_true(
@@ -417,6 +425,7 @@ require_true(
     numeric_parameter("group_mean_threshold") == 0.0001 &&
     numeric_parameter("zero_floor") == 0.000001 &&
     numeric_parameter("tca_max_iters") == 10 &&
+    identical(parameters$tca_parallel, expected_tca_parallel) &&
     numeric_parameter("random_seed") == 20260901 &&
     identical(parameters$scale, "log2_cpm") &&
     identical(manifest$tca_version, "1.2.1"),
@@ -450,8 +459,29 @@ require_true(
 )
 require_true(
   identical(effective_parameters$proportion_mode, expected_proportion_mode) &&
-    as.numeric(effective_parameters$log2_pseudocount) == log2_pseudocount,
+    as.numeric(effective_parameters$log2_pseudocount) == log2_pseudocount &&
+    identical(effective_parameters$tca_parallel, expected_tca_parallel),
   "The effective-parameter file does not match the fixture"
+)
+
+tca_model <- readRDS(output_value("tca_model"))
+require_true(
+  identical(tca_model$tca_parallel, expected_tca_parallel),
+  "The TCA model metadata has an incorrect parallel setting"
+)
+parallel_log_token <- sprintf(
+  "parallel=%s",
+  tolower(as.character(expected_tca_parallel))
+)
+fit_log_lines <- readLines(output_value("tca_model_log"), warn = FALSE)
+export_log_lines <- readLines(output_value("export_detail_log"), warn = FALSE)
+require_true(
+  any(grepl(parallel_log_token, fit_log_lines, fixed = TRUE)),
+  "The TCA fit log has an incorrect parallel setting"
+)
+require_true(
+  any(grepl(parallel_log_token, export_log_lines, fixed = TRUE)),
+  "The TCA export log has an incorrect parallel setting"
 )
 
 qc_summary <- readr::read_tsv(

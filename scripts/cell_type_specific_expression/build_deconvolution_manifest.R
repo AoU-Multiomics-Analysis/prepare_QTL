@@ -124,6 +124,12 @@ run_build_manifest <- function() {
       help = "Maximum TCA iteration count."
     ),
     optparse::make_option(
+      "--tca-parallel",
+      dest = "tca_parallel",
+      type = "character",
+      help = "Whether TCA parallel execution was enabled."
+    ),
+    optparse::make_option(
       "--random-seed",
       dest = "random_seed",
       type = "integer",
@@ -175,7 +181,8 @@ run_build_manifest <- function() {
     "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
     "dtangle_marker_fraction", "dtangle_marker_method",
     "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
-    "tca_max_iters", "random_seed", "scale", "effective_parameters_output",
+    "tca_max_iters", "tca_parallel", "random_seed", "scale",
+    "effective_parameters_output",
     "container_image", "output", "qc_output"
   )
   missing_options <- required_options[vapply(
@@ -261,6 +268,10 @@ run_build_manifest <- function() {
       call. = FALSE
     )
   }
+  tca_parallel <- tolower(options$tca_parallel)
+  if (!tca_parallel %in% c("true", "false")) {
+    stop("tca_parallel must be true or false", call. = FALSE)
+  }
   parameters <- list(
     proportion_mode = options$proportion_mode,
     log2_pseudocount = validate_log2_pseudocount(
@@ -273,6 +284,7 @@ run_build_manifest <- function() {
     group_mean_threshold = options$group_mean_threshold,
     zero_floor = options$zero_floor,
     tca_max_iters = options$tca_max_iters,
+    tca_parallel = identical(tca_parallel, "true"),
     random_seed = options$random_seed,
     scale = options$scale
   )

@@ -1,3 +1,10 @@
+validate_boolean_flag <- function(value, label) {
+  if (!is.logical(value) || length(value) != 1L || is.na(value)) {
+    stop(sprintf("%s must be true or false", label), call. = FALSE)
+  }
+  value
+}
+
 validate_proportion_mode <- function(
     lm22_defined,
     precomputed_proportions_defined) {

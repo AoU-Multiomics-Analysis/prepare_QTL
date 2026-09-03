@@ -22,6 +22,7 @@ task BuildManifest {
     Float group_mean_threshold
     Float zero_floor
     Int tca_max_iters
+    Boolean tca_parallel
     Int random_seed
     String scale
     String tca_version = "1.2.1"
@@ -186,6 +187,7 @@ BED_OUTPUT_SOURCES
       --group-mean-threshold '~{group_mean_threshold}' \
       --zero-floor '~{zero_floor}' \
       --tca-max-iters '~{tca_max_iters}' \
+      --tca-parallel '~{tca_parallel}' \
       --random-seed '~{random_seed}' \
       --scale '~{scale}' \
       --effective-parameters-output outputs/effective_parameters.json \

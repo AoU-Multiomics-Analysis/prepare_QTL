@@ -26,6 +26,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     Float group_mean_threshold = 0.0001
     Float zero_floor = 0.000001
     Int tca_max_iters = 10
+    Boolean tca_parallel = false
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
 
@@ -68,6 +69,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       group_mean_threshold = group_mean_threshold,
       zero_floor = zero_floor,
       tca_max_iters = tca_max_iters,
+      tca_parallel = tca_parallel,
       random_seed = random_seed,
       log2_pseudocount = log2_pseudocount,
       dtangle_cpu = dtangle_cpu,

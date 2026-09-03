@@ -21,6 +21,7 @@ workflow CellTypeDeconvolution {
     Float group_mean_threshold = 0.0001
     Float zero_floor = 0.000001
     Int tca_max_iters = 10
+    Boolean tca_parallel = false
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
 
@@ -99,6 +100,7 @@ workflow CellTypeDeconvolution {
       covariates = covariates,
       max_iters = tca_max_iters,
       random_seed = random_seed,
+      parallel = tca_parallel,
       docker_image = deconvolution_docker_image,
       cpu = fit_cpu,
       memory = fit_memory,
@@ -115,6 +117,7 @@ workflow CellTypeDeconvolution {
       model = FitTca.model,
       tca_weights = ProcessProportions.tca_weights,
       covariates = covariates,
+      parallel = tca_parallel,
       docker_image = deconvolution_docker_image,
       cpu = export_cpu,
       memory = export_memory,
@@ -145,6 +148,7 @@ workflow CellTypeDeconvolution {
       group_mean_threshold = group_mean_threshold,
       zero_floor = zero_floor,
       tca_max_iters = tca_max_iters,
+      tca_parallel = tca_parallel,
       random_seed = random_seed,
       scale = "log2_cpm",
       tca_version = tca_version,

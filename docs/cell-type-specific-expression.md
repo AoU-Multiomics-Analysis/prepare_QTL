@@ -42,6 +42,7 @@ a value.
 | `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
 | `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
+| `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
 | `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
@@ -82,6 +83,7 @@ a value.
 | `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
 | `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
+| `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
 | `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
