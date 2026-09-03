@@ -56,11 +56,11 @@ run_build_manifest <- function() {
       help = "TCA model log with internal iteration records."
     ),
     optparse::make_option(
-      "--dtangle-metadata",
-      dest = "dtangle_metadata",
+      "--hspe-metadata",
+      dest = "hspe_metadata",
       type = "character",
       default = NULL,
-      help = "Optional dtangle metadata JSON with LM22 QC."
+      help = "Optional hspe metadata JSON with LM22 QC."
     ),
     optparse::make_option(
       "--tca-version",
@@ -73,7 +73,7 @@ run_build_manifest <- function() {
       "--proportion-mode",
       dest = "proportion_mode",
       type = "character",
-      help = "Proportion source: dtangle or precomputed."
+      help = "Proportion source: hspe or precomputed."
     ),
     optparse::make_option(
       "--log2-pseudocount",
@@ -88,22 +88,22 @@ run_build_manifest <- function() {
       help = "Minimum required LM22 gene overlap."
     ),
     optparse::make_option(
-      "--dtangle-marker-fraction",
-      dest = "dtangle_marker_fraction",
+      "--hspe-marker-fraction",
+      dest = "hspe_marker_fraction",
       type = "double",
-      help = "Fraction of markers selected for dtangle."
+      help = "Fraction of markers selected for hspe."
     ),
     optparse::make_option(
-      "--dtangle-marker-method",
-      dest = "dtangle_marker_method",
+      "--hspe-marker-method",
+      dest = "hspe_marker_method",
       type = "character",
-      help = "Marker selection method used by dtangle."
+      help = "Marker selection method used by hspe."
     ),
     optparse::make_option(
-      "--dtangle-quantile-normalize",
-      dest = "dtangle_quantile_normalize",
+      "--hspe-quantile-normalize",
+      dest = "hspe_quantile_normalize",
       type = "character",
-      help = "Whether dtangle quantile normalization was enabled."
+      help = "Whether hspe quantile normalization was enabled."
     ),
     optparse::make_option(
       "--group-mean-threshold",
@@ -185,8 +185,8 @@ run_build_manifest <- function() {
     "original_proportions", "combined_proportions", "tca_weights",
     "filter_report", "model", "model_log",
     "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
-    "dtangle_marker_fraction", "dtangle_marker_method",
-    "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
+    "hspe_marker_fraction", "hspe_marker_method",
+    "hspe_quantile_normalize", "group_mean_threshold", "zero_floor",
     "tca_max_iters", "tca_parallel", "gene_types", "random_seed", "scale",
     "effective_parameters_output",
     "container_image", "output", "qc_output"
@@ -261,16 +261,16 @@ run_build_manifest <- function() {
   )
   tca_model <- readRDS(options$model)
   tca_log_lines <- readLines(options$model_log, warn = FALSE)
-  dtangle_metadata <- if (is.null(options$dtangle_metadata) ||
-      !nzchar(options$dtangle_metadata)) {
+  hspe_metadata <- if (is.null(options$hspe_metadata) ||
+      !nzchar(options$hspe_metadata)) {
     NULL
   } else {
-    jsonlite::read_json(options$dtangle_metadata, simplifyVector = FALSE)
+    jsonlite::read_json(options$hspe_metadata, simplifyVector = FALSE)
   }
-  quantile_normalize <- tolower(options$dtangle_quantile_normalize)
+  quantile_normalize <- tolower(options$hspe_quantile_normalize)
   if (!quantile_normalize %in% c("true", "false")) {
     stop(
-      "dtangle_quantile_normalize must be true or false",
+      "hspe_quantile_normalize must be true or false",
       call. = FALSE
     )
   }
@@ -285,9 +285,9 @@ run_build_manifest <- function() {
       options$log2_pseudocount
     ),
     min_lm22_overlap = options$min_lm22_overlap,
-    dtangle_marker_fraction = options$dtangle_marker_fraction,
-    dtangle_marker_method = options$dtangle_marker_method,
-    dtangle_quantile_normalize = identical(quantile_normalize, "true"),
+    hspe_marker_fraction = options$hspe_marker_fraction,
+    hspe_marker_method = options$hspe_marker_method,
+    hspe_quantile_normalize = identical(quantile_normalize, "true"),
     group_mean_threshold = options$group_mean_threshold,
     zero_floor = options$zero_floor,
     tca_max_iters = options$tca_max_iters,
@@ -332,7 +332,7 @@ run_build_manifest <- function() {
     filter_report = filter_report,
     tca_model = tca_model,
     tca_log_lines = tca_log_lines,
-    dtangle_metadata = dtangle_metadata
+    hspe_metadata = hspe_metadata
   )
   write_output_manifest(options$output, manifest)
   jsonlite::write_json(

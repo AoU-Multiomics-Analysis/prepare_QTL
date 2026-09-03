@@ -11,13 +11,13 @@ task BuildManifest {
     File combined_proportions
     File tca_weights
     File filter_report
-    File? dtangle_metadata
+    File? hspe_metadata
     String proportion_mode
     Float log2_pseudocount
     Float min_lm22_overlap
-    Float dtangle_marker_fraction
-    String dtangle_marker_method
-    Boolean dtangle_quantile_normalize
+    Float hspe_marker_fraction
+    String hspe_marker_method
+    Boolean hspe_quantile_normalize
     Float group_mean_threshold
     Float zero_floor
     Int tca_max_iters
@@ -35,7 +35,7 @@ task BuildManifest {
     Int max_retries = 2
   }
 
-  String dtangle_metadata_path = if defined(dtangle_metadata) then select_first([dtangle_metadata]) else ""
+  String hspe_metadata_path = if defined(hspe_metadata) then select_first([hspe_metadata]) else ""
 
   command <<<
     set -euo pipefail
@@ -45,10 +45,10 @@ task BuildManifest {
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     public_inventory=outputs/output_inventory.tsv
-    dtangle_metadata_path="~{dtangle_metadata_path}"
-    dtangle_metadata_arguments=()
-    if [[ -n "$dtangle_metadata_path" ]]; then
-      dtangle_metadata_arguments=(--dtangle-metadata "$dtangle_metadata_path")
+    hspe_metadata_path="~{hspe_metadata_path}"
+    hspe_metadata_arguments=()
+    if [[ -n "$hspe_metadata_path" ]]; then
+      hspe_metadata_arguments=(--hspe-metadata "$hspe_metadata_path")
     fi
     mkdir -p outputs
     cp '~{cell_type_bed_inventory}' "$public_inventory"
@@ -70,14 +70,14 @@ task BuildManifest {
       --filter-report '~{filter_report}' \
       --model '~{model}' \
       --model-log '~{model_log}' \
-      "${dtangle_metadata_arguments[@]}" \
+      "${hspe_metadata_arguments[@]}" \
       --tca-version '~{tca_version}' \
       --proportion-mode '~{proportion_mode}' \
       --log2-pseudocount '~{log2_pseudocount}' \
       --min-lm22-overlap '~{min_lm22_overlap}' \
-      --dtangle-marker-fraction '~{dtangle_marker_fraction}' \
-      --dtangle-marker-method '~{dtangle_marker_method}' \
-      --dtangle-quantile-normalize '~{dtangle_quantile_normalize}' \
+      --hspe-marker-fraction '~{hspe_marker_fraction}' \
+      --hspe-marker-method '~{hspe_marker_method}' \
+      --hspe-quantile-normalize '~{hspe_quantile_normalize}' \
       --group-mean-threshold '~{group_mean_threshold}' \
       --zero-floor '~{zero_floor}' \
       --tca-max-iters '~{tca_max_iters}' \

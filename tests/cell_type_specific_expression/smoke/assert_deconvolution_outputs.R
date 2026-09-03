@@ -174,8 +174,8 @@ precomputed_key <- paste(workflow_name, "precomputed_proportions", sep = ".")
 has_lm22 <- !is.null(inputs[[lm22_key]])
 has_precomputed <- !is.null(inputs[[precomputed_key]])
 require_true(has_lm22, "The fixture must provide the required LM22 reference")
-expected_proportion_mode <- if (has_precomputed) "precomputed" else "dtangle"
-if (identical(expected_proportion_mode, "dtangle") && log2_pseudocount == 0) {
+expected_proportion_mode <- if (has_precomputed) "precomputed" else "hspe"
+if (identical(expected_proportion_mode, "hspe") && log2_pseudocount == 0) {
   require_true(all(expression_values > 0), "Pseudocount zero requires positive CPM")
 }
 
@@ -184,7 +184,7 @@ combined <- read_matrix_table("proportions_combined", "sample_id")
 tca_weights <- read_matrix_table("tca_weights", "sample_id")
 proportion_value_tolerance <- 1e-10
 derived_value_tolerance <- 1e-10
-authoritative_proportion_path <- if (identical(expected_proportion_mode, "dtangle")) {
+authoritative_proportion_path <- if (identical(expected_proportion_mode, "hspe")) {
   output_value("estimated_proportions")
 } else {
   input_value("precomputed_proportions")
@@ -440,8 +440,8 @@ manifest <- jsonlite::read_json(output_value("output_manifest"), simplifyVector 
 parameters <- manifest$parameters
 required_parameter_names <- c(
   "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
-  "dtangle_marker_fraction", "dtangle_marker_method",
-  "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
+  "hspe_marker_fraction", "hspe_marker_method",
+  "hspe_quantile_normalize", "group_mean_threshold", "zero_floor",
   "tca_max_iters", "tca_parallel", "gene_type", "random_seed", "scale"
 )
 numeric_parameter <- function(name) as.numeric(parameters[[name]])
@@ -459,9 +459,9 @@ require_true(
 )
 require_true(
   numeric_parameter("min_lm22_overlap") == 0.80 &&
-    numeric_parameter("dtangle_marker_fraction") == 0.10 &&
-    identical(parameters$dtangle_marker_method, "ratio") &&
-    identical(parameters$dtangle_quantile_normalize, FALSE) &&
+    numeric_parameter("hspe_marker_fraction") == 0.10 &&
+    identical(parameters$hspe_marker_method, "ratio") &&
+    identical(parameters$hspe_quantile_normalize, FALSE) &&
     numeric_parameter("group_mean_threshold") == 0.0001 &&
     numeric_parameter("zero_floor") == 0.000001 &&
     numeric_parameter("tca_max_iters") == 10 &&
@@ -470,7 +470,7 @@ require_true(
       unlist(parameters$gene_type, use.names = FALSE),
       input_value("gene_type")
     ) &&
-    numeric_parameter("random_seed") == 20260901 &&
+    numeric_parameter("random_seed") == as.numeric(input_value("random_seed")) &&
     identical(parameters$scale, "cpm") &&
     identical(manifest$tca_version, "1.2.1"),
   "The deconvolution manifest parameters are incorrect"
@@ -550,7 +550,7 @@ require_true(
   "The deconvolution QC summary has an invalid metric set"
 )
 qc_status <- stats::setNames(qc_summary$status, qc_summary$metric)
-expected_lm22_status <- if (expected_proportion_mode == "dtangle") {
+expected_lm22_status <- if (expected_proportion_mode == "hspe") {
   "passed"
 } else {
   "not_applicable_precomputed_mode"
@@ -574,11 +574,18 @@ required_file_outputs <- c(
   "export_detail_log", "output_manifest", "output_inventory", "manifest_log",
   "effective_parameters_file"
 )
-if (identical(expected_proportion_mode, "dtangle")) {
+if (identical(expected_proportion_mode, "hspe")) {
+  hspe_metadata <- jsonlite::read_json(output_value("hspe_metadata"))
+  require_true(
+    identical(hspe_metadata$hspe_version, "0.1") &&
+      identical(hspe_metadata$optimizer, "DEoptimR") &&
+      as.numeric(hspe_metadata$random_seed) == as.numeric(input_value("random_seed")),
+    "HSPE metadata must record the source package, optimizer, and workflow seed"
+  )
   required_file_outputs <- c(
     required_file_outputs,
-    "estimated_proportions", "dtangle_markers", "dtangle_metadata",
-    "dtangle_overlap_report", "transformed_lm22", "dtangle_log"
+    "estimated_proportions", "hspe_markers", "hspe_metadata",
+    "hspe_overlap_report", "transformed_lm22", "hspe_log"
   )
 }
 purrr::walk(required_file_outputs, function(name) {

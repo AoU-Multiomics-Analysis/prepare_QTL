@@ -21,8 +21,8 @@ workflow PrepareCellTypeEqtlWorkflow {
     Int max_retries = 2
 
     Float min_lm22_overlap = 0.80
-    Float dtangle_marker_fraction = 0.10
-    Boolean dtangle_quantile_normalize = false
+    Float hspe_marker_fraction = 0.10
+    Boolean hspe_quantile_normalize = false
     Float group_mean_threshold = 0.0001
     Float zero_floor = 0.000001
     Int tca_max_iters = 10
@@ -31,9 +31,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     Float log2_pseudocount = 0.0
     Array[String] gene_type = ["protein_coding", "lncRNA"]
 
-    Int dtangle_cpu = 4
-    String dtangle_memory = "32 GB"
-    Int dtangle_disk_gb = 100
+    Int hspe_cpu = 4
+    String hspe_memory = "32 GB"
+    Int hspe_disk_gb = 100
     Int proportions_cpu = 2
     String proportions_memory = "16 GB"
     Int proportions_disk_gb = 50
@@ -65,8 +65,8 @@ workflow PrepareCellTypeEqtlWorkflow {
       preemptible_attempts = preemptible_attempts,
       max_retries = max_retries,
       min_lm22_overlap = min_lm22_overlap,
-      dtangle_marker_fraction = dtangle_marker_fraction,
-      dtangle_quantile_normalize = dtangle_quantile_normalize,
+      hspe_marker_fraction = hspe_marker_fraction,
+      hspe_quantile_normalize = hspe_quantile_normalize,
       group_mean_threshold = group_mean_threshold,
       zero_floor = zero_floor,
       tca_max_iters = tca_max_iters,
@@ -74,9 +74,9 @@ workflow PrepareCellTypeEqtlWorkflow {
       random_seed = random_seed,
       log2_pseudocount = log2_pseudocount,
       gene_type = gene_type,
-      dtangle_cpu = dtangle_cpu,
-      dtangle_memory = dtangle_memory,
-      dtangle_disk_gb = dtangle_disk_gb,
+      hspe_cpu = hspe_cpu,
+      hspe_memory = hspe_memory,
+      hspe_disk_gb = hspe_disk_gb,
       proportions_cpu = proportions_cpu,
       proportions_memory = proportions_memory,
       proportions_disk_gb = proportions_disk_gb,
@@ -154,11 +154,11 @@ workflow PrepareCellTypeEqtlWorkflow {
     File proportion_mode_validation_log = CellTypeDeconvolution.proportion_mode_validation_log
 
     File? estimated_proportions = CellTypeDeconvolution.estimated_proportions
-    File? dtangle_markers = CellTypeDeconvolution.dtangle_markers
-    File? dtangle_metadata = CellTypeDeconvolution.dtangle_metadata
-    File? dtangle_overlap_report = CellTypeDeconvolution.dtangle_overlap_report
+    File? hspe_markers = CellTypeDeconvolution.hspe_markers
+    File? hspe_metadata = CellTypeDeconvolution.hspe_metadata
+    File? hspe_overlap_report = CellTypeDeconvolution.hspe_overlap_report
     File? transformed_lm22 = CellTypeDeconvolution.transformed_lm22
-    File? dtangle_log = CellTypeDeconvolution.dtangle_log
+    File? hspe_log = CellTypeDeconvolution.hspe_log
 
     File proportions_lm22 = CellTypeDeconvolution.proportions_lm22
     File proportions_combined = CellTypeDeconvolution.proportions_combined

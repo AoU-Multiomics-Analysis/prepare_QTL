@@ -15,17 +15,17 @@ if (file.exists(assertion_helpers_path)) {
   source(assertion_helpers_path, local = .GlobalEnv)
 }
 
-testthat::test_that("precomputed proportions select whether dtangle runs", {
+testthat::test_that("precomputed proportions select whether hspe runs", {
   testthat::expect_true(exists("validate_proportion_mode", mode = "function"))
   if (!exists("validate_proportion_mode", mode = "function")) {
     return(invisible(NULL))
   }
 
-  dtangle <- validate_proportion_mode(FALSE)
+  hspe <- validate_proportion_mode(FALSE)
   precomputed <- validate_proportion_mode(TRUE)
   testthat::expect_identical(
-    dtangle,
-    list(selected_mode = "dtangle", estimate_proportions = TRUE)
+    hspe,
+    list(selected_mode = "hspe", estimate_proportions = TRUE)
   )
   testthat::expect_identical(
     precomputed,
@@ -70,11 +70,11 @@ testthat::test_that("mode validation CLI selects precomputed proportions", {
   testthat::expect_match(result$output, "estimate_proportions=false")
 })
 
-testthat::test_that("mode validation CLI selects dtangle when proportions are absent", {
+testthat::test_that("mode validation CLI selects hspe when proportions are absent", {
   result <- run_validation_cli(FALSE)
 
   testthat::expect_identical(result$status, 0L, info = result$output)
-  testthat::expect_match(result$output, "selected_mode=dtangle")
+  testthat::expect_match(result$output, "selected_mode=hspe")
   testthat::expect_match(result$output, "estimate_proportions=true")
 })
 
@@ -108,7 +108,7 @@ integrated_fixture_files <- c(
   "samples.tsv",
   "additional_covariates.tsv",
   "expected_groups.txt",
-  "dtangle-e2e.inputs.json",
+  "hspe-e2e.inputs.json",
   "precomputed-e2e.inputs.json"
 )
 
@@ -378,14 +378,14 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
 
   input_paths <- file.path(
     fixture_directory,
-    c("dtangle-e2e.inputs.json", "precomputed-e2e.inputs.json")
+    c("hspe-e2e.inputs.json", "precomputed-e2e.inputs.json")
   )
   testthat::expect_true(all(file.exists(input_paths)))
   if (!all(file.exists(input_paths))) {
     return(invisible(NULL))
   }
 
-  dtangle_inputs <- jsonlite::read_json(input_paths[[1L]], simplifyVector = TRUE)
+  hspe_inputs <- jsonlite::read_json(input_paths[[1L]], simplifyVector = TRUE)
   precomputed_inputs <- jsonlite::read_json(input_paths[[2L]], simplifyVector = TRUE)
   prefix <- "PrepareCellTypeEqtlWorkflow."
   required_shared_inputs <- c(
@@ -393,7 +393,7 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
     "deconvolution_docker_image", "qtl_docker_image", "log2_pseudocount",
     "gene_type"
   )
-  purrr::walk(list(dtangle_inputs, precomputed_inputs), function(inputs) {
+  purrr::walk(list(hspe_inputs, precomputed_inputs), function(inputs) {
     testthat::expect_true(all(paste0(prefix, required_shared_inputs) %in% names(inputs)))
     testthat::expect_identical(
       inputs[[paste0(prefix, "deconvolution_docker_image")]],
@@ -410,12 +410,12 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
     )
   })
 
-  testthat::expect_true(paste0(prefix, "lm22") %in% names(dtangle_inputs))
+  testthat::expect_true(paste0(prefix, "lm22") %in% names(hspe_inputs))
   testthat::expect_false(
-    paste0(prefix, "precomputed_proportions") %in% names(dtangle_inputs)
+    paste0(prefix, "precomputed_proportions") %in% names(hspe_inputs)
   )
   testthat::expect_equal(
-    dtangle_inputs[[paste0(prefix, "log2_pseudocount")]],
+    hspe_inputs[[paste0(prefix, "log2_pseudocount")]],
     0
   )
   testthat::expect_true(
@@ -436,13 +436,13 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
       dplyr::select(-dplyr::all_of(c("#chr", "start", "end", "gene_id"))) |>
       as.matrix()
   }
-  dtangle_values <- read_expression_values(
-    dtangle_inputs[[paste0(prefix, "expression")]]
+  hspe_values <- read_expression_values(
+    hspe_inputs[[paste0(prefix, "expression")]]
   )
   precomputed_values <- read_expression_values(
     precomputed_inputs[[paste0(prefix, "expression")]]
   )
-  testthat::expect_true(all(dtangle_values > 0))
+  testthat::expect_true(all(hspe_values > 0))
   testthat::expect_true(any(precomputed_values == 0))
   testthat::expect_false(any(precomputed_values < 0))
 })

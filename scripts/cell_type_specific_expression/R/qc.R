@@ -319,7 +319,7 @@ build_pipeline_qc_summary <- function(
     filter_report,
     tca_model,
     tca_log_lines,
-    dtangle_metadata = NULL) {
+    hspe_metadata = NULL) {
   if (!inherits(export_summary, "data.frame") ||
       !all(c("metric", "value") %in% names(export_summary)) ||
       nrow(export_summary) == 0L || anyNA(export_summary$metric) ||
@@ -406,7 +406,7 @@ build_pipeline_qc_summary <- function(
       "fitted"
     )
   )
-  lm22_status <- if (is.null(dtangle_metadata)) {
+  lm22_status <- if (is.null(hspe_metadata)) {
     tibble::tibble(
       metric = c(
         "lm22_gene_count", "lm22_cell_type_count",
@@ -420,13 +420,13 @@ build_pipeline_qc_summary <- function(
       "gene_count", "cell_type_count", "value_min", "value_max",
       "validation_status"
     )
-    if (!is.list(dtangle_metadata) ||
-        !is.list(dtangle_metadata$lm22_qc) ||
-        !all(required_lm22_fields %in% names(dtangle_metadata$lm22_qc)) ||
-        !identical(dtangle_metadata$lm22_qc$validation_status, "passed")) {
-      stop("dtangle metadata is missing passed LM22 QC", call. = FALSE)
+    if (!is.list(hspe_metadata) ||
+        !is.list(hspe_metadata$lm22_qc) ||
+        !all(required_lm22_fields %in% names(hspe_metadata$lm22_qc)) ||
+        !identical(hspe_metadata$lm22_qc$validation_status, "passed")) {
+      stop("hspe metadata is missing passed LM22 QC", call. = FALSE)
     }
-    qc <- dtangle_metadata$lm22_qc
+    qc <- hspe_metadata$lm22_qc
     tibble::tibble(
       metric = c(
         "lm22_gene_count", "lm22_cell_type_count",

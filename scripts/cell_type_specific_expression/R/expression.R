@@ -278,7 +278,7 @@ make_cpm_mapping_report <- function(cpm, annotation) {
     mapping_action = dplyr::case_when(
       is.na(matching_indices) ~ "missing_gtf_gene_id",
       !usable_gene_names ~ "missing_gene_name",
-      duplicate_gene_names ~ "duplicate_gene_name_aggregated_for_dtangle",
+      duplicate_gene_names ~ "duplicate_gene_name_aggregated_for_hspe",
       TRUE ~ "mapped"
     )
   )
@@ -295,7 +295,7 @@ make_tca_expression <- function(expression) {
   cpm
 }
 
-make_dtangle_expression <- function(expression, annotation, log2_pseudocount = 0) {
+make_hspe_expression <- function(expression, annotation, log2_pseudocount = 0) {
   if (!is.list(expression) || !all(c("coordinates", "cpm") %in% names(expression))) {
     stop("expression must contain coordinates and cpm", call. = FALSE)
   }
@@ -323,7 +323,7 @@ make_dtangle_expression <- function(expression, annotation, log2_pseudocount = 0
 make_excluded_genes <- function(mapping_report) {
   mapping_report |>
     dplyr::filter(!(.data$mapping_action %in% c(
-      "mapped", "duplicate_gene_name_aggregated_for_dtangle"
+      "mapped", "duplicate_gene_name_aggregated_for_hspe"
     ))) |>
     dplyr::transmute(
       gene_id = .data$gene_id,

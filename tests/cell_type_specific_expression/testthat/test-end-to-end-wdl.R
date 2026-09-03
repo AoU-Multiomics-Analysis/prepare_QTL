@@ -251,11 +251,11 @@ testthat::test_that("end-to-end WDL exposes the full deconvolution provenance", 
   expected_outputs <- c(
     "File proportion_mode_validation_log = CellTypeDeconvolution.proportion_mode_validation_log",
     "File? estimated_proportions = CellTypeDeconvolution.estimated_proportions",
-    "File? dtangle_markers = CellTypeDeconvolution.dtangle_markers",
-    "File? dtangle_metadata = CellTypeDeconvolution.dtangle_metadata",
-    "File? dtangle_overlap_report = CellTypeDeconvolution.dtangle_overlap_report",
+    "File? hspe_markers = CellTypeDeconvolution.hspe_markers",
+    "File? hspe_metadata = CellTypeDeconvolution.hspe_metadata",
+    "File? hspe_overlap_report = CellTypeDeconvolution.hspe_overlap_report",
     "File? transformed_lm22 = CellTypeDeconvolution.transformed_lm22",
-    "File? dtangle_log = CellTypeDeconvolution.dtangle_log",
+    "File? hspe_log = CellTypeDeconvolution.hspe_log",
     "File proportions_lm22 = CellTypeDeconvolution.proportions_lm22",
     "File proportions_combined = CellTypeDeconvolution.proportions_combined",
     "File tca_weights = CellTypeDeconvolution.tca_weights",
@@ -282,5 +282,5 @@ testthat::test_that("end-to-end WDL exposes the full deconvolution provenance", 
     expected_outputs,
     ~ testthat::expect_true(.x %in% output_declarations, info = .x)
   )
-  testthat::expect_false(any(grepl("dtangle_shared_bulk", output_declarations)))
+  testthat::expect_false(any(grepl("hspe_shared_bulk", output_declarations)))
 })

@@ -6,7 +6,7 @@ source(file.path(dirname(script_path), "bootstrap.R"))
 
 utc_time <- function() format(Sys.time(), tz = "UTC", usetz = TRUE)
 
-run_dtangle_stage <- function() {
+run_hspe_stage <- function() {
   option_list <- list(
     optparse::make_option(
       "--expression",
@@ -20,7 +20,7 @@ run_dtangle_stage <- function() {
       default = 0,
       help = paste(
         "Non-negative pseudocount added to bulk CPM and LM22 before",
-        "their dtangle log2 transforms."
+        "their hspe log2 transforms."
       )
     ),
     optparse::make_option(
@@ -48,27 +48,34 @@ run_dtangle_stage <- function() {
       dest = "marker_fraction",
       type = "double",
       default = pipeline_defaults()$marker_fraction,
-      help = "Fraction of reference genes used as dtangle markers."
+      help = "Fraction of reference genes used as hspe markers."
     ),
     optparse::make_option(
       "--marker-method",
       dest = "marker_method",
       type = "character",
       default = "ratio",
-      help = "dtangle marker method; only ratio is supported."
+      help = "hspe marker method; only ratio is supported."
     ),
     optparse::make_option(
       "--quantile-normalize",
       dest = "quantile_normalize",
       action = "store_true",
       default = FALSE,
-      help = "Jointly quantile normalize LM22 and bulk profiles for dtangle only."
+      help = "Jointly quantile normalize LM22 and bulk profiles for hspe only."
+    ),
+    optparse::make_option(
+      "--random-seed",
+      dest = "random_seed",
+      type = "integer",
+      default = 20260901L,
+      help = "Random seed for HSPE optimization with DEoptimR."
     ),
     optparse::make_option(
       "--output-dir",
       dest = "output_dir",
       type = "character",
-      help = "Directory for dtangle outputs."
+      help = "Directory for hspe outputs."
     )
   )
   options <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
@@ -85,66 +92,68 @@ run_dtangle_stage <- function() {
     )
   }
 
-  message(sprintf("stage=dtangle utc_start=%s", utc_time()))
+  message(sprintf("stage=hspe utc_start=%s", utc_time()))
   lm22_linear <- standardize_lm22(read_lm22_matrix(options$lm22))
   expression <- read_expression_bed(options$expression)
   annotation <- read_gtf_gene_annotation(options$gtf)
-  dtangle_expression <- make_dtangle_expression(
+  hspe_expression <- make_hspe_expression(
     expression,
     annotation,
     options$log2_pseudocount
   )
-  bulk_log <- dtangle_expression$log_expression
+  bulk_log <- hspe_expression$log_expression
   message(sprintf(
-    "stage=dtangle bulk_dimensions=genes:%d samples:%d lm22_dimensions=genes:%d cell_types:%d",
+    "stage=hspe bulk_dimensions=genes:%d samples:%d lm22_dimensions=genes:%d cell_types:%d",
     nrow(bulk_log), ncol(bulk_log), nrow(lm22_linear), ncol(lm22_linear)
   ))
   message(sprintf(
     paste0(
-      "stage=dtangle settings=min_overlap:%.3f marker_fraction:%.3f ",
-      "marker_method:%s quantile_normalize:%s log2_pseudocount:%g"
+      "stage=hspe settings=min_overlap:%.3f marker_fraction:%.3f ",
+      "marker_method:%s quantile_normalize:%s log2_pseudocount:%g random_seed:%d optimizer:DEoptimR"
     ),
     options$min_overlap,
     options$marker_fraction,
     options$marker_method,
     options$quantile_normalize,
-    dtangle_expression$log2_pseudocount
+    hspe_expression$log2_pseudocount,
+    options$random_seed
   ))
-  inputs <- prepare_dtangle_inputs(
+  inputs <- prepare_hspe_inputs(
     bulk_log = bulk_log,
     lm22_linear = lm22_linear,
     min_overlap = options$min_overlap,
     quantile_normalize = options$quantile_normalize,
-    log2_pseudocount = dtangle_expression$log2_pseudocount
+    log2_pseudocount = hspe_expression$log2_pseudocount
   )
   message(sprintf(
-    "stage=dtangle overlap=shared_genes:%d overlap_fraction:%.3f",
+    "stage=hspe overlap=shared_genes:%d overlap_fraction:%.3f",
     inputs$overlap_count,
     inputs$overlap_fraction
   ))
-  fit <- estimate_dtangle(
+  fit <- estimate_hspe(
     inputs,
     marker_fraction = options$marker_fraction,
-    marker_method = options$marker_method
+    marker_method = options$marker_method,
+    random_seed = options$random_seed
   )
-  fit$metadata$log2_pseudocount <- dtangle_expression$log2_pseudocount
+  fit$metadata$log2_pseudocount <- hspe_expression$log2_pseudocount
   marker_counts <- unlist(fit$metadata$marker_counts, use.names = TRUE)
-  message(sprintf("stage=dtangle package=dtangle version=%s", fit$metadata$dtangle_version))
+  message(sprintf("stage=hspe package=hspe version=%s", fit$metadata$hspe_version))
   message(sprintf(
-    "stage=dtangle markers_per_cell_type=%s",
+    "stage=hspe markers_per_cell_type=%s",
     paste(sprintf("%s:%d", names(marker_counts), marker_counts), collapse = ",")
   ))
 
   dir.create(options$output_dir, recursive = TRUE, showWarnings = FALSE)
   output_paths <- list(
-    proportions = file.path(options$output_dir, "dtangle_proportions.tsv"),
-    markers = file.path(options$output_dir, "dtangle_markers.tsv"),
-    metadata = file.path(options$output_dir, "dtangle_metadata.json"),
-    overlap = file.path(options$output_dir, "dtangle_overlap.tsv"),
-    lm22_log = file.path(options$output_dir, "dtangle_lm22_log.tsv.gz")
+    proportions = file.path(options$output_dir, "hspe_proportions.tsv"),
+    markers = file.path(options$output_dir, "hspe_markers.tsv"),
+    metadata = file.path(options$output_dir, "hspe_metadata.json"),
+    overlap = file.path(options$output_dir, "hspe_overlap.tsv"),
+    lm22_log = file.path(options$output_dir, "hspe_lm22_log.tsv.gz")
   )
   message(sprintf(
-    "stage=dtangle output_paths=%s",
+    "stage=hspe output_paths=%s",
     paste(unlist(output_paths, use.names = FALSE), collapse = ",")
   ))
   write_numeric_matrix(fit$proportions, output_paths$proportions, "sample_id")
@@ -152,14 +161,14 @@ run_dtangle_stage <- function() {
   jsonlite::write_json(fit$metadata, output_paths$metadata, auto_unbox = TRUE, pretty = TRUE)
   readr::write_tsv(inputs$overlap_report, output_paths$overlap, na = "")
   write_numeric_matrix(inputs$transformed_lm22, output_paths$lm22_log, "gene_symbol")
-  message(sprintf("stage=dtangle utc_complete=%s", utc_time()))
+  message(sprintf("stage=hspe utc_complete=%s", utc_time()))
 }
 
 tryCatch(
-  run_dtangle_stage(),
+  run_hspe_stage(),
   error = function(error) {
     message(sprintf(
-      "stage=dtangle status=failed utc_time=%s message=%s",
+      "stage=hspe status=failed utc_time=%s message=%s",
       utc_time(), conditionMessage(error)
     ))
     quit(status = 1L)

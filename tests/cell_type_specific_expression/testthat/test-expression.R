@@ -24,7 +24,7 @@ testthat::test_that("TCA uses linear CPM and accepts zero values", {
   testthat::expect_equal(make_tca_expression(expression), expression$cpm)
 })
 
-testthat::test_that("dtangle adds the pseudocount after duplicate-symbol aggregation", {
+testthat::test_that("hspe adds the pseudocount after duplicate-symbol aggregation", {
   expression <- list(
     coordinates = tibble::tibble(
       `#chr` = c("chr1", "chr1"),
@@ -45,7 +45,7 @@ testthat::test_that("dtangle adds the pseudocount after duplicate-symbol aggrega
     gene_type = "protein_coding"
   )
 
-  result <- make_dtangle_expression(expression, annotation, 1)
+  result <- make_hspe_expression(expression, annotation, 1)
 
   testthat::expect_equal(
     result$log_expression["GENE1", ],
@@ -160,7 +160,7 @@ testthat::test_that("gene-type filtering permits missing gene names", {
   testthat::expect_identical(result$report$filter_reason, "retained")
 })
 
-testthat::test_that("dtangle view sums duplicate symbols without CPM renormalization", {
+testthat::test_that("hspe view sums duplicate symbols without CPM renormalization", {
   cpm <- matrix(c(2, 3, 5, 7), nrow = 2,
     dimnames = list(c("g1", "g2"), c("s1", "s2")))
   expression <- list(
@@ -174,7 +174,7 @@ testthat::test_that("dtangle view sums duplicate symbols without CPM renormaliza
     gene_id = c("g1", "g2"), gene_name = c("A", "A"), gene_type = c("x", "y")
   )
 
-  result <- make_dtangle_expression(expression, annotation)
+  result <- make_hspe_expression(expression, annotation)
 
   testthat::expect_identical(rownames(result$log_expression), "A")
   testthat::expect_equal(
@@ -184,8 +184,8 @@ testthat::test_that("dtangle view sums duplicate symbols without CPM renormaliza
   testthat::expect_identical(
     result$mapping_report$mapping_action,
     c(
-      "duplicate_gene_name_aggregated_for_dtangle",
-      "duplicate_gene_name_aggregated_for_dtangle"
+      "duplicate_gene_name_aggregated_for_hspe",
+      "duplicate_gene_name_aggregated_for_hspe"
     )
   )
 })
@@ -217,7 +217,7 @@ testthat::test_that("duplicate aggregation preserves first gene-symbol order and
   )
 })
 
-testthat::test_that("direct CPM views separate TCA genes from dtangle symbols", {
+testthat::test_that("direct CPM views separate TCA genes from hspe symbols", {
   expression <- list(
     coordinates = tibble::tibble(
       `#chr` = c("chr1", "chr1", "chr2"),
@@ -239,12 +239,12 @@ testthat::test_that("direct CPM views separate TCA genes from dtangle symbols", 
   )
 
   tca_expression <- make_tca_expression(expression)
-  dtangle_expression <- make_dtangle_expression(expression, annotation)
+  hspe_expression <- make_hspe_expression(expression, annotation)
 
   testthat::expect_identical(rownames(tca_expression), c("ENSG1", "ENSG2", "ENSG3"))
   testthat::expect_equal(unname(tca_expression[, "S1"]), c(4, 16, 64))
-  testthat::expect_identical(rownames(dtangle_expression$log_expression), "MARKER")
-  testthat::expect_equal(unname(dtangle_expression$log_expression[1, ]), log2(c(20, 40)))
+  testthat::expect_identical(rownames(hspe_expression$log_expression), "MARKER")
+  testthat::expect_equal(unname(hspe_expression$log_expression[1, ]), log2(c(20, 40)))
 })
 
 testthat::test_that("duplicate aggregation does not pivot the full expression matrix", {
@@ -342,7 +342,7 @@ testthat::test_that("BED validation accepts zero CPM without a pseudocount", {
   )
 })
 
-testthat::test_that("dtangle CPM must be strictly positive", {
+testthat::test_that("hspe CPM must be strictly positive", {
   cpm <- matrix(c(1, 0), nrow = 1,
     dimnames = list("g1", c("s1", "s2")))
   expression <- list(
@@ -356,7 +356,7 @@ testthat::test_that("dtangle CPM must be strictly positive", {
   )
 
   testthat::expect_error(
-    make_dtangle_expression(expression, annotation),
+    make_hspe_expression(expression, annotation),
     "positive CPM"
   )
 })
@@ -378,7 +378,7 @@ testthat::test_that("compressed GTF and trimmed IDs are supported", {
     ),
     cpm = cpm
   )
-  result <- make_dtangle_expression(
+  result <- make_hspe_expression(
     expression,
     read_gtf_gene_annotation(gtf)
   )
@@ -402,7 +402,7 @@ testthat::test_that("missing gene names and GTF IDs are reported", {
     ),
     cpm = cpm
   )
-  result <- make_dtangle_expression(expression, annotation)
+  result <- make_hspe_expression(expression, annotation)
   excluded_genes <- make_excluded_genes(result$mapping_report)
 
   testthat::expect_identical(

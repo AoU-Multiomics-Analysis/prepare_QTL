@@ -530,7 +530,7 @@ testthat::test_that("pipeline QC records validation, row sums, and convergence",
     "INFO Iteration 2 out of 10 internal iterations...",
     "INFO Internal loop converged."
   )
-  dtangle_metadata <- list(
+  hspe_metadata <- list(
     lm22_qc = list(
       gene_count = 66L,
       cell_type_count = 22L,
@@ -548,7 +548,7 @@ testthat::test_that("pipeline QC records validation, row sums, and convergence",
     filter_report = filter_report,
     tca_model = model,
     tca_log_lines = tca_log,
-    dtangle_metadata = dtangle_metadata
+    hspe_metadata = hspe_metadata
   )
   expected_metric_prefix <- c(
     "gene_count",
@@ -676,9 +676,9 @@ testthat::test_that("manifest CLI consumes export-time hashes and basenames", {
     "--proportion-mode", "precomputed",
     "--log2-pseudocount", "0.123456789",
     "--min-lm22-overlap", "0.8",
-    "--dtangle-marker-fraction", "0.1",
-    "--dtangle-marker-method", "ratio",
-    "--dtangle-quantile-normalize", "false",
+    "--hspe-marker-fraction", "0.1",
+    "--hspe-marker-method", "ratio",
+    "--hspe-quantile-normalize", "false",
     "--group-mean-threshold", "0.0001",
     "--zero-floor", "0.000001",
     "--tca-max-iters", "10",
@@ -706,8 +706,8 @@ testthat::test_that("manifest CLI consumes export-time hashes and basenames", {
     names(effective_parameters),
     c(
       "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
-      "dtangle_marker_fraction", "dtangle_marker_method",
-      "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
+      "hspe_marker_fraction", "hspe_marker_method",
+      "hspe_quantile_normalize", "group_mean_threshold", "zero_floor",
       "tca_max_iters", "tca_parallel", "gene_type", "random_seed", "scale"
     )
   )
@@ -717,7 +717,7 @@ testthat::test_that("manifest CLI consumes export-time hashes and basenames", {
     0.123456789,
     tolerance = 1e-12
   )
-  testthat::expect_identical(effective_parameters$dtangle_quantile_normalize, FALSE)
+  testthat::expect_identical(effective_parameters$hspe_quantile_normalize, FALSE)
   testthat::expect_identical(effective_parameters$tca_parallel, FALSE)
   testthat::expect_identical(
     unlist(effective_parameters$gene_type, use.names = FALSE),
