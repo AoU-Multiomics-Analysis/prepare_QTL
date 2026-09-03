@@ -422,7 +422,7 @@ if (pseudocount > 0) {
 required_upstream_outputs <- c(
   "proportion_mode_validation_log", "proportions_lm22",
   "proportions_combined", "tca_weights", "cell_group_filter_report",
-  "proportions_log", "tca_model", "tca_model_log", "tca_expression",
+  "proportions_log", "tca_model", "tca_model_log",
   "tca_excluded_genes", "fit_tca_log", "cell_type_bed_inventory",
   "reconstruction_by_sample", "qc_summary", "qc_plots", "export_log",
   "export_detail_log", "output_manifest", "output_inventory", "manifest_log",

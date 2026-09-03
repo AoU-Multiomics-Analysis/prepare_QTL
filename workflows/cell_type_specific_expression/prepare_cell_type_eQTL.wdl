@@ -168,7 +168,6 @@ workflow PrepareCellTypeEqtlWorkflow {
 
     File tca_model = CellTypeDeconvolution.tca_model
     File tca_model_log = CellTypeDeconvolution.tca_model_log
-    File tca_expression = CellTypeDeconvolution.tca_expression
     File tca_excluded_genes = CellTypeDeconvolution.tca_excluded_genes
     File fit_tca_log = CellTypeDeconvolution.fit_tca_log
 

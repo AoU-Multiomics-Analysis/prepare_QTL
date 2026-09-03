@@ -307,24 +307,6 @@ require_true(
   "The retained groups do not match expected_groups.txt"
 )
 
-tca_expression <- read_matrix_table("tca_expression", "gene_id")
-require_true(
-  identical(rownames(tca_expression), expected_gene_ids),
-  "The TCA gene order does not match the expression BED"
-)
-require_true(
-  identical(colnames(tca_expression), expected_samples),
-  "The TCA sample order does not match the expression BED"
-)
-require_true(
-  all(c("ENSGSYN000001", "ENSGDUP000001") %in% rownames(tca_expression)),
-  "The TCA expression is missing required synthetic genes"
-)
-require_true(
-  any(grepl("^ENSGEXTRA", rownames(tca_expression))),
-  "The TCA expression is missing a non-signature gene"
-)
-
 reconstruction <- readr::read_tsv(
   output_value("reconstruction_by_sample"),
   show_col_types = FALSE,
@@ -568,7 +550,7 @@ required_file_outputs <- c(
   "filtered_expression", "gene_type_filter_report", "gene_type_filter_log",
   "proportion_mode_validation_log", "proportions_lm22",
   "proportions_combined", "tca_weights", "cell_group_filter_report",
-  "proportions_log", "tca_model", "tca_model_log", "tca_expression",
+  "proportions_log", "tca_model", "tca_model_log",
   "tca_excluded_genes", "fit_tca_log", "cell_type_bed_inventory",
   "reconstruction_by_sample", "qc_summary", "qc_plots", "export_log",
   "export_detail_log", "output_manifest", "output_inventory", "manifest_log",

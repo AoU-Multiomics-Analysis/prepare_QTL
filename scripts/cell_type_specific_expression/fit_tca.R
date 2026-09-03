@@ -62,7 +62,7 @@ run_tca_stage <- function() {
       "--output-dir",
       dest = "output_dir",
       type = "character",
-      help = "Directory for the model, filtered expression, and excluded-gene report."
+      help = "Directory for the model and excluded-gene report."
     )
   )
   options <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
@@ -85,7 +85,6 @@ run_tca_stage <- function() {
   output_paths <- list(
     model = file.path(options$output_dir, "tca_model.rds"),
     model_log = file.path(options$output_dir, "tca_model.log"),
-    expression = file.path(options$output_dir, "tca_expression.tsv.gz"),
     excluded_genes = file.path(options$output_dir, "tca_excluded_genes.tsv")
   )
   tca_log_path <<- output_paths$model_log
@@ -154,7 +153,6 @@ run_tca_stage <- function() {
   result$model$log2_pseudocount <- log2_pseudocount
   result$model$tca_parallel <- tca_parallel
   saveRDS(result$model, output_paths$model)
-  write_numeric_matrix(result$X, output_paths$expression, "gene_id")
   readr::write_tsv(result$excluded_genes, output_paths$excluded_genes, na = "")
   complete_message <- sprintf(
     paste0(

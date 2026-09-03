@@ -108,6 +108,21 @@ testthat::test_that("TCA task memory defaults are 256 GB", {
   })
 })
 
+testthat::test_that("TCA export rebuilds expression without a persisted matrix", {
+  task <- wdl_text("tasks", "tca.wdl")
+  standalone <- wdl_text("deconvolution.wdl")
+  integrated <- wdl_text("prepare_cell_type_eQTL.wdl")
+
+  purrr::walk(c(task, standalone, integrated), function(text) {
+    testthat::expect_false(grepl("tca_expression", text, fixed = TRUE))
+  })
+  testthat::expect_match(
+    task,
+    "--expression '~{expression}'",
+    fixed = TRUE
+  )
+})
+
 testthat::test_that("TCA parallel execution is explicit and disabled by default", {
   task_text <- wdl_text("tasks", "tca.wdl")
   workflow_text <- wdl_text("deconvolution.wdl")

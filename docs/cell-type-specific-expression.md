@@ -156,7 +156,9 @@ invalid. The pseudocount must be finite and nonnegative.
 dtangle and TCA apply `log2(CPM + log2_pseudocount)` exactly once. Duplicate
 gene symbols are first combined in linear CPM for the dtangle view. TCA uses
 valid, nonconstant gene-ID rows. Each exported cell-type BED is in log2-CPM
-space.
+space. The workflow does not store a separate transformed bulk-expression
+matrix. The export task rebuilds the TCA view from `filtered_expression` and
+removes the same constant genes before tensor extraction.
 
 The integrated workflow sends each TCA BED to the `Log2CpmBed` input of
 `prepare_eQTL.wdl`. The QTL step does not apply a second log2 transform. It

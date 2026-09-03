@@ -13,8 +13,6 @@ run_export_tca_beds <- function() {
     optparse::make_option("--log2-pseudocount", dest = "log2_pseudocount",
       type = "double", default = 0,
       help = "Non-negative pseudocount added before the one log2 transform."),
-    optparse::make_option("--tca-expression", dest = "tca_expression", type = "character",
-      help = "Filtered gene-by-sample log2(CPM) TSV with gene_id first column."),
     optparse::make_option("--model", type = "character",
       help = "Cohort-wide fitted TCA model RDS."),
     optparse::make_option("--weights", type = "character",
@@ -32,7 +30,7 @@ run_export_tca_beds <- function() {
   )
   options <- optparse::parse_args(optparse::OptionParser(option_list = option_list))
   required_options <- c(
-    "expression", "tca_expression", "model", "weights", "output_dir"
+    "expression", "model", "weights", "output_dir"
   )
   missing_options <- required_options[vapply(
     options[required_options],
@@ -58,8 +56,14 @@ run_export_tca_beds <- function() {
     normalizePath(options$output_dir)
   ))
 
-  X <- read_numeric_matrix(options$tca_expression, "gene_id")
   expression <- read_expression_bed(options$expression, log2_pseudocount)
+  filtered_expression <- remove_constant_features(
+    make_tca_expression(expression, log2_pseudocount)
+  )
+  if (nrow(filtered_expression$matrix) == 0L) {
+    stop("No variable genes remain after constant-gene removal", call. = FALSE)
+  }
+  X <- filtered_expression$matrix
   coordinates <- expression$coordinates
   weights <- read_numeric_matrix(options$weights, "sample_id")
   model <- readRDS(options$model)
@@ -80,10 +84,7 @@ run_export_tca_beds <- function() {
   if (!is.null(C2) && !identical(rownames(C2), colnames(X))) {
     stop("Covariate sample order must match expression sample order exactly", call. = FALSE)
   }
-  excluded_constant_genes <- count_excluded_constant_genes(
-    coordinates,
-    rownames(X)
-  )
+  excluded_constant_genes <- nrow(filtered_expression$report)
   coordinate_index <- match(rownames(X), coordinates$gene_id)
   if (anyNA(coordinate_index)) {
     stop("Every modeled gene_id must have BED coordinates", call. = FALSE)
@@ -99,7 +100,7 @@ run_export_tca_beds <- function() {
   )
   paths_message <- sprintf(
     "stage=export_tca_beds input_paths=%s output_dir=%s",
-    paste(c(options$tca_expression, options$expression, options$model, options$weights,
+    paste(c(options$expression, options$model, options$weights,
       options$covariates), collapse = ","), options$output_dir
   )
   message(dimensions_message)
