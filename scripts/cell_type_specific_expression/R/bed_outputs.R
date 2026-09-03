@@ -129,25 +129,6 @@ validate_tensor_contract <- function(
   invisible(TRUE)
 }
 
-count_excluded_constant_genes <- function(coordinates, modeled_gene_ids) {
-  if (!inherits(coordinates, "data.frame") ||
-      !"gene_id" %in% names(coordinates) ||
-      anyNA(coordinates$gene_id) || any(!nzchar(coordinates$gene_id)) ||
-      anyDuplicated(coordinates$gene_id) > 0L) {
-    stop("coordinates must contain unique non-empty gene_id values", call. = FALSE)
-  }
-  if (!is.character(modeled_gene_ids) || length(modeled_gene_ids) == 0L ||
-      anyNA(modeled_gene_ids) || any(!nzchar(modeled_gene_ids)) ||
-      anyDuplicated(modeled_gene_ids) > 0L ||
-      !all(modeled_gene_ids %in% coordinates$gene_id)) {
-    stop(
-      "Every modeled gene must occur once in the prepared coordinates",
-      call. = FALSE
-    )
-  }
-  as.integer(nrow(coordinates) - length(modeled_gene_ids))
-}
-
 build_tca_tensor_arguments <- function(
     X,
     model,

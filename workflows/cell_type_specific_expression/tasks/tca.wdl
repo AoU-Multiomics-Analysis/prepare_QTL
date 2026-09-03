@@ -42,20 +42,14 @@ task FitTca {
       --random-seed '~{random_seed}' \
       --log2-pseudocount '~{log2_pseudocount}' \
       --output-dir outputs 2>&1 | tee -a "$log"
-    read -r gene_count sample_count < <(
-      gzip -cd outputs/tca_expression.tsv.gz |
-        awk -F '\t' 'NR == 1 { samples = NF - 1 } END { print NR - 1, samples }'
-    )
-    printf 'stage=%s dimensions=genes:%s,samples:%s outputs=%s completion_time=%s\n' \
-      "$stage" "$gene_count" "$sample_count" \
-      "model,model_log,tca_expression,excluded_genes" \
+    printf 'stage=%s outputs=%s completion_time=%s\n' \
+      "$stage" "model,model_log,excluded_genes" \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>
 
   output {
     File model = "outputs/tca_model.rds"
     File model_log = "outputs/tca_model.log"
-    File tca_expression = "outputs/tca_expression.tsv.gz"
     File excluded_genes = "outputs/tca_excluded_genes.tsv"
     File log = "fit_tca.log"
   }
@@ -72,7 +66,6 @@ task FitTca {
 
 task ExportTcaBeds {
   input {
-    File tca_expression
     File expression
     Float log2_pseudocount
     File model
@@ -103,7 +96,6 @@ task ExportTcaBeds {
       covariates_arguments=(--covariates "$covariates_path")
     fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/export_tca_beds.R \
-      --tca-expression '~{tca_expression}' \
       --expression '~{expression}' \
       --model '~{model}' \
       --weights '~{tca_weights}' \

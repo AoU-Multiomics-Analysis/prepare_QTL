@@ -126,7 +126,6 @@ workflow CellTypeDeconvolution {
 
   call tca_tasks.ExportTcaBeds {
     input:
-      tca_expression = FitTca.tca_expression,
       expression = FilterExpressionGenes.expression,
       log2_pseudocount = log2_pseudocount,
       model = FitTca.model,
@@ -199,7 +198,6 @@ workflow CellTypeDeconvolution {
 
     File tca_model = FitTca.model
     File tca_model_log = FitTca.model_log
-    File tca_expression = FitTca.tca_expression
     File tca_excluded_genes = FitTca.excluded_genes
     File fit_tca_log = FitTca.log
 

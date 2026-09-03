@@ -319,12 +319,10 @@ testthat::test_that("TCA export reconstructs without optional covariates", {
     gene_id = gene_ids
   )
   expression_path <- file.path(working_directory, "expression.bed")
-  tca_expression_path <- file.path(working_directory, "tca_expression.tsv")
   weights_path <- file.path(working_directory, "weights.tsv")
   model_path <- file.path(working_directory, "model.rds")
   command_log <- file.path(working_directory, "command.log")
   write_expression_bed(expression_path, coordinates, 2^tca_expression)
-  write_numeric_matrix(tca_expression, tca_expression_path, "gene_id")
   write_numeric_matrix(weights, weights_path, "sample_id")
   model <- list(
     W = weights,
@@ -341,7 +339,6 @@ testthat::test_that("TCA export reconstructs without optional covariates", {
   arguments <- c(
     script,
     "--expression", expression_path,
-    "--tca-expression", tca_expression_path,
     "--model", model_path,
     "--weights", weights_path,
     "--num-cores", "1",
@@ -481,31 +478,6 @@ testthat::test_that("manifest provenance accepts digests and approved image tags
       "example:test"
     ),
     ~ testthat::expect_error(validate_container_image(.x), "immutable.*SHA-256")
-  )
-})
-
-testthat::test_that("constant exclusions are derived from input and modeled genes", {
-  testthat::expect_true(exists(
-    "count_excluded_constant_genes",
-    mode = "function"
-  ))
-  if (!exists("count_excluded_constant_genes", mode = "function")) {
-    return(invisible(NULL))
-  }
-  coordinates <- tibble::tibble(
-    `#chr` = rep("chr1", 3L),
-    start = c(0L, 10L, 20L),
-    end = c(5L, 15L, 25L),
-    gene_id = c("g1", "g2", "g3")
-  )
-
-  testthat::expect_identical(
-    count_excluded_constant_genes(coordinates, c("g1", "g3")),
-    1L
-  )
-  testthat::expect_error(
-    count_excluded_constant_genes(coordinates, c("g1", "missing")),
-    "modeled gene"
   )
 })
 
