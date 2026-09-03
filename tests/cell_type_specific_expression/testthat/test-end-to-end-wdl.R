@@ -255,7 +255,6 @@ testthat::test_that("end-to-end WDL exposes the full deconvolution provenance", 
     "File? dtangle_metadata = CellTypeDeconvolution.dtangle_metadata",
     "File? dtangle_overlap_report = CellTypeDeconvolution.dtangle_overlap_report",
     "File? transformed_lm22 = CellTypeDeconvolution.transformed_lm22",
-    "File? dtangle_shared_bulk = CellTypeDeconvolution.dtangle_shared_bulk",
     "File? dtangle_log = CellTypeDeconvolution.dtangle_log",
     "File proportions_lm22 = CellTypeDeconvolution.proportions_lm22",
     "File proportions_combined = CellTypeDeconvolution.proportions_combined",
@@ -284,4 +283,5 @@ testthat::test_that("end-to-end WDL exposes the full deconvolution provenance", 
     expected_outputs,
     ~ testthat::expect_true(.x %in% output_declarations, info = .x)
   )
+  testthat::expect_false(any(grepl("dtangle_shared_bulk", output_declarations)))
 })

@@ -165,7 +165,6 @@ workflow CellTypeDeconvolution {
     File? dtangle_metadata = RunDtangle.metadata
     File? dtangle_overlap_report = RunDtangle.overlap_report
     File? transformed_lm22 = RunDtangle.transformed_lm22
-    File? dtangle_shared_bulk = RunDtangle.shared_bulk
     File? dtangle_log = RunDtangle.log
 
     File proportions_lm22 = ProcessProportions.original

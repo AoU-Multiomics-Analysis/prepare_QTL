@@ -290,7 +290,7 @@ testthat::test_that("dtangle returns normalized proportions and nonempty markers
   testthat::expect_true(all(marker_counts$marker_count > 0L))
 })
 
-testthat::test_that("the dtangle CLI writes its six declared outputs", {
+testthat::test_that("the dtangle CLI writes its five declared outputs", {
   testthat::skip_if_not_installed("dtangle")
   lm22 <- make_synthetic_lm22()
   expression_cpm <- matrix(
@@ -338,6 +338,7 @@ testthat::test_that("the dtangle CLI writes its six declared outputs", {
   testthat::expect_equal(status, 0L)
   testthat::expect_true(all(file.exists(file.path(output_dir, c(
     "dtangle_proportions.tsv", "dtangle_markers.tsv", "dtangle_metadata.json",
-    "dtangle_overlap.tsv", "dtangle_lm22_log.tsv.gz", "dtangle_shared_bulk.tsv.gz"
+    "dtangle_overlap.tsv", "dtangle_lm22_log.tsv.gz"
   )))))
+  testthat::expect_false(file.exists(file.path(output_dir, "dtangle_shared_bulk.tsv.gz")))
 })
