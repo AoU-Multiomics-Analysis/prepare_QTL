@@ -87,10 +87,7 @@ run_dtangle_stage <- function() {
 
   message(sprintf("stage=dtangle utc_start=%s", utc_time()))
   lm22_linear <- standardize_lm22(read_lm22_matrix(options$lm22))
-  expression <- read_expression_bed(
-    options$expression,
-    options$log2_pseudocount
-  )
+  expression <- read_expression_bed(options$expression)
   annotation <- read_gtf_gene_annotation(options$gtf)
   dtangle_expression <- make_dtangle_expression(
     expression,
