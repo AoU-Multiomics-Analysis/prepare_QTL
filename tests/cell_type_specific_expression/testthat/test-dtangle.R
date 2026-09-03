@@ -28,6 +28,32 @@ testthat::test_that("dtangle CLI rejects incomplete direct CPM input mode", {
   )
 })
 
+testthat::test_that("dtangle CLI validates LM22 before the large inputs", {
+  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_dtangle.R")
+  lm22_path <- tempfile(fileext = ".tsv")
+  writeLines("Gene symbol\tB cells naive\nABCB4\t1", lm22_path)
+
+  result <- suppressWarnings(system2(
+    file.path(R.home("bin"), "Rscript"),
+    c(
+      script_path,
+      "--expression", "missing-expression.bed",
+      "--gtf", "missing-annotation.gtf",
+      "--lm22", lm22_path,
+      "--output-dir", "outputs"
+    ),
+    stdout = TRUE,
+    stderr = TRUE
+  ))
+
+  testthat::expect_true(!is.null(attr(result, "status")))
+  testthat::expect_match(
+    paste(result, collapse = "\n"),
+    "LM22 must contain exactly the 22 standard LM22 columns",
+    fixed = TRUE
+  )
+})
+
 testthat::test_that("dtangle CLI rejects the retired prepared-log option", {
   script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_dtangle.R")
 

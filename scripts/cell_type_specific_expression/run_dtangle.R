@@ -28,7 +28,10 @@ run_dtangle_stage <- function() {
     optparse::make_option(
       "--lm22",
       type = "character",
-      help = "Standard positive linear LM22 matrix TSV with gene_symbol first column."
+      help = paste(
+        "Standard positive linear LM22 matrix TSV with the official",
+        "'Gene symbol' header or the canonical 'gene_symbol' header."
+      )
     ),
     optparse::make_option(
       "--min-overlap",
@@ -80,6 +83,7 @@ run_dtangle_stage <- function() {
   }
 
   message(sprintf("stage=dtangle utc_start=%s", utc_time()))
+  lm22_linear <- standardize_lm22(read_lm22_matrix(options$lm22))
   expression <- read_expression_bed(
     options$expression,
     options$log2_pseudocount
@@ -91,7 +95,6 @@ run_dtangle_stage <- function() {
     options$log2_pseudocount
   )
   bulk_log <- dtangle_expression$log_expression
-  lm22_linear <- read_numeric_matrix(options$lm22, "gene_symbol")
   message(sprintf(
     "stage=dtangle bulk_dimensions=genes:%d samples:%d lm22_dimensions=genes:%d cell_types:%d",
     nrow(bulk_log), ncol(bulk_log), nrow(lm22_linear), ncol(lm22_linear)

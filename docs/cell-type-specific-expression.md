@@ -157,6 +157,10 @@ both inputs.
 - Supply `precomputed_proportions` to use precomputed LM22 proportions and
   skip dtangle.
 
+The workflow accepts the official LM22 first-column header, `Gene symbol`. It
+also accepts the canonical header, `gene_symbol`, and standardizes either form
+to `gene_symbol` inside the dtangle task.
+
 ### Precomputed LM22 schema
 
 The precomputed file must have `sample_id` as the first column. Sample IDs must
