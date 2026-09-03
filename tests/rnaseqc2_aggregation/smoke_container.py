@@ -129,6 +129,7 @@ def main() -> None:
             args.image, "-c", r"""
 set -euo pipefail
 python3 -m unittest discover -s /tests -p test_merge_rnaseqc.py -v
+python3 /tests/check_gce_credentials.py
 python3 - <<'PY'
 import subprocess
 text = subprocess.check_output(["gsutil", "version", "-l"], text=True)
