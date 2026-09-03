@@ -134,6 +134,7 @@ standalone_input_contract <- parse_expected_contract(c(
     "export_cpu|Int|8",
     "export_memory|String|\"256 GB\"",
     "export_disk_gb|Int|500",
+    "gene_summary_memory|String|\"8 GB\"",
     "manifest_cpu|Int|4",
     "manifest_memory|String|\"32 GB\"",
     "manifest_disk_gb|Int|100"
@@ -177,6 +178,7 @@ integrated_input_contract <- parse_expected_contract(c(
     "export_cpu|Int|8",
     "export_memory|String|\"256 GB\"",
     "export_disk_gb|Int|500",
+    "gene_summary_memory|String|\"8 GB\"",
     "manifest_cpu|Int|4",
     "manifest_memory|String|\"32 GB\"",
     "manifest_disk_gb|Int|100",

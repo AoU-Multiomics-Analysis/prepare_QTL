@@ -422,6 +422,39 @@ purrr::pwalk(
     )
   }
 )
+gene_summary <- readr::read_tsv(output_value("cell_type_gene_summary"), show_col_types = FALSE)
+require_true(
+  identical(gene_summary$cell_type, rep(expected_groups, each = length(expected_gene_ids))) &&
+    identical(gene_summary$gene_id, rep(expected_gene_ids, length(expected_groups))) &&
+    all(gene_summary$scale == "cpm") && all(gene_summary$n_samples == length(expected_samples)),
+  "Gene summary identities, sample counts, or CPM scale are incorrect"
+)
+purrr::walk(seq_len(nrow(inventory)), function(index) {
+  path <- cell_type_bed_paths[match(inventory$path[[index]], basename(cell_type_bed_paths))]
+  bed <- readr::read_tsv(path, show_col_types = FALSE)
+  values <- as.matrix(bed[, expected_samples])
+  observed <- gene_summary |> dplyr::filter(.data$cell_type == inventory$cell_group[[index]])
+  require_true(
+    identical(observed[["#chr"]], bed[["#chr"]]) &&
+      identical(observed$start, bed$start) && identical(observed$end, bed$end),
+    "Gene summary coordinates differ from the exported BED"
+  )
+  expected <- list(
+    mean_cpm = rowMeans(values), median_cpm = apply(values, 1, stats::median),
+    sd_cpm = apply(values, 1, stats::sd),
+    se_mean_cpm = apply(values, 1, stats::sd) / sqrt(ncol(values)),
+    q1_cpm = apply(values, 1, stats::quantile, probs = 0.25, type = 7),
+    q3_cpm = apply(values, 1, stats::quantile, probs = 0.75, type = 7),
+    iqr_cpm = apply(values, 1, stats::IQR, type = 7)
+  )
+  purrr::iwalk(expected, function(value, name) {
+    require_true(
+      isTRUE(all.equal(observed[[name]], unname(value), tolerance = 1e-10)),
+      sprintf("Gene summary %s differs from exported CPM values", name)
+    )
+  })
+})
+
 public_inventory <- readr::read_tsv(
   output_value("output_inventory"),
   show_col_types = FALSE,
@@ -572,7 +605,7 @@ required_file_outputs <- c(
   "tca_excluded_genes", "fit_tca_log", "cell_type_bed_inventory",
   "reconstruction_by_sample", "qc_summary", "qc_plots", "export_log",
   "export_detail_log", "output_manifest", "output_inventory", "manifest_log",
-  "effective_parameters_file"
+  "effective_parameters_file", "cell_type_gene_summary", "gene_summary_log"
 )
 if (identical(expected_proportion_mode, "hspe")) {
   hspe_metadata <- jsonlite::read_json(output_value("hspe_metadata"))

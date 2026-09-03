@@ -46,6 +46,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     Int export_cpu = 8
     String export_memory = "256 GB"
     Int export_disk_gb = 500
+    String gene_summary_memory = "8 GB"
     Int manifest_cpu = 4
     String manifest_memory = "32 GB"
     Int manifest_disk_gb = 100
@@ -92,6 +93,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       export_cpu = export_cpu,
       export_memory = export_memory,
       export_disk_gb = export_disk_gb,
+      gene_summary_memory = gene_summary_memory,
       manifest_cpu = manifest_cpu,
       manifest_memory = manifest_memory,
       manifest_disk_gb = manifest_disk_gb
@@ -180,6 +182,8 @@ workflow PrepareCellTypeEqtlWorkflow {
 
     Array[File] cell_type_beds = CellTypeDeconvolution.cell_type_beds
     File cell_type_bed_inventory = CellTypeDeconvolution.cell_type_bed_inventory
+    File cell_type_gene_summary = CellTypeDeconvolution.cell_type_gene_summary
+    File gene_summary_log = CellTypeDeconvolution.gene_summary_log
     File reconstruction_by_sample = CellTypeDeconvolution.reconstruction_by_sample
     File qc_summary = CellTypeDeconvolution.qc_summary
     File qc_plots = CellTypeDeconvolution.qc_plots

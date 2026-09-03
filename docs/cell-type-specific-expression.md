@@ -120,6 +120,7 @@ a value.
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
 | `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
+| `gene_summary_memory` | `String` | `"8 GB"` | Memory for the gene summary task. It uses one CPU and `export_disk_gb` for disk space. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
 | `manifest_disk_gb` | `Int` | `100` | Local disk in GB for the deconvolution manifest. |
@@ -165,6 +166,7 @@ a value.
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
 | `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
+| `gene_summary_memory` | `String` | `"8 GB"` | Memory for the gene summary task. It uses one CPU and `export_disk_gb` for disk space. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
 | `manifest_disk_gb` | `Int` | `100` | Local disk in GB for the deconvolution manifest. |
@@ -341,6 +343,48 @@ To use precomputed proportions in the integrated workflow, keep the required
 merges it with the selected phenotype PCs for each output branch.
 `deconvolution_covariates` is optional and has a different role in the TCA
 model.
+
+## Per-gene CPM summaries
+
+Both entry points publish `cell_type_gene_summary` as
+`cell_type_gene_summary.tsv.gz`, and `gene_summary_log`. The
+`SummarizeCellTypeBeds` task runs after TCA BED export in both HSPE and
+precomputed-proportion modes. It matches localized BED basenames to the
+inventory and reads one BED at a time in blocks of 256 genes. The task uses
+one CPU, `gene_summary_memory` (default `"8 GB"`), `export_disk_gb`, and the
+global retry settings. This adds one task; it does not add a scatter or
+change TCA fitting.
+
+The table has one row per cell type and gene. Cell types follow inventory
+order; genes follow BED order. Gene IDs retain their version suffixes. The
+columns are:
+
+- `cell_type`, `n_samples`, `scale` (always `cpm`).
+- `#chr`, `start`, `end`, `gene_id` from the BED.
+- `mean_cpm`, `median_cpm` across samples.
+- `sd_cpm`: sample standard deviation, with denominator `n_samples - 1`.
+- `se_mean_cpm`: `sd_cpm / sqrt(n_samples)`.
+- `q1_cpm`, `q3_cpm`: 25th and 75th percentiles, using R quantile type 7.
+- `iqr_cpm`: `q3_cpm - q1_cpm`.
+
+The task summarizes TCA-estimated linear CPM before downstream sample
+selection, connectivity-outlier removal, INT, or scaling. It includes all
+samples and genes present in the exported BEDs. It does not change the BEDs,
+apply a log transform, remove zeros, or clamp negative TCA estimates. Invalid
+or missing values cause an error instead of being silently removed. For one
+sample, SD and standard error are `NA`; for a constant gene with two or more
+samples, both are zero.
+
+The standard error describes between-sample variation in the estimated
+values, under an independent-sample assumption. It does not include TCA model
+uncertainty and is not a standard error for the median. Related or repeated
+samples need a separate dependence-aware analysis. These are CPM summaries,
+not TPM summaries. Before comparing external datasets, check expression
+units, gene identifiers, cell-type definitions, and processing differences.
+
+The summary is a separate workflow output. The existing BED inventory and
+QTL manifest keep their current schemas. GitHub Actions checks the summary
+against the exported BEDs in both end-to-end smoke runs.
 
 ## Independent filtering and outputs
 
