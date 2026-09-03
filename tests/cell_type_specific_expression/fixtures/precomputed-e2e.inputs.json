@@ -1,5 +1,6 @@
 {
   "PrepareCellTypeEqtlWorkflow.expression": "tests/cell_type_specific_expression/fixtures/synthetic_expression_with_zero.bed",
+  "PrepareCellTypeEqtlWorkflow.lm22": "tests/cell_type_specific_expression/fixtures/synthetic_signature.tsv",
   "PrepareCellTypeEqtlWorkflow.precomputed_proportions": "tests/cell_type_specific_expression/fixtures/precomputed_proportions.tsv",
   "PrepareCellTypeEqtlWorkflow.OutputPrefix": "synthetic.precomputed",
   "PrepareCellTypeEqtlWorkflow.log2_pseudocount": 1,

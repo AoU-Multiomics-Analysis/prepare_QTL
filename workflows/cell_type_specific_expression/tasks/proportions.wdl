@@ -2,7 +2,6 @@ version 1.0
 
 task ValidateProportionMode {
   input {
-    File? lm22
     File? precomputed_proportions
     String docker_image
     Int cpu = 1
@@ -20,11 +19,10 @@ task ValidateProportionMode {
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/validate_proportion_mode.R \
-      --lm22-defined '~{defined(lm22)}' \
       --precomputed-defined '~{defined(precomputed_proportions)}' \
       --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=%s outputs=%s completion_time=%s\n' \
-      "$stage" "inputs:2" \
+      "$stage" "inputs:1" \
       "selected_mode,estimate_proportions" \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>

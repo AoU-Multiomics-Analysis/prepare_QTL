@@ -15,11 +15,6 @@ parse_presence_flag <- function(value, label) {
 run_validation <- function() {
   option_list <- list(
     optparse::make_option(
-      "--lm22-defined",
-      dest = "lm22_defined",
-      type = "character"
-    ),
-    optparse::make_option(
       "--precomputed-defined",
       dest = "precomputed_defined",
       type = "character"
@@ -33,7 +28,7 @@ run_validation <- function() {
   options <- optparse::parse_args(optparse::OptionParser(
     option_list = option_list
   ))
-  required <- c("lm22_defined", "precomputed_defined", "output_dir")
+  required <- c("precomputed_defined", "output_dir")
   missing <- required[vapply(
     options[required],
     function(value) is.null(value) || !nzchar(value),
@@ -47,7 +42,6 @@ run_validation <- function() {
   }
   message(sprintf("stage=validate_proportion_mode utc_start=%s", tensor_utc_time()))
   result <- validate_proportion_mode(
-    parse_presence_flag(options$lm22_defined, "lm22_defined"),
     parse_presence_flag(
       options$precomputed_defined,
       "precomputed_proportions_defined"

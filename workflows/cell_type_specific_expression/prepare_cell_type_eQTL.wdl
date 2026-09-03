@@ -8,7 +8,7 @@ workflow PrepareCellTypeEqtlWorkflow {
   input {
     File expression
     File gtf
-    File? lm22
+    File lm22
     File? precomputed_proportions
     File? deconvolution_covariates
     File SampleList

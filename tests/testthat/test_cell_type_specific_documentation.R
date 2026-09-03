@@ -103,7 +103,7 @@ parse_wdl_input_contract <- function(path) {
 standalone_input_contract <- parse_expected_contract(c(
     "expression|File|Required",
     "gtf|File|Required",
-    "lm22|File?|None",
+    "lm22|File|Required",
     "precomputed_proportions|File?|None",
     "covariates|File?|None",
     "deconvolution_docker_image|String|\"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main\"",
@@ -138,7 +138,7 @@ standalone_input_contract <- parse_expected_contract(c(
 integrated_input_contract <- parse_expected_contract(c(
     "expression|File|Required",
     "gtf|File|Required",
-    "lm22|File?|None",
+    "lm22|File|Required",
     "precomputed_proportions|File?|None",
     "deconvolution_covariates|File?|None",
     "SampleList|File|Required",
@@ -265,7 +265,8 @@ testthat::test_that("guide states the expression and proportion input contracts"
         "log2\\(CPM \\+ log2_pseudocount\\).*exactly once",
         "LM22.*dtangle",
         "precomputed LM22 proportions",
-        "exactly one.*lm22.*precomputed_proportions",
+        "LM22.*required",
+        "precomputed_proportions.*provided.*skip.*dtangle",
         "exactly the 22 standard LM22 columns",
         "sample_id.*first column",
         "sample IDs.*unique.*non-empty",

@@ -30,8 +30,8 @@ a value.
 | --- | --- | --- | --- |
 | `expression` | `File` | Required | Linear-CPM BED described below. |
 | `gtf` | `File` | Required | Gene annotation used to map gene IDs to symbols in dtangle mode. The WDL requires it in both modes. |
-| `lm22` | `File?` | `None` | LM22 reference matrix. Supply exactly one proportion-mode input. |
-| `precomputed_proportions` | `File?` | `None` | Sample-by-LM22 proportion matrix. Supply exactly one proportion-mode input. |
+| `lm22` | `File` | Required | LM22 reference matrix. The workflow requires it in both proportion modes. |
+| `precomputed_proportions` | `File?` | `None` | Optional sample-by-LM22 proportion matrix. If provided, the workflow skips dtangle. |
 | `covariates` | `File?` | `None` | Optional TCA covariates with `sample_id` first. Samples must match the expression order. Values must be finite numeric values, with no intercept or constant column. |
 | `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for all deconvolution tasks. |
 | `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for all tasks. |
@@ -67,8 +67,8 @@ a value.
 | --- | --- | --- | --- |
 | `expression` | `File` | Required | Linear-CPM BED described below. |
 | `gtf` | `File` | Required | Gene annotation used to map gene IDs to symbols in dtangle mode. The WDL requires it in both modes. |
-| `lm22` | `File?` | `None` | LM22 reference matrix. Supply exactly one proportion-mode input. |
-| `precomputed_proportions` | `File?` | `None` | Sample-by-LM22 proportion matrix. Supply exactly one proportion-mode input. |
+| `lm22` | `File` | Required | LM22 reference matrix. The workflow requires it in both proportion modes. |
+| `precomputed_proportions` | `File?` | `None` | Optional sample-by-LM22 proportion matrix. If provided, the workflow skips dtangle. |
 | `deconvolution_covariates` | `File?` | `None` | Optional TCA covariates. This is the integrated alias of standalone `covariates`. |
 | `SampleList` | `File` | Required | Sample list passed to every scattered expression-QTL call. |
 | `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
@@ -152,12 +152,13 @@ applies INT to one branch and direct centering and scaling to the other branch.
 
 ## Proportion modes
 
-You must supply exactly one of lm22 or precomputed_proportions. Do not supply
-both inputs.
+LM22 is required. If `precomputed_proportions` is not provided, the workflow
+uses LM22 to estimate the 22 cell-type proportions with dtangle. If
+`precomputed_proportions` is provided, the workflow skips dtangle and uses the
+provided precomputed LM22 proportions.
 
-- Supply `lm22` to estimate the 22 LM22 cell-type proportions with dtangle.
-- Supply `precomputed_proportions` to use precomputed LM22 proportions and
-  skip dtangle.
+- Provide only `lm22` to estimate proportions with dtangle.
+- Provide both inputs to use precomputed proportions and skip dtangle.
 
 The workflow accepts the official LM22 first-column header, `Gene symbol`. It
 also accepts the canonical header, `gene_symbol`, and standardizes either form
@@ -222,6 +223,7 @@ This example runs the standalone workflow with precomputed proportions:
 {
   "CellTypeDeconvolution.expression": "gs://bucket/expression.cpm.bed.gz",
   "CellTypeDeconvolution.gtf": "gs://bucket/genes.gtf.gz",
+  "CellTypeDeconvolution.lm22": "gs://bucket/LM22.txt",
   "CellTypeDeconvolution.precomputed_proportions": "gs://bucket/lm22-proportions.tsv",
   "CellTypeDeconvolution.log2_pseudocount": 0.0
 }
@@ -243,8 +245,8 @@ prefix. Add the required `SampleList`, `AdditionalCovariates`, and
 }
 ```
 
-To use precomputed proportions in the integrated workflow, remove the `lm22`
-entry and add this entry:
+To use precomputed proportions in the integrated workflow, keep the required
+`lm22` entry and add this entry:
 
 ```json
 {

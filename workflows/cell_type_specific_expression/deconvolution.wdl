@@ -9,7 +9,7 @@ workflow CellTypeDeconvolution {
   input {
     File expression
     File gtf
-    File? lm22
+    File lm22
     File? precomputed_proportions
     File? covariates
     String deconvolution_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"
@@ -45,7 +45,6 @@ workflow CellTypeDeconvolution {
   String tca_version = "1.2.1"
   call proportion_tasks.ValidateProportionMode {
     input:
-      lm22 = lm22,
       precomputed_proportions = precomputed_proportions,
       docker_image = deconvolution_docker_image,
       preemptible_attempts = preemptible_attempts,
@@ -61,7 +60,7 @@ workflow CellTypeDeconvolution {
         expression = expression,
         log2_pseudocount = log2_pseudocount,
         gtf = gtf,
-        lm22 = select_first([lm22]),
+        lm22 = lm22,
         min_overlap = min_lm22_overlap,
         marker_fraction = dtangle_marker_fraction,
         marker_method = dtangle_marker_method,

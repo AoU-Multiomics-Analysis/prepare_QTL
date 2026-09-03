@@ -15,14 +15,14 @@ if (file.exists(assertion_helpers_path)) {
   source(assertion_helpers_path, local = .GlobalEnv)
 }
 
-testthat::test_that("proportion mode requires exactly one optional input", {
+testthat::test_that("precomputed proportions select whether dtangle runs", {
   testthat::expect_true(exists("validate_proportion_mode", mode = "function"))
   if (!exists("validate_proportion_mode", mode = "function")) {
     return(invisible(NULL))
   }
 
-  dtangle <- validate_proportion_mode(TRUE, FALSE)
-  precomputed <- validate_proportion_mode(FALSE, TRUE)
+  dtangle <- validate_proportion_mode(FALSE)
+  precomputed <- validate_proportion_mode(TRUE)
   testthat::expect_identical(
     dtangle,
     list(selected_mode = "dtangle", estimate_proportions = TRUE)
@@ -31,17 +31,11 @@ testthat::test_that("proportion mode requires exactly one optional input", {
     precomputed,
     list(selected_mode = "precomputed", estimate_proportions = FALSE)
   )
-  testthat::expect_error(
-    validate_proportion_mode(TRUE, TRUE),
-    "exactly one.*lm22.*precomputed_proportions"
-  )
-  testthat::expect_error(
-    validate_proportion_mode(FALSE, FALSE),
-    "exactly one.*lm22.*precomputed_proportions"
-  )
+  testthat::expect_error(validate_proportion_mode(NA), "true or false")
+  testthat::expect_error(validate_proportion_mode(1), "true or false")
 })
 
-run_validation_cli <- function(lm22_defined, precomputed_defined) {
+run_validation_cli <- function(precomputed_defined) {
   script <- testthat::test_path(
     "..", "..", "..", "scripts", "cell_type_specific_expression",
     "validate_proportion_mode.R"
@@ -55,7 +49,6 @@ run_validation_cli <- function(lm22_defined, precomputed_defined) {
     file.path(R.home("bin"), "Rscript"),
     c(
       script,
-      "--lm22-defined", tolower(as.character(lm22_defined)),
       "--precomputed-defined", tolower(as.character(precomputed_defined)),
       "--output-dir", output_directory
     ),
@@ -69,24 +62,20 @@ run_validation_cli <- function(lm22_defined, precomputed_defined) {
   list(status = as.integer(status), output = paste(output, collapse = "\n"))
 }
 
-testthat::test_that("mode validation CLI rejects both optional inputs without Docker", {
-  result <- run_validation_cli(TRUE, TRUE)
+testthat::test_that("mode validation CLI selects precomputed proportions", {
+  result <- run_validation_cli(TRUE)
 
-  testthat::expect_false(identical(result$status, 0L))
-  testthat::expect_match(
-    result$output,
-    "exactly one.*lm22.*precomputed_proportions"
-  )
+  testthat::expect_identical(result$status, 0L, info = result$output)
+  testthat::expect_match(result$output, "selected_mode=precomputed")
+  testthat::expect_match(result$output, "estimate_proportions=false")
 })
 
-testthat::test_that("mode validation CLI rejects neither optional input without Docker", {
-  result <- run_validation_cli(FALSE, FALSE)
+testthat::test_that("mode validation CLI selects dtangle when proportions are absent", {
+  result <- run_validation_cli(FALSE)
 
-  testthat::expect_false(identical(result$status, 0L))
-  testthat::expect_match(
-    result$output,
-    "exactly one.*lm22.*precomputed_proportions"
-  )
+  testthat::expect_identical(result$status, 0L, info = result$output)
+  testthat::expect_match(result$output, "selected_mode=dtangle")
+  testthat::expect_match(result$output, "estimate_proportions=true")
 })
 
 fixture_generator_path <- function() {
@@ -400,7 +389,7 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
   precomputed_inputs <- jsonlite::read_json(input_paths[[2L]], simplifyVector = TRUE)
   prefix <- "PrepareCellTypeEqtlWorkflow."
   required_shared_inputs <- c(
-    "expression", "gtf", "SampleList", "AdditionalCovariates", "OutputPrefix",
+    "expression", "gtf", "lm22", "SampleList", "AdditionalCovariates", "OutputPrefix",
     "deconvolution_docker_image", "qtl_docker_image", "log2_pseudocount"
   )
   purrr::walk(list(dtangle_inputs, precomputed_inputs), function(inputs) {
@@ -427,7 +416,7 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
   testthat::expect_true(
     paste0(prefix, "precomputed_proportions") %in% names(precomputed_inputs)
   )
-  testthat::expect_false(paste0(prefix, "lm22") %in% names(precomputed_inputs))
+  testthat::expect_true(paste0(prefix, "lm22") %in% names(precomputed_inputs))
   testthat::expect_gt(
     precomputed_inputs[[paste0(prefix, "log2_pseudocount")]],
     0

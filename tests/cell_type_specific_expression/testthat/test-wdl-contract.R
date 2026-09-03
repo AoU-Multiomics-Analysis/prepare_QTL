@@ -28,6 +28,30 @@ testthat::test_that("standalone deconvolution sources use WDL 1.0", {
   })
 })
 
+testthat::test_that("LM22 is required and precomputed proportions control estimation", {
+  workflow_paths <- c("deconvolution.wdl", "prepare_cell_type_eQTL.wdl")
+  purrr::walk(workflow_paths, function(path) {
+    text <- wdl_text(path)
+    testthat::expect_match(text, "File lm22", fixed = TRUE, info = path)
+    testthat::expect_false(grepl("File? lm22", text, fixed = TRUE), info = path)
+    testthat::expect_match(
+      text,
+      "File? precomputed_proportions",
+      fixed = TRUE,
+      info = path
+    )
+  })
+
+  task_text <- wdl_text("tasks", "proportions.wdl")
+  testthat::expect_false(grepl("File? lm22", task_text, fixed = TRUE))
+  testthat::expect_false(grepl("--lm22-defined", task_text, fixed = TRUE))
+  testthat::expect_match(
+    task_text,
+    "--precomputed-defined '~{defined(precomputed_proportions)}'",
+    fixed = TRUE
+  )
+})
+
 testthat::test_that("TCA task memory defaults are 256 GB", {
   text <- wdl_text("tasks", "tca.wdl")
   task_names <- c("FitTca", "ExportTcaBeds")
