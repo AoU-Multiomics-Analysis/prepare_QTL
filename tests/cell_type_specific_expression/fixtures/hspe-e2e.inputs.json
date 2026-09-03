@@ -39,5 +39,8 @@
   "PrepareCellTypeEqtlWorkflow.scatter_disk_gb": 10,
   "PrepareCellTypeEqtlWorkflow.eqtl_cpu": 2,
   "PrepareCellTypeEqtlWorkflow.eqtl_memory": 8,
-  "PrepareCellTypeEqtlWorkflow.eqtl_disk_gb": 20
+  "PrepareCellTypeEqtlWorkflow.eqtl_disk_gb": 20,
+  "PrepareCellTypeEqtlWorkflow.hspe_batch_size": 5,
+  "PrepareCellTypeEqtlWorkflow.hspe_batch_memory": "2 GB",
+  "PrepareCellTypeEqtlWorkflow.hspe_batch_disk_gb": 10
 }

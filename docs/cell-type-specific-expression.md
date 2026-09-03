@@ -30,17 +30,52 @@ DEoptimR 1.1-4 and nloptr 2.2.1.
 HSPE replaces dtangle for proportion estimation. Rename the `dtangle_*` inputs
 to `hspe_*` in existing Terra configurations or input JSON files. This includes
 `marker_fraction`, `quantile_normalize`, `cpu`, `memory`, and `disk_gb` suffixes.
-The estimator outputs and task names now use `hspe` and `RunHspe`. The
+The estimator outputs use the `hspe` prefix. The
 `estimated_proportions` output name and the precomputed-proportion schema do not
 change. Use the matching workflow and container release; an older container
-does not contain `run_hspe.R`.
+does not contain the batch preparation, fitting, and merge scripts.
 
 The estimator uses HSPE's default DEoptimR optimizer and stopping criteria.
 `random_seed` controls HSPE and TCA independently. HSPE 0.1 fits samples
-sequentially; `hspe_cpu` does not enable sample-level parallel execution.
+sequentially within each batch; Terra can run separate batches concurrently.
 The metadata records the HSPE version, optimizer version, seed, markers, and
 LM22 overlap. Marker selection remains `ratio` with fraction `0.10` by default.
 No new gene-expression filter or normalization is introduced by this migration.
+
+## HSPE sample batches
+
+`PrepareHspeBatches` reads the gene-type-filtered BED and GTF once for HSPE.
+It maps gene IDs, combines duplicate symbols in linear CPM, applies the log2
+transform, and intersects with LM22. If joint quantile normalization is enabled,
+it runs once on all reference and bulk profiles before marker selection.
+The task selects ratio markers once from the reference and writes small RDS
+files that contain only selected-marker expression for each sample batch.
+Workers do not receive the full BED or GTF and do not select markers again.
+
+`RunHspeBatch` uses one CPU and fits up to `hspe_batch_size` samples (default
+100). The default worker memory is 4 GB. The existing `hspe_cpu`, `hspe_memory`,
+and `hspe_disk_gb` settings apply to preparation and gene-type filtering. Increasing `hspe_cpu` does
+not increase worker concurrency. Terra/Cromwell scheduling and cloud quotas
+control how many batches run together. A failed batch can retry independently.
+
+Each sample seed is derived from the workflow seed and its UTF-8 sample ID.
+It does not depend on batch size, sample order, or worker scheduling. These seeds
+differ from the previous single-call random sequence, so old results need not
+be bitwise identical. The HSPE loss, optimizer, and stopping rules are unchanged.
+
+`MergeHspeBatches` rejects duplicate, missing, or unexpected samples, mismatched
+cell-type columns, invalid proportions, inconsistent seeds, and version conflicts.
+It restores the original BED sample order. Its `hspe_sample_diagnostics` output
+contains each sample ID, seed, iteration count, convergence code, and optimized
+loss. Code 0 means convergence; code 1 means the iteration limit was reached.
+The `hspe_log` output combines preparation, worker, and merge logs. Metadata
+records batch size, batch count, selected-marker count, and seed strategy.
+Batch RDS files are internal task outputs, not new public workflow outputs.
+
+Major-lineage grouping and the cohort-mean abundance filter run after merging.
+TCA still fits the full cohort on linear CPM. Supplying precomputed proportions
+skips all three HSPE stages. The GitHub Actions fixture uses 12 samples in
+batches of five, which also tests the final partial batch.
 
 ## Public input contracts
 
@@ -63,6 +98,9 @@ a value.
 | `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
 | `hspe_marker_fraction` | `Float` | `0.10` | hspe marker fraction in `(0, 1]`. |
 | `hspe_quantile_normalize` | `Boolean` | `false` | If `true`, quantile-normalize the joined LM22 and bulk profiles before hspe. |
+| `hspe_batch_size` | `Int` | `100` | Maximum samples per HSPE batch; must be positive. |
+| `hspe_batch_memory` | `String` | `"4 GB"` | Memory for each single-CPU HSPE worker. |
+| `hspe_batch_disk_gb` | `Int` | `10` | Local disk in GB for each HSPE worker. |
 | `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
 | `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
@@ -105,6 +143,9 @@ a value.
 | `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
 | `hspe_marker_fraction` | `Float` | `0.10` | hspe marker fraction in `(0, 1]`. |
 | `hspe_quantile_normalize` | `Boolean` | `false` | If `true`, quantile-normalize the joined LM22 and bulk profiles before hspe. |
+| `hspe_batch_size` | `Int` | `100` | Maximum samples per HSPE batch; must be positive. |
+| `hspe_batch_memory` | `String` | `"4 GB"` | Memory for each single-CPU HSPE worker. |
+| `hspe_batch_disk_gb` | `Int` | `10` | Local disk in GB for each HSPE worker. |
 | `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
 | `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
@@ -182,7 +223,8 @@ bulk matrix and `log2(LM22 + log2_pseudocount)` for the reference matrix.
 Duplicate gene symbols are combined in linear CPM before the bulk transform.
 TCA uses valid, nonconstant gene-ID rows directly in linear CPM. Each exported
 cell-type BED is on the linear-CPM model scale. The workflow does not store a
-separate transformed bulk-expression matrix. The export task rebuilds the
+full transformed bulk-expression matrix. Marker-only batches are temporary
+HSPE task files. The export task rebuilds the
 linear TCA view from `filtered_expression` and removes the same constant genes
 before tensor extraction.
 

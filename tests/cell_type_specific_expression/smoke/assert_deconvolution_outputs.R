@@ -582,11 +582,28 @@ if (identical(expected_proportion_mode, "hspe")) {
       as.numeric(hspe_metadata$random_seed) == as.numeric(input_value("random_seed")),
     "HSPE metadata must record the source package, optimizer, and workflow seed"
   )
+  require_true(
+    as.numeric(hspe_metadata$batch_size) == as.numeric(input_value("hspe_batch_size")) &&
+      as.numeric(hspe_metadata$batch_count) == ceiling(length(expected_samples) /
+        as.numeric(input_value("hspe_batch_size"))) &&
+      as.numeric(hspe_metadata$batch_count) > 1,
+    "The HSPE smoke run must fit and merge multiple batches, including a partial batch"
+  )
+  diagnostics <- readr::read_tsv(output_value("hspe_sample_diagnostics"),
+                                show_col_types = FALSE)
+  require_true(identical(diagnostics$sample_id, expected_samples),
+               "HSPE diagnostics must preserve every sample in the original order")
+  require_true(all(diagnostics$random_seed > 0 & diagnostics$iterations > 0 &
+                     diagnostics$convergence %in% c(0, 1)),
+               "HSPE diagnostics must contain valid seeds and optimizer status")
   required_file_outputs <- c(
     required_file_outputs,
     "estimated_proportions", "hspe_markers", "hspe_metadata",
-    "hspe_overlap_report", "transformed_lm22", "hspe_log"
+    "hspe_overlap_report", "transformed_lm22", "hspe_log", "hspe_sample_diagnostics"
   )
+} else {
+  require_true(is.null(outputs[[paste(workflow_name, "hspe_sample_diagnostics", sep = ".")]]),
+               "Precomputed mode must skip HSPE batches")
 }
 purrr::walk(required_file_outputs, function(name) {
   path <- output_value(name)

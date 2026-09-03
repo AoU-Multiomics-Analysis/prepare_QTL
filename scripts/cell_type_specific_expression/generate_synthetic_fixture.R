@@ -250,6 +250,9 @@ hspe_inputs <- append(
 )
 # A non-default seed checks forwarding through both workflow layers.
 hspe_inputs[["PrepareCellTypeEqtlWorkflow.random_seed"]] <- 20260902L
+hspe_inputs[["PrepareCellTypeEqtlWorkflow.hspe_batch_size"]] <- 5L
+hspe_inputs[["PrepareCellTypeEqtlWorkflow.hspe_batch_memory"]] <- "2 GB"
+hspe_inputs[["PrepareCellTypeEqtlWorkflow.hspe_batch_disk_gb"]] <- 10L
 precomputed_inputs <- append(
   common_inputs,
   list(

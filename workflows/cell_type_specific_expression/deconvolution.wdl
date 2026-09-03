@@ -19,6 +19,9 @@ workflow CellTypeDeconvolution {
     Float min_lm22_overlap = 0.80
     Float hspe_marker_fraction = 0.10
     Boolean hspe_quantile_normalize = false
+    Int hspe_batch_size = 100
+    String hspe_batch_memory = "4 GB"
+    Int hspe_batch_disk_gb = 10
     Float group_mean_threshold = 0.0001
     Float zero_floor = 0.000001
     Int tca_max_iters = 10
@@ -71,7 +74,7 @@ workflow CellTypeDeconvolution {
   String hspe_marker_method = "ratio"
 
   if (ValidateProportionMode.estimate_proportions) {
-    call hspe_tasks.RunHspe {
+    call hspe_tasks.PrepareHspeBatches {
       input:
         expression = FilterExpressionGenes.expression,
         log2_pseudocount = log2_pseudocount,
@@ -79,7 +82,7 @@ workflow CellTypeDeconvolution {
         lm22 = lm22,
         min_overlap = min_lm22_overlap,
         marker_fraction = hspe_marker_fraction,
-        marker_method = hspe_marker_method,
+        batch_size = hspe_batch_size,
         quantile_normalize = hspe_quantile_normalize,
         random_seed = random_seed,
         docker_image = deconvolution_docker_image,
@@ -89,10 +92,35 @@ workflow CellTypeDeconvolution {
         preemptible_attempts = preemptible_attempts,
         max_retries = max_retries
     }
+    scatter (batch in PrepareHspeBatches.batches) {
+      call hspe_tasks.RunHspeBatch {
+        input:
+          prepared = PrepareHspeBatches.prepared,
+          batch = batch,
+          docker_image = deconvolution_docker_image,
+          memory = hspe_batch_memory,
+          disk_gb = hspe_batch_disk_gb,
+          preemptible_attempts = preemptible_attempts,
+          max_retries = max_retries
+      }
+    }
+    call hspe_tasks.MergeHspeBatches {
+      input:
+        prepared = PrepareHspeBatches.prepared,
+        batch_results = RunHspeBatch.result,
+        preparation_log = PrepareHspeBatches.log,
+        batch_logs = RunHspeBatch.log,
+        docker_image = deconvolution_docker_image,
+        cpu = proportions_cpu,
+        memory = proportions_memory,
+        disk_gb = proportions_disk_gb,
+        preemptible_attempts = preemptible_attempts,
+        max_retries = max_retries
+    }
   }
 
   File proportions_for_processing = if ValidateProportionMode.estimate_proportions
-    then select_first([RunHspe.proportions])
+    then select_first([MergeHspeBatches.proportions])
     else select_first([precomputed_proportions])
 
   call proportion_tasks.ProcessProportions {
@@ -150,7 +178,7 @@ workflow CellTypeDeconvolution {
       combined_proportions = ProcessProportions.combined,
       tca_weights = ProcessProportions.tca_weights,
       filter_report = ProcessProportions.filter_report,
-      hspe_metadata = RunHspe.metadata,
+      hspe_metadata = MergeHspeBatches.metadata,
       proportion_mode = proportion_mode,
       log2_pseudocount = log2_pseudocount,
       min_lm22_overlap = min_lm22_overlap,
@@ -181,12 +209,13 @@ workflow CellTypeDeconvolution {
 
     File proportion_mode_validation_log = ValidateProportionMode.log
 
-    File? estimated_proportions = RunHspe.proportions
-    File? hspe_markers = RunHspe.markers
-    File? hspe_metadata = RunHspe.metadata
-    File? hspe_overlap_report = RunHspe.overlap_report
-    File? transformed_lm22 = RunHspe.transformed_lm22
-    File? hspe_log = RunHspe.log
+    File? estimated_proportions = MergeHspeBatches.proportions
+    File? hspe_markers = PrepareHspeBatches.markers
+    File? hspe_metadata = MergeHspeBatches.metadata
+    File? hspe_overlap_report = PrepareHspeBatches.overlap_report
+    File? transformed_lm22 = PrepareHspeBatches.transformed_lm22
+    File? hspe_log = MergeHspeBatches.log
+    File? hspe_sample_diagnostics = MergeHspeBatches.diagnostics
 
     File proportions_lm22 = ProcessProportions.original
     File proportions_combined = ProcessProportions.combined
