@@ -318,7 +318,8 @@ run_build_manifest <- function() {
     parameters,
     options$effective_parameters_output,
     auto_unbox = TRUE,
-    pretty = TRUE
+    pretty = TRUE,
+    digits = NA
   )
   readr::write_tsv(qc_summary, options$qc_output, na = "")
   complete_message <- sprintf(

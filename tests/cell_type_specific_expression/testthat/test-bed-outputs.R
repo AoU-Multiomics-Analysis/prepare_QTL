@@ -638,7 +638,7 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     "--model-log", model_log_path,
     "--tca-version", "1.2.1",
     "--proportion-mode", "precomputed",
-    "--log2-pseudocount", "0.25",
+    "--log2-pseudocount", "0.123456789",
     "--min-lm22-overlap", "0.8",
     "--dtangle-marker-fraction", "0.1",
     "--dtangle-marker-method", "ratio",
@@ -674,7 +674,11 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     )
   )
   testthat::expect_identical(effective_parameters$proportion_mode, "precomputed")
-  testthat::expect_equal(effective_parameters$log2_pseudocount, 0.25)
+  testthat::expect_equal(
+    effective_parameters$log2_pseudocount,
+    0.123456789,
+    tolerance = 1e-12
+  )
   testthat::expect_identical(effective_parameters$dtangle_quantile_normalize, FALSE)
   testthat::expect_identical(
     manifest$outputs[[1L]]$path,
