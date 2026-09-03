@@ -1,6 +1,9 @@
-read_numeric_matrix <- function(path, id_column) {
+read_numeric_matrix <- function(path, id_column, id_column_aliases = character()) {
   if (!is.character(id_column) || length(id_column) != 1L || is.na(id_column)) {
     stop("id_column must be one non-missing character value", call. = FALSE)
+  }
+  if (!is.character(id_column_aliases) || anyNA(id_column_aliases)) {
+    stop("id_column_aliases must contain non-missing character values", call. = FALSE)
   }
   if (!file.exists(path)) {
     stop(sprintf("Matrix file does not exist: %s", path), call. = FALSE)
@@ -14,9 +17,12 @@ read_numeric_matrix <- function(path, id_column) {
     show_col_types = FALSE
   )
   column_names <- names(table)
-  if (length(column_names) == 0L || !identical(column_names[[1L]], id_column)) {
+  valid_id_columns <- c(id_column, id_column_aliases)
+  if (length(column_names) == 0L || !(column_names[[1L]] %in% valid_id_columns)) {
     stop(sprintf("The first column must be '%s'", id_column), call. = FALSE)
   }
+  names(table)[[1L]] <- id_column
+  column_names[[1L]] <- id_column
   if (anyDuplicated(column_names) > 0L) {
     stop("Matrix columns must have unique names", call. = FALSE)
   }
@@ -51,6 +57,14 @@ read_numeric_matrix <- function(path, id_column) {
   matrix_values <- do.call(cbind, values)
   dimnames(matrix_values) <- list(identifiers, value_names)
   matrix_values
+}
+
+read_lm22_matrix <- function(path) {
+  read_numeric_matrix(
+    path,
+    id_column = "gene_symbol",
+    id_column_aliases = "Gene symbol"
+  )
 }
 
 write_numeric_matrix <- function(x, path, id_column) {
