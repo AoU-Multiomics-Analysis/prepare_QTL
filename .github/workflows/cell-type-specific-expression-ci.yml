@@ -85,19 +85,19 @@ jobs:
             prepare-qtl:test \
             Rscript tests/test_prepare_expression_log2_cpm.R
 
-      - name: Run the dtangle end-to-end smoke workflow
+      - name: Run the hspe end-to-end smoke workflow
         run: |
           set -euo pipefail
-          run_directory="$PWD/ci-runs/dtangle"
+          run_directory="$PWD/ci-runs/hspe"
           mkdir -p "$run_directory"
           miniwdl run \
             workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl \
-            --input tests/cell_type_specific_expression/fixtures/dtangle-e2e.inputs.json \
+            --input tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json \
             --dir "$run_directory/." \
             --verbose \
             --no-color
 
-      - name: Assert the dtangle deconvolution outputs
+      - name: Assert the hspe deconvolution outputs
         run: |
           set -euo pipefail
           docker run --rm \
@@ -107,11 +107,11 @@ jobs:
             --workdir "$PWD" \
             cell-type-specific-expression:test \
             Rscript tests/cell_type_specific_expression/smoke/assert_deconvolution_outputs.R \
-            "$PWD/ci-runs/dtangle/outputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures/dtangle-e2e.inputs.json" \
+            "$PWD/ci-runs/hspe/outputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json" \
             "$PWD/tests/cell_type_specific_expression/fixtures"
 
-      - name: Assert the dtangle QTL outputs
+      - name: Assert the hspe QTL outputs
         run: |
           set -euo pipefail
           docker run --rm \
@@ -121,8 +121,8 @@ jobs:
             --workdir "$PWD" \
             prepare-qtl:test \
             Rscript tests/cell_type_specific_expression/smoke/assert_qtl_outputs.R \
-            "$PWD/ci-runs/dtangle/outputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures/dtangle-e2e.inputs.json" \
+            "$PWD/ci-runs/hspe/outputs.json" \
+            "$PWD/tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json" \
             "$PWD/tests/cell_type_specific_expression/fixtures"
 
       - name: Run the precomputed end-to-end smoke workflow

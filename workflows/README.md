@@ -9,7 +9,7 @@ implementation modules.
 | Directory | Contents |
 | --- | --- |
 | `common/` | Phenotype-PC calculation, covariate merging, and phenotype residualization shared across modalities. |
-| `cell_type_specific_expression/` | Whole-blood dtangle and TCA deconvolution and cell-type-specific expression-QTL preparation. |
+| `cell_type_specific_expression/` | Whole-blood hspe and TCA deconvolution and cell-type-specific expression-QTL preparation. |
 | `expression/` | RNA-SeQC aggregation and expression-QTL preparation. |
 | `proteomics/` | Olink normalization and protein-QTL preparation. |
 | `splicing/` | Splicing-QTL preparation. |

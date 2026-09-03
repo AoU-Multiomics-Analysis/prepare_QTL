@@ -16,7 +16,7 @@ wdl_text_path <- function(path) {
 testthat::test_that("standalone deconvolution sources use WDL 1.0", {
   paths <- c(
     wdl_path("deconvolution.wdl"),
-    wdl_path("tasks", "dtangle.wdl"),
+    wdl_path("tasks", "hspe.wdl"),
     wdl_path("tasks", "expression.wdl"),
     wdl_path("tasks", "proportions.wdl"),
     wdl_path("tasks", "tca.wdl"),
@@ -162,7 +162,7 @@ testthat::test_that("TCA parallel execution is explicit and disabled by default"
 })
 
 testthat::test_that("TCA smoke fixtures retain 8 GB overrides", {
-  fixture_names <- c("dtangle-e2e.inputs.json", "precomputed-e2e.inputs.json")
+  fixture_names <- c("hspe-e2e.inputs.json", "precomputed-e2e.inputs.json")
 
   purrr::walk(fixture_names, function(fixture_name) {
     inputs <- jsonlite::read_json(
@@ -182,19 +182,19 @@ testthat::test_that("TCA smoke fixtures retain 8 GB overrides", {
   })
 })
 
-testthat::test_that("workflow applies the log2 pseudocount only to dtangle", {
+testthat::test_that("workflow applies the log2 pseudocount only to hspe", {
   text <- wdl_text("deconvolution.wdl")
 
   testthat::expect_match(text, "workflow CellTypeDeconvolution", fixed = TRUE)
   testthat::expect_match(text, "Float log2_pseudocount = 0.0", fixed = TRUE)
   testthat::expect_match(text, "log2_pseudocount = log2_pseudocount", fixed = TRUE)
 
-  dtangle_call <- stringr::str_extract(
+  hspe_call <- stringr::str_extract(
     text,
-    "call [^{]+RunDtangle \\{[\\s\\S]*?\\n  \\}"
+    "call [^{]+RunHspe \\{[\\s\\S]*?\\n  \\}"
   )
   testthat::expect_match(
-    dtangle_call,
+    hspe_call,
     "log2_pseudocount = log2_pseudocount",
     fixed = TRUE
   )
@@ -232,13 +232,13 @@ testthat::test_that("effective parameters are materialized inside BuildManifest"
   )
 })
 
-testthat::test_that("filter validation and dtangle receive the log2 pseudocount", {
-  dtangle_text <- wdl_text("tasks", "dtangle.wdl")
+testthat::test_that("filter validation and hspe receive the log2 pseudocount", {
+  hspe_text <- wdl_text("tasks", "hspe.wdl")
   expression_text <- wdl_text("tasks", "expression.wdl")
   tca_text <- wdl_text("tasks", "tca.wdl")
-  testthat::expect_match(dtangle_text, "Float log2_pseudocount", fixed = TRUE)
+  testthat::expect_match(hspe_text, "Float log2_pseudocount", fixed = TRUE)
   testthat::expect_match(
-    dtangle_text,
+    hspe_text,
     "--log2-pseudocount '~{log2_pseudocount}'",
     fixed = TRUE
   )
@@ -253,7 +253,7 @@ testthat::test_that("filter validation and dtangle receive the log2 pseudocount"
 
 testthat::test_that("migrated WDL scripts use the prepare_qtl runtime path", {
   paths <- c(
-    "deconvolution.wdl", "tasks/dtangle.wdl", "tasks/proportions.wdl",
+    "deconvolution.wdl", "tasks/hspe.wdl", "tasks/proportions.wdl",
     "tasks/tca.wdl", "tasks/qc.wdl"
   )
   texts <- purrr::map(paths, wdl_text_path)
