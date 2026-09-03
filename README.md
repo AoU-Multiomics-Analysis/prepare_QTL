@@ -23,7 +23,7 @@ prepare_QTL/
 - [R scripts](docs/scripts.md): Command-line script inputs, outputs, and processing behavior.
 - [Phenotype normalization and filtering](docs/phenotype-normalization-filtering.md): Modality-specific filtering, normalization, transformations, and WGCNA outlier removal.
 - [Molecular QTL workflows](docs/molecular-qtl-workflows.md): eQTL, sQTL, pQTL, methylation, proteomics normalization, phenotype PC, and covariate merge WDLs.
-- [Cell-type-specific expression](docs/cell-type-specific-expression.md): Whole-blood dtangle and TCA deconvolution, cell-type eQTL preparation, and output contracts.
+- [Cell-type-specific expression](docs/cell-type-specific-expression.md): Whole-blood hspe and TCA deconvolution, cell-type eQTL preparation, and output contracts.
 - [PacBio 5mC QTL workflow](docs/methylation-qtl.md): pb-CpG-tools inputs, QC, sharding, site metadata, and TensorQTL phenotype output.
 - [Genotype workflows](docs/genotype-workflows.md): VCF, PLINK, genotype PC, allele frequency, and dosage WDLs.
 - [Docker environment](docs/docker.md): Docker image location and included R package dependencies.

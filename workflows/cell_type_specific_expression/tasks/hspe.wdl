@@ -1,6 +1,6 @@
 version 1.0
 
-task RunDtangle {
+task RunHspe {
   input {
     File expression
     Float log2_pseudocount
@@ -10,6 +10,7 @@ task RunDtangle {
     Float marker_fraction = 0.10
     String marker_method = "ratio"
     Boolean quantile_normalize = false
+    Int random_seed = 20260901
     String docker_image
     Int cpu = 4
     String memory = "32 GB"
@@ -22,34 +23,35 @@ task RunDtangle {
 
   command <<<
     set -euo pipefail
-    stage="run_dtangle"
+    stage="run_hspe"
     log="$stage.log"
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/run_dtangle.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/run_hspe.R \
       --expression '~{expression}' \
       --gtf '~{gtf}' \
       --lm22 '~{lm22}' \
       --min-overlap '~{min_overlap}' \
       --marker-fraction '~{marker_fraction}' \
       --marker-method '~{marker_method}' \
+      --random-seed '~{random_seed}' \
       ~{quantile_normalize_argument} \
       --log2-pseudocount '~{log2_pseudocount}' \
       --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=%s outputs=%s completion_time=%s\n' \
-      "$stage" "$(wc -l < outputs/dtangle_proportions.tsv)" \
+      "$stage" "$(wc -l < outputs/hspe_proportions.tsv)" \
       "proportions,markers,metadata,overlap_report,transformed_lm22" \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>
 
   output {
-    File proportions = "outputs/dtangle_proportions.tsv"
-    File markers = "outputs/dtangle_markers.tsv"
-    File metadata = "outputs/dtangle_metadata.json"
-    File overlap_report = "outputs/dtangle_overlap.tsv"
-    File transformed_lm22 = "outputs/dtangle_lm22_log.tsv.gz"
-    File log = "run_dtangle.log"
+    File proportions = "outputs/hspe_proportions.tsv"
+    File markers = "outputs/hspe_markers.tsv"
+    File metadata = "outputs/hspe_metadata.json"
+    File overlap_report = "outputs/hspe_overlap.tsv"
+    File transformed_lm22 = "outputs/hspe_lm22_log.tsv.gz"
+    File log = "run_hspe.log"
   }
 
   runtime {

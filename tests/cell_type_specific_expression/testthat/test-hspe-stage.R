@@ -5,9 +5,9 @@ if (file.exists(expression_path)) {
   source(expression_path, local = .GlobalEnv)
 }
 
-dtangle_stage_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "R", "dtangle_stage.R")
-if (file.exists(dtangle_stage_path)) {
-  source(dtangle_stage_path, local = .GlobalEnv)
+hspe_stage_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "R", "hspe_stage.R")
+if (file.exists(hspe_stage_path)) {
+  source(hspe_stage_path, local = .GlobalEnv)
 }
 
 make_synthetic_lm22 <- function(markers_per_type = 3L, baseline = 4, marker = 1024) {
@@ -47,7 +47,7 @@ testthat::test_that("LM22 uses the same log2 pseudocount as bulk CPM", {
     dimnames = list(rownames(lm22), "S1")
   )
 
-  inputs <- prepare_dtangle_inputs(
+  inputs <- prepare_hspe_inputs(
     bulk_log,
     lm22,
     min_overlap = 1,
@@ -115,7 +115,7 @@ testthat::test_that("LM22 rejects nonfinite values", {
   testthat::expect_error(validate_lm22(lm22), "finite")
 })
 
-testthat::test_that("dtangle input preparation stops below the overlap threshold", {
+testthat::test_that("hspe input preparation stops below the overlap threshold", {
   lm22 <- make_synthetic_lm22()
   bulk_log <- matrix(
     log2(5),
@@ -125,12 +125,12 @@ testthat::test_that("dtangle input preparation stops below the overlap threshold
   )
 
   testthat::expect_error(
-    prepare_dtangle_inputs(bulk_log, lm22, min_overlap = 0.80),
+    prepare_hspe_inputs(bulk_log, lm22, min_overlap = 0.80),
     "overlap.*below"
   )
 })
 
-testthat::test_that("dtangle input preparation preserves LM22 and official orders", {
+testthat::test_that("hspe input preparation preserves LM22 and official orders", {
   lm22 <- make_synthetic_lm22()
   lm22 <- lm22[, rev(lm22_cell_types()), drop = FALSE]
   bulk_log <- matrix(
@@ -140,7 +140,7 @@ testthat::test_that("dtangle input preparation preserves LM22 and official order
     dimnames = list(rev(rownames(lm22)), c("S2", "S1"))
   )
 
-  inputs <- prepare_dtangle_inputs(bulk_log, lm22, min_overlap = 0.80)
+  inputs <- prepare_hspe_inputs(bulk_log, lm22, min_overlap = 0.80)
 
   testthat::expect_identical(colnames(inputs$Y), rownames(lm22))
   testthat::expect_identical(rownames(inputs$Y), c("S2", "S1"))
@@ -154,7 +154,7 @@ testthat::test_that("finite negative log2 CPM values are accepted", {
     seq(-3, 3, length.out = nrow(lm22)), ncol = 1,
     dimnames = list(rev(rownames(lm22)), "S1")
   )
-  inputs <- prepare_dtangle_inputs(bulk_log, lm22, 0.80, FALSE)
+  inputs <- prepare_hspe_inputs(bulk_log, lm22, 0.80, FALSE)
   testthat::expect_identical(colnames(inputs$Y), rownames(lm22))
   testthat::expect_identical(colnames(inputs$references), rownames(lm22))
 })
@@ -170,7 +170,7 @@ testthat::test_that("nonfinite log2 CPM values are rejected", {
   bulk_log[1L, 1L] <- Inf
 
   testthat::expect_error(
-    prepare_dtangle_inputs(bulk_log, lm22, 0.80, FALSE),
+    prepare_hspe_inputs(bulk_log, lm22, 0.80, FALSE),
     "log2\\(CPM\\).*finite"
   )
 })
@@ -181,7 +181,7 @@ testthat::test_that("synthetic CPM mixtures use log2 without a pseudocount", {
                     dimnames = list(paste0("S", 1:8), lm22_cell_types()))
   weights <- weights / rowSums(weights)
   bulk_cpm <- reference %*% t(weights)
-  inputs <- prepare_dtangle_inputs(log2(bulk_cpm), reference, 0.80, FALSE)
+  inputs <- prepare_hspe_inputs(log2(bulk_cpm), reference, 0.80, FALSE)
   testthat::expect_equal(inputs$shared_bulk, log2(bulk_cpm))
 })
 
@@ -190,7 +190,7 @@ testthat::test_that("overlap report lists every LM22 gene in reference order", {
   kept <- rownames(lm22)[-c(2L, 5L)]
   bulk_log <- matrix(1, nrow = length(kept), ncol = 1,
                      dimnames = list(rev(kept), "S1"))
-  inputs <- prepare_dtangle_inputs(bulk_log, lm22, 0.80, FALSE)
+  inputs <- prepare_hspe_inputs(bulk_log, lm22, 0.80, FALSE)
   testthat::expect_identical(inputs$overlap_report$gene_symbol, rownames(lm22))
   testthat::expect_identical(
     inputs$overlap_report$matched,
@@ -207,7 +207,7 @@ testthat::test_that("LM22 QC records dimensions, value range, and validation", {
     dimnames = list(rownames(lm22), "S1")
   )
 
-  inputs <- prepare_dtangle_inputs(bulk_log, lm22, 0.80, FALSE)
+  inputs <- prepare_hspe_inputs(bulk_log, lm22, 0.80, FALSE)
 
   testthat::expect_identical(inputs$lm22_qc$gene_count, nrow(lm22))
   testthat::expect_identical(inputs$lm22_qc$cell_type_count, 22L)
@@ -225,7 +225,7 @@ testthat::test_that("joint quantile normalization uses joined log-scale profiles
     dimnames = list(rownames(lm22), c("S1", "S2"))
   )
 
-  inputs <- prepare_dtangle_inputs(
+  inputs <- prepare_hspe_inputs(
     bulk_log,
     lm22,
     min_overlap = 0.80,
@@ -251,7 +251,7 @@ testthat::test_that("joint quantile normalization preserves colliding sample ide
     dimnames = list(rownames(lm22), sample_id)
   )
 
-  inputs <- prepare_dtangle_inputs(
+  inputs <- prepare_hspe_inputs(
     bulk_log,
     lm22,
     min_overlap = 0.80,
@@ -263,12 +263,12 @@ testthat::test_that("joint quantile normalization preserves colliding sample ide
   testthat::expect_equal(inputs$Y, t(expected[, 23L, drop = FALSE]))
 })
 
-testthat::test_that("dtangle estimation requires version 2.0.10", {
-  testthat::skip_if_not_installed("dtangle")
-  testthat::expect_equal(validate_dtangle_version(), "2.0.10")
+testthat::test_that("hspe estimation requires version 0.1", {
+  testthat::skip_if_not_installed("hspe")
+  testthat::expect_equal(validate_hspe_version(), "0.1")
 })
 
-testthat::test_that("dtangle estimation supports only ratio markers", {
+testthat::test_that("hspe estimation supports only ratio markers", {
   inputs <- list(
     Y = matrix(1, nrow = 1, ncol = 1),
     references = matrix(1, nrow = 1, ncol = 1),
@@ -278,13 +278,13 @@ testthat::test_that("dtangle estimation supports only ratio markers", {
   )
 
   testthat::expect_error(
-    estimate_dtangle(inputs, marker_method = "diff"),
+    estimate_hspe(inputs, marker_method = "diff"),
     "marker_method.*ratio"
   )
 })
 
-testthat::test_that("dtangle returns normalized proportions and nonempty markers", {
-  testthat::skip_if_not_installed("dtangle")
+testthat::test_that("hspe returns normalized proportions and nonempty markers", {
+  testthat::skip_if_not_installed("hspe")
   set.seed(20260901)
   reference <- make_synthetic_lm22(markers_per_type = 3L, baseline = 4, marker = 1024)
   weights <- matrix(
@@ -296,8 +296,8 @@ testthat::test_that("dtangle returns normalized proportions and nonempty markers
   bulk_linear <- reference %*% t(weights)
   bulk_log <- log2(bulk_linear + 1)
 
-  inputs <- prepare_dtangle_inputs(bulk_log, reference, 0.80, FALSE)
-  fit <- estimate_dtangle(inputs, marker_fraction = 0.10)
+  inputs <- prepare_hspe_inputs(bulk_log, reference, 0.80, FALSE)
+  fit <- estimate_hspe(inputs, marker_fraction = 0.10)
   marker_counts <- dplyr::count(fit$markers, .data$cell_type, name = "marker_count")
 
   testthat::expect_equal(dim(fit$proportions), c(8L, 22L))
@@ -315,8 +315,8 @@ testthat::test_that("dtangle returns normalized proportions and nonempty markers
   testthat::expect_true(all(marker_counts$marker_count > 0L))
 })
 
-testthat::test_that("the dtangle CLI writes its five declared outputs", {
-  testthat::skip_if_not_installed("dtangle")
+testthat::test_that("the hspe CLI writes its five declared outputs", {
+  testthat::skip_if_not_installed("hspe")
   lm22 <- make_synthetic_lm22()
   expression_cpm <- matrix(
     5,
@@ -354,16 +354,21 @@ testthat::test_that("the dtangle CLI writes its five declared outputs", {
   status <- system2(
     file.path(R.home("bin"), "Rscript"),
     c(
-      "scripts/cell_type_specific_expression/run_dtangle.R", "--expression",
+      "scripts/cell_type_specific_expression/run_hspe.R", "--expression",
       expression_path,
-      "--gtf", gtf_path, "--lm22", lm22_path, "--output-dir", output_dir
+      "--gtf", gtf_path, "--lm22", lm22_path, "--output-dir", output_dir,
+      "--random-seed", "123"
     )
   )
 
   testthat::expect_equal(status, 0L)
   testthat::expect_true(all(file.exists(file.path(output_dir, c(
-    "dtangle_proportions.tsv", "dtangle_markers.tsv", "dtangle_metadata.json",
-    "dtangle_overlap.tsv", "dtangle_lm22_log.tsv.gz"
+    "hspe_proportions.tsv", "hspe_markers.tsv", "hspe_metadata.json",
+    "hspe_overlap.tsv", "hspe_lm22_log.tsv.gz"
   )))))
-  testthat::expect_false(file.exists(file.path(output_dir, "dtangle_shared_bulk.tsv.gz")))
+  testthat::expect_false(file.exists(file.path(output_dir, "hspe_shared_bulk.tsv.gz")))
+  metadata <- jsonlite::read_json(file.path(output_dir, "hspe_metadata.json"))
+  testthat::expect_equal(metadata$random_seed, 123)
+  testthat::expect_identical(metadata$hspe_version, "0.1")
+  testthat::expect_identical(metadata$optimizer, "DEoptimR")
 })

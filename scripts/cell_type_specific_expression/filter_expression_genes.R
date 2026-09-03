@@ -29,7 +29,7 @@ run_filter_expression_genes <- function() {
       dest = "log2_pseudocount",
       type = "double",
       default = 0,
-      help = "Non-negative pseudocount validated for the downstream dtangle transform."
+      help = "Non-negative pseudocount validated for the downstream hspe transform."
     ),
     optparse::make_option(
       "--output-dir",
@@ -55,7 +55,7 @@ run_filter_expression_genes <- function() {
   gene_types <- parse_gene_types(options$gene_types)
   log2_pseudocount <- validate_log2_pseudocount(options$log2_pseudocount)
   message(sprintf(
-    "stage=filter_expression_genes utc_start=%s gene_types=%s dtangle_log2_pseudocount=%g",
+    "stage=filter_expression_genes utc_start=%s gene_types=%s hspe_log2_pseudocount=%g",
     utc_time(),
     paste(gene_types, collapse = ","),
     log2_pseudocount

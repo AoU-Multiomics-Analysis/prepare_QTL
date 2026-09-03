@@ -13,6 +13,6 @@ validate_proportion_mode <- function(precomputed_proportions_defined) {
   if (precomputed_proportions_defined) {
     list(selected_mode = "precomputed", estimate_proportions = FALSE)
   } else {
-    list(selected_mode = "dtangle", estimate_proportions = TRUE)
+    list(selected_mode = "hspe", estimate_proportions = TRUE)
   }
 }

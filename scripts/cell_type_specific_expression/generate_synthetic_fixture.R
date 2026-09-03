@@ -206,17 +206,17 @@ common_inputs <- list(
   "PrepareCellTypeEqtlWorkflow.preemptible_attempts" = 0L,
   "PrepareCellTypeEqtlWorkflow.max_retries" = 0L,
   "PrepareCellTypeEqtlWorkflow.min_lm22_overlap" = 0.80,
-  "PrepareCellTypeEqtlWorkflow.dtangle_marker_fraction" = 0.10,
-  "PrepareCellTypeEqtlWorkflow.dtangle_quantile_normalize" = FALSE,
+  "PrepareCellTypeEqtlWorkflow.hspe_marker_fraction" = 0.10,
+  "PrepareCellTypeEqtlWorkflow.hspe_quantile_normalize" = FALSE,
   "PrepareCellTypeEqtlWorkflow.group_mean_threshold" = 0.0001,
   "PrepareCellTypeEqtlWorkflow.zero_floor" = 0.000001,
   "PrepareCellTypeEqtlWorkflow.tca_max_iters" = 10L,
   "PrepareCellTypeEqtlWorkflow.tca_parallel" = FALSE,
   "PrepareCellTypeEqtlWorkflow.gene_type" = c("protein_coding", "lncRNA"),
   "PrepareCellTypeEqtlWorkflow.random_seed" = seed,
-  "PrepareCellTypeEqtlWorkflow.dtangle_cpu" = 2L,
-  "PrepareCellTypeEqtlWorkflow.dtangle_memory" = "8 GB",
-  "PrepareCellTypeEqtlWorkflow.dtangle_disk_gb" = 20L,
+  "PrepareCellTypeEqtlWorkflow.hspe_cpu" = 2L,
+  "PrepareCellTypeEqtlWorkflow.hspe_memory" = "8 GB",
+  "PrepareCellTypeEqtlWorkflow.hspe_disk_gb" = 20L,
   "PrepareCellTypeEqtlWorkflow.proportions_cpu" = 1L,
   "PrepareCellTypeEqtlWorkflow.proportions_memory" = "4 GB",
   "PrepareCellTypeEqtlWorkflow.proportions_disk_gb" = 10L,
@@ -236,18 +236,20 @@ common_inputs <- list(
   "PrepareCellTypeEqtlWorkflow.eqtl_memory" = 8L,
   "PrepareCellTypeEqtlWorkflow.eqtl_disk_gb" = 20L
 )
-dtangle_inputs <- append(
+hspe_inputs <- append(
   common_inputs,
   list(
     "PrepareCellTypeEqtlWorkflow.expression" =
       file.path(fixture_root, "synthetic_expression.bed"),
     "PrepareCellTypeEqtlWorkflow.lm22" =
       file.path(fixture_root, "synthetic_signature.tsv"),
-    "PrepareCellTypeEqtlWorkflow.OutputPrefix" = "synthetic.dtangle",
+    "PrepareCellTypeEqtlWorkflow.OutputPrefix" = "synthetic.hspe",
     "PrepareCellTypeEqtlWorkflow.log2_pseudocount" = 0.0
   ),
   after = 0L
 )
+# A non-default seed checks forwarding through both workflow layers.
+hspe_inputs[["PrepareCellTypeEqtlWorkflow.random_seed"]] <- 20260902L
 precomputed_inputs <- append(
   common_inputs,
   list(
@@ -263,8 +265,8 @@ precomputed_inputs <- append(
   after = 0L
 )
 jsonlite::write_json(
-  dtangle_inputs,
-  file.path(output_directory, "dtangle-e2e.inputs.json"),
+  hspe_inputs,
+  file.path(output_directory, "hspe-e2e.inputs.json"),
   auto_unbox = TRUE,
   pretty = TRUE
 )

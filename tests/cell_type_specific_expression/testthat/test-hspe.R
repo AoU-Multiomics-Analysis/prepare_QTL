@@ -1,12 +1,12 @@
-testthat::test_that("dtangle CLI reads direct CPM BED and GTF", {
-  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_dtangle.R")
+testthat::test_that("hspe CLI reads direct CPM BED and GTF", {
+  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_hspe.R")
   text <- paste(readLines(script_path, warn = FALSE), collapse = "\n")
   testthat::expect_match(text, '"--expression"', fixed = TRUE)
   testthat::expect_match(text, '"--gtf"', fixed = TRUE)
 })
 
-testthat::test_that("dtangle CLI rejects incomplete direct CPM input mode", {
-  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_dtangle.R")
+testthat::test_that("hspe CLI rejects incomplete direct CPM input mode", {
+  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_hspe.R")
 
   result <- suppressWarnings(system2(
     file.path(R.home("bin"), "Rscript"),
@@ -28,8 +28,8 @@ testthat::test_that("dtangle CLI rejects incomplete direct CPM input mode", {
   )
 })
 
-testthat::test_that("dtangle CLI validates LM22 before the large inputs", {
-  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_dtangle.R")
+testthat::test_that("hspe CLI validates LM22 before the large inputs", {
+  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_hspe.R")
   lm22_path <- tempfile(fileext = ".tsv")
   writeLines("Gene symbol\tB cells naive\nABCB4\t1", lm22_path)
 
@@ -54,8 +54,8 @@ testthat::test_that("dtangle CLI validates LM22 before the large inputs", {
   )
 })
 
-testthat::test_that("dtangle CLI rejects the retired prepared-log option", {
-  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_dtangle.R")
+testthat::test_that("hspe CLI rejects the retired prepared-log option", {
+  script_path <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "run_hspe.R")
 
   result <- suppressWarnings(system2(
     file.path(R.home("bin"), "Rscript"),

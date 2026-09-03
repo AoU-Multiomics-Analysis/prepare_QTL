@@ -47,16 +47,16 @@ transform_lm22 <- function(lm22_linear, log2_pseudocount = 0) {
   log2(standardize_lm22(lm22_linear) + log2_pseudocount)
 }
 
-validate_dtangle_version <- function() {
-  required_version <- "2.0.10"
-  if (!requireNamespace("dtangle", quietly = TRUE)) {
-    stop("The dtangle package is required for proportion estimation", call. = FALSE)
+validate_hspe_version <- function() {
+  required_version <- "0.1"
+  if (!requireNamespace("hspe", quietly = TRUE)) {
+    stop("The hspe package is required for proportion estimation", call. = FALSE)
   }
-  observed_version <- as.character(utils::packageVersion("dtangle"))
+  observed_version <- as.character(utils::packageVersion("hspe"))
   if (!identical(observed_version, required_version)) {
     stop(
       sprintf(
-        "dtangle version %s is required; found %s",
+        "hspe version %s is required; found %s",
         required_version, observed_version
       ),
       call. = FALSE
@@ -99,7 +99,7 @@ standardize_bulk_log <- function(bulk_log) {
   bulk_log
 }
 
-prepare_dtangle_inputs <- function(
+prepare_hspe_inputs <- function(
     bulk_log,
     lm22_linear,
     min_overlap = pipeline_defaults()$min_lm22_overlap,
@@ -155,7 +155,7 @@ prepare_dtangle_inputs <- function(
     ]
   }
   if (!identical(colnames(t(shared_bulk)), colnames(t(shared_lm22)))) {
-    stop("Aligned dtangle gene columns are not identical", call. = FALSE)
+    stop("Aligned hspe gene columns are not identical", call. = FALSE)
   }
   transformed_lm22 <- shared_lm22
 
@@ -173,12 +173,13 @@ prepare_dtangle_inputs <- function(
   )
 }
 
-estimate_dtangle <- function(
+estimate_hspe <- function(
     inputs,
     marker_fraction = pipeline_defaults()$marker_fraction,
-    marker_method = "ratio") {
+    marker_method = "ratio",
+    random_seed = 20260901L) {
   if (!is.list(inputs) || !all(c("Y", "references", "overlap_report") %in% names(inputs))) {
-    stop("inputs must be returned by prepare_dtangle_inputs", call. = FALSE)
+    stop("inputs must be returned by prepare_hspe_inputs", call. = FALSE)
   }
   if (!is.numeric(marker_fraction) || length(marker_fraction) != 1L ||
       !is.finite(marker_fraction) || marker_fraction <= 0 || marker_fraction > 1) {
@@ -188,14 +189,21 @@ estimate_dtangle <- function(
       is.na(marker_method) || marker_method != "ratio") {
     stop("marker_method must be the supported value 'ratio'", call. = FALSE)
   }
-  dtangle_version <- validate_dtangle_version()
+  if (!is.numeric(random_seed) || length(random_seed) != 1L ||
+      !is.finite(random_seed) || random_seed < 1 || random_seed != trunc(random_seed) ||
+      random_seed > .Machine$integer.max) {
+    stop("random_seed must be one positive R integer", call. = FALSE)
+  }
+  random_seed <- as.integer(random_seed)
+  hspe_version <- validate_hspe_version()
 
-  fit <- dtangle::dtangle(
+  fit <- hspe::hspe(
     Y = inputs$Y,
     references = inputs$references,
     n_markers = marker_fraction,
-    data_type = "rna-seq",
-    marker_method = marker_method
+    marker_method = marker_method,
+    seed = random_seed,
+    sto = TRUE
   )
   selected_marker_counts <- lengths(fit$markers)
   if (length(selected_marker_counts) != nrow(inputs$references) ||
@@ -211,12 +219,15 @@ estimate_dtangle <- function(
       dimnames = list(rownames(inputs$Y), rownames(inputs$references))
     )
   }
-  colnames(proportions) <- rownames(inputs$references)
+  if (!identical(dim(proportions), c(nrow(inputs$Y), nrow(inputs$references)))) {
+    stop("HSPE returned unexpected sample or cell-type dimensions", call. = FALSE)
+  }
+  dimnames(proportions) <- list(rownames(inputs$Y), rownames(inputs$references))
   if (any(!is.finite(proportions)) || any(proportions < 0)) {
-    stop("dtangle estimates must be finite and nonnegative", call. = FALSE)
+    stop("hspe estimates must be finite and nonnegative", call. = FALSE)
   }
   if (any(abs(rowSums(proportions) - 1) > 1e-8)) {
-    stop("dtangle estimate rows must sum to one within 1e-8", call. = FALSE)
+    stop("hspe estimate rows must sum to one within 1e-8", call. = FALSE)
   }
 
   markers <- purrr::map2_dfr(
@@ -232,8 +243,10 @@ estimate_dtangle <- function(
   )
   marker_counts <- stats::setNames(selected_marker_counts, rownames(inputs$references))
   metadata <- list(
-    dtangle_version = dtangle_version,
-    gamma = unname(fit$gamma),
+    hspe_version = hspe_version,
+    optimizer = "DEoptimR",
+    optimizer_version = as.character(utils::packageVersion("DEoptimR")),
+    random_seed = random_seed,
     marker_method = marker_method,
     marker_fraction = marker_fraction,
     marker_counts = as.list(marker_counts),
