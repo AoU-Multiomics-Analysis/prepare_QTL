@@ -8,6 +8,8 @@ RUN micromamba install --yes --name base --file /tmp/environment.yml && \
     micromamba clean --all --yes
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER scripts/expression/merge_rnaseqc.py /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py
+# Standalone gsutil needs this setting to request credentials from VM metadata.
+COPY envs/RNASeQCAggregation/boto.cfg /etc/boto.cfg
 # Terra can bypass the micromamba entrypoint. These tools need no activation hook.
 ENV PATH=/opt/conda/bin:$PATH
 

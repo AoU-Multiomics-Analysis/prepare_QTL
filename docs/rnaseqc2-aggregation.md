@@ -70,8 +70,9 @@ coreutils, findutils (`xargs`), and gawk packages from conda-forge. It does not
 include RNA-SeQC, STAR, RSEM, R, or scientific Python libraries. It merges
 existing RNA-SeQC outputs; it does not generate per-sample QC files.
 
-The image contains no cloud credentials. Cloud reads use the service account
-of the Terra task VM. The account needs read access to all objects in the
+The image contains no cloud credentials. `/etc/boto.cfg` tells standalone
+`gsutil` to obtain credentials from the service account attached to the Terra
+task VM. The account needs read access to all objects in the
 manifest. This has not been tested with a live Terra submission.
 
 The insert-size output is an `Array[File]` with zero or one file. WDL 1.0 uses this form so that the output can be absent without creating an invalid empty gzip file.
@@ -109,7 +110,9 @@ miniwdl check workflows/expression/rnaseqc2_aggregate_batched.wdl
 Linux AMD64 image. No local Docker build is needed. The checks run the merger
 tests against the script inside the image, with only the tests mounted from
 the repository. They also check compiled checksum support and local file
-copying with `gsutil`. Real WDL validation and final-merge tasks run with
+copying with `gsutil`. A credential-selection check replaces only the metadata
+server call and verifies that `gsutil` creates VM service-account credentials.
+Real WDL validation and final-merge tasks run with
 synthetic files, with and without insert-size tables. These checks do not
 access private buckets or submit jobs to Terra.
 
