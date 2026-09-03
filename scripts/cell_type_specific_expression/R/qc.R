@@ -579,7 +579,8 @@ write_output_manifest <- function(path, manifest) {
     path,
     auto_unbox = TRUE,
     pretty = TRUE,
-    null = "null"
+    null = "null",
+    digits = NA
   )
   invisible(path)
 }

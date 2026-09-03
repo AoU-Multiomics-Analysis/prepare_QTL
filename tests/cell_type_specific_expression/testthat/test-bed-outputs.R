@@ -619,6 +619,10 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     "Internal loop converged."
   ), model_log_path)
   manifest_path <- file.path(working_directory, "output manifest.json")
+  effective_parameters_path <- file.path(
+    working_directory,
+    "effective parameters.json"
+  )
   qc_path <- file.path(working_directory, "final qc.tsv")
   log_path <- file.path(working_directory, "manifest log.txt")
   script <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "build_deconvolution_manifest.R")
@@ -633,6 +637,18 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     "--model", model_path,
     "--model-log", model_log_path,
     "--tca-version", "1.2.1",
+    "--proportion-mode", "precomputed",
+    "--log2-pseudocount", "0.123456789",
+    "--min-lm22-overlap", "0.8",
+    "--dtangle-marker-fraction", "0.1",
+    "--dtangle-marker-method", "ratio",
+    "--dtangle-quantile-normalize", "false",
+    "--group-mean-threshold", "0.0001",
+    "--zero-floor", "0.000001",
+    "--tca-max-iters", "10",
+    "--random-seed", "20260901",
+    "--scale", "log2_cpm",
+    "--effective-parameters-output", effective_parameters_path,
     "--container-image", "cell-type-specific-expression:test",
     "--output", manifest_path,
     "--qc-output", qc_path,
@@ -643,6 +659,27 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
 
   testthat::expect_identical(status, 0L)
   manifest <- jsonlite::read_json(manifest_path, simplifyVector = FALSE)
+  effective_parameters <- jsonlite::read_json(
+    effective_parameters_path,
+    simplifyVector = FALSE
+  )
+  testthat::expect_identical(manifest$parameters, effective_parameters)
+  testthat::expect_identical(
+    names(effective_parameters),
+    c(
+      "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
+      "dtangle_marker_fraction", "dtangle_marker_method",
+      "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
+      "tca_max_iters", "random_seed", "scale"
+    )
+  )
+  testthat::expect_identical(effective_parameters$proportion_mode, "precomputed")
+  testthat::expect_equal(
+    effective_parameters$log2_pseudocount,
+    0.123456789,
+    tolerance = 1e-12
+  )
+  testthat::expect_identical(effective_parameters$dtangle_quantile_normalize, FALSE)
   testthat::expect_identical(
     manifest$outputs[[1L]]$path,
     basename(bed_path)

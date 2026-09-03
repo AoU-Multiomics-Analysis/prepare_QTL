@@ -13,7 +13,17 @@ task BuildManifest {
     File tca_weights
     File filter_report
     File? dtangle_metadata
-    File? parameters_json
+    String proportion_mode
+    Float log2_pseudocount
+    Float min_lm22_overlap
+    Float dtangle_marker_fraction
+    String dtangle_marker_method
+    Boolean dtangle_quantile_normalize
+    Float group_mean_threshold
+    Float zero_floor
+    Int tca_max_iters
+    Int random_seed
+    String scale
     String tca_version = "1.2.1"
     String container_image
     String docker_image
@@ -24,7 +34,6 @@ task BuildManifest {
     Int max_retries = 2
   }
 
-  String parameters_path = if defined(parameters_json) then select_first([parameters_json]) else ""
   String dtangle_metadata_path = if defined(dtangle_metadata) then select_first([dtangle_metadata]) else ""
 
   command <<<
@@ -37,11 +46,6 @@ task BuildManifest {
     localized_bed_files="$PWD/localized_bed_files"
     checksum_inventory=checksum_inventory.localized.tsv
     public_inventory=outputs/output_inventory.tsv
-    parameters_path="~{parameters_path}"
-    parameters_arguments=()
-    if [[ -n "$parameters_path" ]]; then
-      parameters_arguments=(--parameters-json "$parameters_path")
-    fi
     dtangle_metadata_path="~{dtangle_metadata_path}"
     dtangle_metadata_arguments=()
     if [[ -n "$dtangle_metadata_path" ]]; then
@@ -173,7 +177,18 @@ BED_OUTPUT_SOURCES
       --model-log '~{model_log}' \
       "${dtangle_metadata_arguments[@]}" \
       --tca-version '~{tca_version}' \
-      "${parameters_arguments[@]}" \
+      --proportion-mode '~{proportion_mode}' \
+      --log2-pseudocount '~{log2_pseudocount}' \
+      --min-lm22-overlap '~{min_lm22_overlap}' \
+      --dtangle-marker-fraction '~{dtangle_marker_fraction}' \
+      --dtangle-marker-method '~{dtangle_marker_method}' \
+      --dtangle-quantile-normalize '~{dtangle_quantile_normalize}' \
+      --group-mean-threshold '~{group_mean_threshold}' \
+      --zero-floor '~{zero_floor}' \
+      --tca-max-iters '~{tca_max_iters}' \
+      --random-seed '~{random_seed}' \
+      --scale '~{scale}' \
+      --effective-parameters-output outputs/effective_parameters.json \
       --container-image '~{container_image}' \
       --output outputs/output_manifest.json \
       --qc-output outputs/qc_summary.tsv \
@@ -181,7 +196,7 @@ BED_OUTPUT_SOURCES
     bed_count="$(awk 'END { print NR - 1 }' "$public_inventory")"
     printf 'stage=%s dimensions=beds:%s outputs=%s completion_time=%s\n' \
       "$stage" "$bed_count" \
-      "output_manifest,qc_summary,qc_plots,provenance" \
+      "output_manifest,qc_summary,qc_plots,provenance,effective_parameters" \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>
 
@@ -190,6 +205,7 @@ BED_OUTPUT_SOURCES
     File qc_summary = "outputs/qc_summary.tsv"
     File qc_plots = export_qc_plots
     File provenance = "outputs/output_inventory.tsv"
+    File effective_parameters_file = "outputs/effective_parameters.json"
     File log = "build_manifest.log"
   }
 

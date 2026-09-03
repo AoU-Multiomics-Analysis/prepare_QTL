@@ -5,20 +5,6 @@ import "tasks/proportions.wdl" as proportion_tasks
 import "tasks/tca.wdl" as tca_tasks
 import "tasks/qc.wdl" as qc_tasks
 
-struct EffectiveParameters {
-  String proportion_mode
-  Float log2_pseudocount
-  Float min_lm22_overlap
-  Float dtangle_marker_fraction
-  String dtangle_marker_method
-  Boolean dtangle_quantile_normalize
-  Float group_mean_threshold
-  Float zero_floor
-  Int tca_max_iters
-  Int random_seed
-  String scale
-}
-
 workflow CellTypeDeconvolution {
   input {
     File expression
@@ -67,20 +53,6 @@ workflow CellTypeDeconvolution {
 
   String proportion_mode = ValidateProportionMode.selected_mode
   String dtangle_marker_method = "ratio"
-  EffectiveParameters effective_parameters = object {
-    proportion_mode: proportion_mode,
-    min_lm22_overlap: min_lm22_overlap,
-    dtangle_marker_fraction: dtangle_marker_fraction,
-    dtangle_marker_method: dtangle_marker_method,
-    dtangle_quantile_normalize: dtangle_quantile_normalize,
-    group_mean_threshold: group_mean_threshold,
-    zero_floor: zero_floor,
-    tca_max_iters: tca_max_iters,
-    random_seed: random_seed,
-    log2_pseudocount: log2_pseudocount,
-    scale: "log2_cpm"
-  }
-  File effective_parameters_json = write_json(effective_parameters)
 
   if (ValidateProportionMode.estimate_proportions) {
     call dtangle_tasks.RunDtangle {
@@ -164,7 +136,17 @@ workflow CellTypeDeconvolution {
       tca_weights = ProcessProportions.tca_weights,
       filter_report = ProcessProportions.filter_report,
       dtangle_metadata = RunDtangle.metadata,
-      parameters_json = effective_parameters_json,
+      proportion_mode = proportion_mode,
+      log2_pseudocount = log2_pseudocount,
+      min_lm22_overlap = min_lm22_overlap,
+      dtangle_marker_fraction = dtangle_marker_fraction,
+      dtangle_marker_method = dtangle_marker_method,
+      dtangle_quantile_normalize = dtangle_quantile_normalize,
+      group_mean_threshold = group_mean_threshold,
+      zero_floor = zero_floor,
+      tca_max_iters = tca_max_iters,
+      random_seed = random_seed,
+      scale = "log2_cpm",
       tca_version = tca_version,
       container_image = deconvolution_docker_image,
       docker_image = deconvolution_docker_image,
@@ -208,6 +190,6 @@ workflow CellTypeDeconvolution {
     File output_manifest = BuildManifest.output_manifest
     File output_inventory = BuildManifest.provenance
     File manifest_log = BuildManifest.log
-    File effective_parameters_file = effective_parameters_json
+    File effective_parameters_file = BuildManifest.effective_parameters_file
   }
 }
