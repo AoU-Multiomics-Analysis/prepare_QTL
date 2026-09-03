@@ -5,6 +5,7 @@ import "tasks/expression.wdl" as expression_tasks
 import "tasks/proportions.wdl" as proportion_tasks
 import "tasks/tca.wdl" as tca_tasks
 import "tasks/qc.wdl" as qc_tasks
+import "tasks/gene_summary.wdl" as summary_tasks
 
 workflow CellTypeDeconvolution {
   input {
@@ -42,6 +43,7 @@ workflow CellTypeDeconvolution {
     Int export_cpu = 8
     String export_memory = "256 GB"
     Int export_disk_gb = 500
+    String gene_summary_memory = "8 GB"
     Int manifest_cpu = 4
     String manifest_memory = "32 GB"
     Int manifest_disk_gb = 100
@@ -167,6 +169,17 @@ workflow CellTypeDeconvolution {
       max_retries = max_retries
   }
 
+  call summary_tasks.SummarizeCellTypeBeds {
+    input:
+      cell_type_beds = ExportTcaBeds.cell_type_beds,
+      cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
+      docker_image = deconvolution_docker_image,
+      memory = gene_summary_memory,
+      disk_gb = export_disk_gb,
+      preemptible_attempts = preemptible_attempts,
+      max_retries = max_retries
+  }
+
   call qc_tasks.BuildManifest {
     input:
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
@@ -230,6 +243,8 @@ workflow CellTypeDeconvolution {
 
     Array[File] cell_type_beds = ExportTcaBeds.cell_type_beds
     File cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory
+    File cell_type_gene_summary = SummarizeCellTypeBeds.summary
+    File gene_summary_log = SummarizeCellTypeBeds.log
     File reconstruction_by_sample = ExportTcaBeds.reconstruction_by_sample
     File qc_summary = BuildManifest.qc_summary
     File qc_plots = ExportTcaBeds.qc_plots
