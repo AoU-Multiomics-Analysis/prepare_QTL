@@ -3,3 +3,7 @@ rust/*/target/
 
 # Local linked worktrees
 .worktrees/
+
+# Python caches
+__pycache__/
+*.py[cod]

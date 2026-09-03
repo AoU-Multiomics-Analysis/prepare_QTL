@@ -20,6 +20,7 @@ prepare_QTL/
 
 ## Documentation
 
+- [RNA-SeQC aggregation](docs/rnaseqc2-aggregation.md): One sample manifest, collision-free file staging, batch aggregation, and a row-streaming cohort merge.
 - [R scripts](docs/scripts.md): Command-line script inputs, outputs, and processing behavior.
 - [Phenotype normalization and filtering](docs/phenotype-normalization-filtering.md): Modality-specific filtering, normalization, transformations, and WGCNA outlier removal.
 - [Molecular QTL workflows](docs/molecular-qtl-workflows.md): eQTL, sQTL, pQTL, methylation, proteomics normalization, phenotype PC, and covariate merge WDLs.
@@ -30,6 +31,7 @@ prepare_QTL/
 
 ## Main Workflows
 
+- [`workflows/expression/rnaseqc2_aggregate_batched.wdl`](workflows/expression/rnaseqc2_aggregate_batched.wdl): Aggregates individual RNA-SeQC GCT, metrics, and optional insert-size files in batches before a final cohort merge.
 - [`workflows/cell_type_specific_expression/deconvolution.wdl`](workflows/cell_type_specific_expression/deconvolution.wdl): Estimates or accepts LM22 proportions and uses TCA on linear CPM to create one BED for each retained major cell type.
 - [`workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl`](workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl): Runs deconvolution and prepares an independent set of INT and scaled QTL inputs for each retained cell type.
 - [`workflows/expression/prepare_eQTL.wdl`](workflows/expression/prepare_eQTL.wdl): Prepares INT, scaled, and raw expression BED files from raw counts or a pre-normalized log2-CPM BED, plus phenotype PCs, optional QTL covariates, and optional residualized BEDs for INT and scaled outputs.

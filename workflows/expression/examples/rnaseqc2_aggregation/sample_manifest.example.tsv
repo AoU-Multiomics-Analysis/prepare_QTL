@@ -1,0 +1,3 @@
+sample_id	tpm_gct	count_gct	exon_count_gct	metrics_tsv	insert_size_hist
+GTEX-001	gs://YOUR_BUCKET/GTEX-001/sample.gene_tpm.gct.gz	gs://YOUR_BUCKET/GTEX-001/sample.gene_reads.gct.gz	gs://YOUR_BUCKET/GTEX-001/sample.exon_reads.gct.gz	gs://YOUR_BUCKET/GTEX-001/sample.metrics.tsv.gz	gs://YOUR_BUCKET/GTEX-001/sample.fragmentSizes.txt.gz
+GTEX-002	gs://YOUR_BUCKET/GTEX-002/sample.gene_tpm.gct.gz	gs://YOUR_BUCKET/GTEX-002/sample.gene_reads.gct.gz	gs://YOUR_BUCKET/GTEX-002/sample.exon_reads.gct.gz	gs://YOUR_BUCKET/GTEX-002/sample.metrics.tsv.gz	gs://YOUR_BUCKET/GTEX-002/sample.fragmentSizes.txt.gz

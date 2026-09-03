@@ -2,6 +2,9 @@
 version: 1.2
 workflows:
   - subclass: WDL
+    primaryDescriptorPath: /workflows/expression/rnaseqc2_aggregate_batched.wdl
+    name: rnaseqc2_aggregate_batched
+  - subclass: WDL
     primaryDescriptorPath: /workflows/cell_type_specific_expression/deconvolution.wdl
     name: cell_type_deconvolution
   - subclass: WDL

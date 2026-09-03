@@ -10,7 +10,7 @@ implementation modules.
 | --- | --- |
 | `common/` | Phenotype-PC calculation, covariate merging, and phenotype residualization shared across modalities. |
 | `cell_type_specific_expression/` | Whole-blood hspe and TCA deconvolution and cell-type-specific expression-QTL preparation. |
-| `expression/` | Expression-QTL preparation. |
+| `expression/` | RNA-SeQC aggregation and expression-QTL preparation. |
 | `proteomics/` | Olink normalization and protein-QTL preparation. |
 | `splicing/` | Splicing-QTL preparation. |
 | `methylation/` | Per-sample processing, cohort aggregation, connectivity analysis, annotation, and methylation-QTL outputs. |
@@ -20,6 +20,7 @@ implementation modules.
 
 | Area | WDL | Use |
 | --- | --- | --- |
+| Expression | `expression/rnaseqc2_aggregate_batched.wdl` | Aggregate RNA-SeQC outputs from one sample manifest in batches, then stream the cohort merge. |
 | Cell-type expression | `cell_type_specific_expression/deconvolution.wdl` | Estimate proportions in log2 space and create cell-type-specific linear-CPM BED files with TCA. |
 | Cell-type expression | `cell_type_specific_expression/prepare_cell_type_eQTL.wdl` | Deconvolve whole blood and prepare INT and scaled QTL inputs for each retained cell type. |
 | Expression | `expression/prepare_eQTL.wdl` | Prepare expression QTL phenotypes. |
@@ -33,6 +34,7 @@ implementation modules.
 
 Every public entry point and the independently callable common helpers are
 registered in [`.dockstore.yml`](../.dockstore.yml) and checked in CI.
+See the [RNA-SeQC aggregation guide](../docs/rnaseqc2-aggregation.md) for the combined manifest, resource settings, and output files.
 See the [cell-type-specific expression guide](../docs/cell-type-specific-expression.md)
 for inputs, proportion modes, output arrays, and the manifest schema.
 

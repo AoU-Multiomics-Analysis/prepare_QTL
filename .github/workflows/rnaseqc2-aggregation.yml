@@ -1,0 +1,41 @@
+name: RNA-SeQC aggregation checks
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - "scripts/check_wdl_logging.py"
+      - "scripts/expression/merge_rnaseqc.py"
+      - "workflows/expression/rnaseqc2_aggregate_batched.wdl"
+      - "workflows/expression/examples/rnaseqc2_aggregation/**"
+      - "tests/rnaseqc2_aggregation/**"
+      - "docs/rnaseqc2-aggregation.md"
+      - ".github/workflows/rnaseqc2-aggregation.yml"
+  push:
+    paths:
+      - "scripts/check_wdl_logging.py"
+      - "scripts/expression/merge_rnaseqc.py"
+      - "workflows/expression/rnaseqc2_aggregate_batched.wdl"
+      - "workflows/expression/examples/rnaseqc2_aggregation/**"
+      - "tests/rnaseqc2_aggregation/**"
+      - "docs/rnaseqc2-aggregation.md"
+      - ".github/workflows/rnaseqc2-aggregation.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install the pinned WDL checker
+        run: python -m pip install miniwdl==1.14.2
+      - name: Run merger tests
+        run: python -m unittest discover -s tests/rnaseqc2_aggregation -v
+      - name: Check WDL syntax and types
+        run: miniwdl check workflows/expression/rnaseqc2_aggregate_batched.wdl
+      - name: Check command logging
+        run: python scripts/check_wdl_logging.py workflows/expression/rnaseqc2_aggregate_batched.wdl
