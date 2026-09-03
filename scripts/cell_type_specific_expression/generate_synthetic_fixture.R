@@ -165,6 +165,7 @@ gene_types <- ifelse(
   "lncRNA",
   "protein_coding"
 )
+gene_types[all_gene_ids == "ENSGEXTRA000006"] <- "processed_pseudogene"
 gtf_lines <- purrr::pmap_chr(
   list(
     gene_id = all_gene_ids,
@@ -211,6 +212,7 @@ common_inputs <- list(
   "PrepareCellTypeEqtlWorkflow.zero_floor" = 0.000001,
   "PrepareCellTypeEqtlWorkflow.tca_max_iters" = 10L,
   "PrepareCellTypeEqtlWorkflow.tca_parallel" = FALSE,
+  "PrepareCellTypeEqtlWorkflow.gene_type" = c("protein_coding", "lncRNA"),
   "PrepareCellTypeEqtlWorkflow.random_seed" = seed,
   "PrepareCellTypeEqtlWorkflow.dtangle_cpu" = 2L,
   "PrepareCellTypeEqtlWorkflow.dtangle_memory" = "8 GB",

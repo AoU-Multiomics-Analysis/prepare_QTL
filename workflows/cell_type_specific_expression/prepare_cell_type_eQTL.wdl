@@ -29,6 +29,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     Boolean tca_parallel = false
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
+    Array[String] gene_type = ["protein_coding", "lncRNA"]
 
     Int dtangle_cpu = 4
     String dtangle_memory = "32 GB"
@@ -72,6 +73,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       tca_parallel = tca_parallel,
       random_seed = random_seed,
       log2_pseudocount = log2_pseudocount,
+      gene_type = gene_type,
       dtangle_cpu = dtangle_cpu,
       dtangle_memory = dtangle_memory,
       dtangle_disk_gb = dtangle_disk_gb,
@@ -145,6 +147,10 @@ workflow PrepareCellTypeEqtlWorkflow {
   }
 
   output {
+    File filtered_expression = CellTypeDeconvolution.filtered_expression
+    File gene_type_filter_report = CellTypeDeconvolution.gene_type_filter_report
+    File gene_type_filter_log = CellTypeDeconvolution.gene_type_filter_log
+
     File proportion_mode_validation_log = CellTypeDeconvolution.proportion_mode_validation_log
 
     File? estimated_proportions = CellTypeDeconvolution.estimated_proportions

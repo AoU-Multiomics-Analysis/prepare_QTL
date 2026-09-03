@@ -112,9 +112,49 @@ expected_samples <- readLines(
   file.path(fixture_directory, "samples.tsv"),
   warn = FALSE
 )
-expected_gene_ids <- expression$gene_id
+gene_type_filter_report <- readr::read_tsv(
+  output_value("gene_type_filter_report"),
+  show_col_types = FALSE,
+  progress = FALSE
+)
+require_true(
+  identical(
+    names(gene_type_filter_report),
+    c("gene_id", "gene_name", "gene_type", "retained", "filter_reason")
+  ),
+  "The gene-type filter report has an invalid schema"
+)
+require_true(
+  identical(gene_type_filter_report$gene_id, expression$gene_id),
+  "The gene-type filter report changed the input gene order"
+)
+selected_gene_types <- input_value("gene_type")
+expected_retained <- gene_type_filter_report$gene_type %in% selected_gene_types
+require_true(
+  identical(gene_type_filter_report$retained, expected_retained),
+  "The gene-type filter report retained an unexpected gene"
+)
+require_true(
+  any(!gene_type_filter_report$retained) &&
+    all(
+      gene_type_filter_report$filter_reason[!gene_type_filter_report$retained] ==
+        "gene_type_not_selected"
+    ),
+  "The smoke fixture must exclude at least one unselected gene type"
+)
+expected_gene_ids <- gene_type_filter_report$gene_id[expected_retained]
 expected_coordinates <- expression |>
+  dplyr::filter(.data$gene_id %in% expected_gene_ids) |>
   dplyr::select(dplyr::all_of(metadata_columns))
+filtered_expression <- readr::read_tsv(
+  output_value("filtered_expression"),
+  show_col_types = FALSE,
+  progress = FALSE
+)
+require_true(
+  identical(filtered_expression$gene_id, expected_gene_ids),
+  "The filtered expression BED has an incorrect gene order"
+)
 expected_groups <- readLines(
   file.path(fixture_directory, "expected_groups.txt"),
   warn = FALSE
@@ -402,7 +442,7 @@ required_parameter_names <- c(
   "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
   "dtangle_marker_fraction", "dtangle_marker_method",
   "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
-  "tca_max_iters", "tca_parallel", "random_seed", "scale"
+  "tca_max_iters", "tca_parallel", "gene_type", "random_seed", "scale"
 )
 numeric_parameter <- function(name) as.numeric(parameters[[name]])
 require_true(
@@ -426,6 +466,10 @@ require_true(
     numeric_parameter("zero_floor") == 0.000001 &&
     numeric_parameter("tca_max_iters") == 10 &&
     identical(parameters$tca_parallel, expected_tca_parallel) &&
+    identical(
+      unlist(parameters$gene_type, use.names = FALSE),
+      input_value("gene_type")
+    ) &&
     numeric_parameter("random_seed") == 20260901 &&
     identical(parameters$scale, "log2_cpm") &&
     identical(manifest$tca_version, "1.2.1"),
@@ -521,6 +565,7 @@ require_true(
 )
 
 required_file_outputs <- c(
+  "filtered_expression", "gene_type_filter_report", "gene_type_filter_log",
   "proportion_mode_validation_log", "proportions_lm22",
   "proportions_combined", "tca_weights", "cell_group_filter_report",
   "proportions_log", "tca_model", "tca_model_log", "tca_expression",

@@ -69,5 +69,5 @@ chr2	synthetic	gene	67001	67500	.	+	.	gene_id "ENSGEXTRA000002"; gene_name "EXTR
 chr1	synthetic	gene	68001	68500	.	+	.	gene_id "ENSGEXTRA000003"; gene_name "EXTRA_GENE_03"; gene_type "protein_coding";
 chr2	synthetic	gene	69001	69500	.	+	.	gene_id "ENSGEXTRA000004"; gene_name "EXTRA_GENE_04"; gene_type "lncRNA";
 chr1	synthetic	gene	70001	70500	.	+	.	gene_id "ENSGEXTRA000005"; gene_name "EXTRA_GENE_05"; gene_type "protein_coding";
-chr2	synthetic	gene	71001	71500	.	+	.	gene_id "ENSGEXTRA000006"; gene_name "EXTRA_GENE_06"; gene_type "protein_coding";
+chr2	synthetic	gene	71001	71500	.	+	.	gene_id "ENSGEXTRA000006"; gene_name "EXTRA_GENE_06"; gene_type "processed_pseudogene";
 chr1	synthetic	gene	72001	72500	.	+	.	gene_id "ENSGDUP000001"; gene_name "SYN_GENE_001"; gene_type "protein_coding";

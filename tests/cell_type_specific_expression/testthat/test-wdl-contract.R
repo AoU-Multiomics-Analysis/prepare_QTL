@@ -17,6 +17,7 @@ testthat::test_that("standalone deconvolution sources use WDL 1.0", {
   paths <- c(
     wdl_path("deconvolution.wdl"),
     wdl_path("tasks", "dtangle.wdl"),
+    wdl_path("tasks", "expression.wdl"),
     wdl_path("tasks", "proportions.wdl"),
     wdl_path("tasks", "tca.wdl"),
     wdl_path("tasks", "qc.wdl")
@@ -24,8 +25,44 @@ testthat::test_that("standalone deconvolution sources use WDL 1.0", {
 
   purrr::walk(paths, function(path) {
     testthat::expect_true(file.exists(path), info = path)
+    if (!file.exists(path)) {
+      return(invisible(NULL))
+    }
     testthat::expect_identical(readLines(path, n = 1L, warn = FALSE), "version 1.0")
   })
+})
+
+testthat::test_that("gene types filter expression before deconvolution", {
+  standalone <- wdl_text("deconvolution.wdl")
+  integrated <- wdl_text("prepare_cell_type_eQTL.wdl")
+  task_path <- wdl_path("tasks", "expression.wdl")
+  testthat::expect_true(file.exists(task_path), info = task_path)
+  if (!file.exists(task_path)) {
+    return(invisible(NULL))
+  }
+  task <- wdl_text("tasks", "expression.wdl")
+
+  purrr::walk(list(standalone, integrated), function(text) {
+    testthat::expect_match(
+      text,
+      'Array[String] gene_type = ["protein_coding", "lncRNA"]',
+      fixed = TRUE
+    )
+  })
+  testthat::expect_match(task, "task FilterExpressionGenes", fixed = TRUE)
+  testthat::expect_match(task, "--gene-types '~{sep=\",\" gene_type}'", fixed = TRUE)
+  testthat::expect_match(task, "File expression = \"outputs/filtered_expression.bed.gz\"", fixed = TRUE)
+  testthat::expect_match(task, "File report = \"outputs/gene_type_filter_report.tsv\"", fixed = TRUE)
+
+  testthat::expect_equal(
+    stringr::str_count(
+      standalone,
+      stringr::fixed("expression = FilterExpressionGenes.expression")
+    ),
+    4L
+  )
+  testthat::expect_match(standalone, "gene_type = gene_type", fixed = TRUE)
+  testthat::expect_match(integrated, "gene_type = gene_type", fixed = TRUE)
 })
 
 testthat::test_that("LM22 is required and precomputed proportions control estimation", {

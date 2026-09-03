@@ -23,6 +23,7 @@ task BuildManifest {
     Float zero_floor
     Int tca_max_iters
     Boolean tca_parallel
+    Array[String] gene_type
     Int random_seed
     String scale
     String tca_version = "1.2.1"
@@ -188,6 +189,7 @@ BED_OUTPUT_SOURCES
       --zero-floor '~{zero_floor}' \
       --tca-max-iters '~{tca_max_iters}' \
       --tca-parallel '~{tca_parallel}' \
+      --gene-types '~{sep="," gene_type}' \
       --random-seed '~{random_seed}' \
       --scale '~{scale}' \
       --effective-parameters-output outputs/effective_parameters.json \

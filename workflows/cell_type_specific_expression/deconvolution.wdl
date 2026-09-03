@@ -1,6 +1,7 @@
 version 1.0
 
 import "tasks/dtangle.wdl" as dtangle_tasks
+import "tasks/expression.wdl" as expression_tasks
 import "tasks/proportions.wdl" as proportion_tasks
 import "tasks/tca.wdl" as tca_tasks
 import "tasks/qc.wdl" as qc_tasks
@@ -24,6 +25,7 @@ workflow CellTypeDeconvolution {
     Boolean tca_parallel = false
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
+    Array[String] gene_type = ["protein_coding", "lncRNA"]
 
     Int dtangle_cpu = 4
     String dtangle_memory = "32 GB"
@@ -43,6 +45,20 @@ workflow CellTypeDeconvolution {
   }
 
   String tca_version = "1.2.1"
+  call expression_tasks.FilterExpressionGenes {
+    input:
+      input_expression = expression,
+      gtf = gtf,
+      gene_type = gene_type,
+      log2_pseudocount = log2_pseudocount,
+      docker_image = deconvolution_docker_image,
+      cpu = dtangle_cpu,
+      memory = dtangle_memory,
+      disk_gb = dtangle_disk_gb,
+      preemptible_attempts = preemptible_attempts,
+      max_retries = max_retries
+  }
+
   call proportion_tasks.ValidateProportionMode {
     input:
       precomputed_proportions = precomputed_proportions,
@@ -57,7 +73,7 @@ workflow CellTypeDeconvolution {
   if (ValidateProportionMode.estimate_proportions) {
     call dtangle_tasks.RunDtangle {
       input:
-        expression = expression,
+        expression = FilterExpressionGenes.expression,
         log2_pseudocount = log2_pseudocount,
         gtf = gtf,
         lm22 = lm22,
@@ -93,7 +109,7 @@ workflow CellTypeDeconvolution {
 
   call tca_tasks.FitTca {
     input:
-      expression = expression,
+      expression = FilterExpressionGenes.expression,
       log2_pseudocount = log2_pseudocount,
       tca_weights = ProcessProportions.tca_weights,
       covariates = covariates,
@@ -111,7 +127,7 @@ workflow CellTypeDeconvolution {
   call tca_tasks.ExportTcaBeds {
     input:
       tca_expression = FitTca.tca_expression,
-      expression = expression,
+      expression = FilterExpressionGenes.expression,
       log2_pseudocount = log2_pseudocount,
       model = FitTca.model,
       tca_weights = ProcessProportions.tca_weights,
@@ -148,6 +164,7 @@ workflow CellTypeDeconvolution {
       zero_floor = zero_floor,
       tca_max_iters = tca_max_iters,
       tca_parallel = tca_parallel,
+      gene_type = gene_type,
       random_seed = random_seed,
       scale = "log2_cpm",
       tca_version = tca_version,
@@ -161,6 +178,10 @@ workflow CellTypeDeconvolution {
   }
 
   output {
+    File filtered_expression = FilterExpressionGenes.expression
+    File gene_type_filter_report = FilterExpressionGenes.report
+    File gene_type_filter_log = FilterExpressionGenes.log
+
     File proportion_mode_validation_log = ValidateProportionMode.log
 
     File? estimated_proportions = RunDtangle.proportions

@@ -696,6 +696,7 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     "--zero-floor", "0.000001",
     "--tca-max-iters", "10",
     "--tca-parallel", "false",
+    "--gene-types", "protein_coding,lncRNA",
     "--random-seed", "20260901",
     "--scale", "log2_cpm",
     "--effective-parameters-output", effective_parameters_path,
@@ -720,7 +721,7 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
       "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
       "dtangle_marker_fraction", "dtangle_marker_method",
       "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
-      "tca_max_iters", "tca_parallel", "random_seed", "scale"
+      "tca_max_iters", "tca_parallel", "gene_type", "random_seed", "scale"
     )
   )
   testthat::expect_identical(effective_parameters$proportion_mode, "precomputed")
@@ -731,6 +732,10 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
   )
   testthat::expect_identical(effective_parameters$dtangle_quantile_normalize, FALSE)
   testthat::expect_identical(effective_parameters$tca_parallel, FALSE)
+  testthat::expect_identical(
+    unlist(effective_parameters$gene_type, use.names = FALSE),
+    c("protein_coding", "lncRNA")
+  )
   testthat::expect_identical(
     manifest$outputs[[1L]]$path,
     basename(bed_path)

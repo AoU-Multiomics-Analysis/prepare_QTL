@@ -72,6 +72,98 @@ testthat::test_that("GTF parsing retains all gene types and ignores non-gene rec
   testthat::expect_identical(observed$gene_type, c("protein_coding", "lncRNA"))
 })
 
+testthat::test_that("gene-type filtering preserves BED order and reports exclusions", {
+  expression <- list(
+    coordinates = tibble::tibble(
+      `#chr` = rep("chr1", 4L),
+      start = c(0L, 10L, 20L, 30L),
+      end = c(10L, 20L, 30L, 40L),
+      gene_id = c("g1", "g2", "g3", "g4")
+    ),
+    cpm = matrix(
+      1:8,
+      nrow = 4L,
+      dimnames = list(c("g1", "g2", "g3", "g4"), c("S1", "S2"))
+    )
+  )
+  annotation <- tibble::tibble(
+    gene_id = c("g1", "g2", "g3"),
+    gene_name = c("A", "B", "C"),
+    gene_type = c("protein_coding", "lncRNA", "pseudogene")
+  )
+
+  result <- filter_expression_by_gene_types(
+    expression,
+    annotation,
+    c("protein_coding", "lncRNA")
+  )
+
+  testthat::expect_identical(result$expression$coordinates$gene_id, c("g1", "g2"))
+  testthat::expect_identical(rownames(result$expression$cpm), c("g1", "g2"))
+  testthat::expect_identical(
+    names(result$report),
+    c("gene_id", "gene_name", "gene_type", "retained", "filter_reason")
+  )
+  testthat::expect_identical(
+    result$report$filter_reason,
+    c("retained", "retained", "gene_type_not_selected", "missing_gtf_gene_id")
+  )
+})
+
+testthat::test_that("gene-type filtering validates its selection", {
+  expression <- list(
+    coordinates = tibble::tibble(
+      `#chr` = "chr1", start = 0L, end = 10L, gene_id = "g1"
+    ),
+    cpm = matrix(1, nrow = 1L, dimnames = list("g1", "S1"))
+  )
+  annotation <- tibble::tibble(
+    gene_id = "g1", gene_name = "A", gene_type = "protein_coding"
+  )
+
+  testthat::expect_error(
+    filter_expression_by_gene_types(expression, annotation, character()),
+    "at least one"
+  )
+  testthat::expect_error(parse_gene_types("protein_coding,"), "non-empty")
+  testthat::expect_error(parse_gene_types(",protein_coding"), "non-empty")
+  testthat::expect_error(parse_gene_types("protein_coding,   "), "non-empty")
+  testthat::expect_error(
+    filter_expression_by_gene_types(
+      expression,
+      annotation,
+      c("protein_coding", "protein_coding")
+    ),
+    "unique"
+  )
+  testthat::expect_error(
+    filter_expression_by_gene_types(expression, annotation, "lncRNA"),
+    "No expression genes"
+  )
+})
+
+testthat::test_that("gene-type filtering permits missing gene names", {
+  expression <- list(
+    coordinates = tibble::tibble(
+      `#chr` = "chr1", start = 0L, end = 10L, gene_id = "g1"
+    ),
+    cpm = matrix(1, nrow = 1L, dimnames = list("g1", "S1"))
+  )
+  annotation <- tibble::tibble(
+    gene_id = "g1", gene_name = NA_character_, gene_type = "protein_coding"
+  )
+
+  result <- filter_expression_by_gene_types(
+    expression,
+    annotation,
+    "protein_coding"
+  )
+
+  testthat::expect_identical(result$expression$coordinates$gene_id, "g1")
+  testthat::expect_true(is.na(result$report$gene_name))
+  testthat::expect_identical(result$report$filter_reason, "retained")
+})
+
 testthat::test_that("dtangle view sums duplicate symbols without CPM renormalization", {
   cpm <- matrix(c(2, 3, 5, 7), nrow = 2,
     dimnames = list(c("g1", "g2"), c("s1", "s2")))

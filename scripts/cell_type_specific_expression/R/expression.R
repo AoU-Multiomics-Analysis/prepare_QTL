@@ -54,9 +54,13 @@ extract_gtf_attribute <- function(attributes, key) {
   stringr::str_match(attributes, pattern)[, 2L]
 }
 
-validate_gtf_gene_annotation <- function(annotation) {
+validate_gtf_gene_annotation <- function(annotation, require_gene_name = TRUE) {
   if (!inherits(annotation, "data.frame")) {
     stop("GTF annotation must be a data frame", call. = FALSE)
+  }
+  if (!is.logical(require_gene_name) || length(require_gene_name) != 1L ||
+      is.na(require_gene_name)) {
+    stop("require_gene_name must be true or false", call. = FALSE)
   }
 
   required_columns <- c("gene_id", "gene_name", "gene_type")
@@ -86,14 +90,93 @@ validate_gtf_gene_annotation <- function(annotation) {
   if (anyDuplicated(annotation$gene_id) > 0L) {
     stop("GTF annotation gene_id values must be unique", call. = FALSE)
   }
-  if (!any(!is.na(annotation$gene_name) & nzchar(annotation$gene_name))) {
+  if (require_gene_name &&
+      !any(!is.na(annotation$gene_name) & nzchar(annotation$gene_name))) {
     stop("GTF annotation must contain at least one usable gene_name", call. = FALSE)
   }
 
   annotation
 }
 
-read_gtf_gene_annotation <- function(path, chunk_size = 100000L) {
+validate_gene_types <- function(gene_types) {
+  if (!is.character(gene_types) || length(gene_types) == 0L) {
+    stop("gene_type must contain at least one value", call. = FALSE)
+  }
+  if (anyNA(gene_types)) {
+    stop("gene_type values must be non-missing", call. = FALSE)
+  }
+
+  gene_types <- trimws(gene_types)
+  if (any(!nzchar(gene_types))) {
+    stop("gene_type values must be non-empty", call. = FALSE)
+  }
+  if (anyDuplicated(gene_types) > 0L) {
+    stop("gene_type values must be unique", call. = FALSE)
+  }
+  gene_types
+}
+
+parse_gene_types <- function(value) {
+  if (!is.character(value) || length(value) != 1L || is.na(value)) {
+    stop("gene_types must be one comma-separated character value", call. = FALSE)
+  }
+  values <- strsplit(value, ",", fixed = TRUE)[[1L]]
+  if (endsWith(value, ",")) {
+    values <- c(values, "")
+  }
+  validate_gene_types(values)
+}
+
+filter_expression_by_gene_types <- function(expression, annotation, gene_types) {
+  if (!is.list(expression) || !all(c("coordinates", "cpm") %in% names(expression))) {
+    stop("expression must contain coordinates and cpm", call. = FALSE)
+  }
+
+  gene_types <- validate_gene_types(gene_types)
+  annotation <- validate_gtf_gene_annotation(annotation, require_gene_name = FALSE)
+  cpm <- validate_cpm_matrix(expression$cpm)
+  coordinates <- tibble::as_tibble(expression$coordinates)
+  if (!identical(names(coordinates), expression_bed_columns()) ||
+      !identical(rownames(cpm), coordinates$gene_id)) {
+    stop("Expression genes and BED coordinates must match exactly", call. = FALSE)
+  }
+
+  annotation_index <- match(coordinates$gene_id, annotation$gene_id)
+  gene_names <- annotation$gene_name[annotation_index]
+  annotated_gene_types <- annotation$gene_type[annotation_index]
+  has_gene_type <- !is.na(annotated_gene_types) & nzchar(annotated_gene_types)
+  retained <- !is.na(annotation_index) & has_gene_type &
+    annotated_gene_types %in% gene_types
+  report <- tibble::tibble(
+    gene_id = coordinates$gene_id,
+    gene_name = gene_names,
+    gene_type = annotated_gene_types,
+    retained = retained,
+    filter_reason = dplyr::case_when(
+      is.na(annotation_index) ~ "missing_gtf_gene_id",
+      !has_gene_type ~ "missing_gene_type",
+      !retained ~ "gene_type_not_selected",
+      TRUE ~ "retained"
+    )
+  )
+  if (!any(retained)) {
+    stop("No expression genes remain after gene-type filtering", call. = FALSE)
+  }
+
+  filtered_expression <- list(
+    coordinates = coordinates[retained, , drop = FALSE],
+    cpm = cpm[retained, , drop = FALSE]
+  )
+  if ("log2_pseudocount" %in% names(expression)) {
+    filtered_expression$log2_pseudocount <- expression$log2_pseudocount
+  }
+  list(expression = filtered_expression, report = report)
+}
+
+read_gtf_gene_annotation <- function(
+    path,
+    chunk_size = 100000L,
+    require_gene_name = TRUE) {
   if (!is.character(path) || length(path) != 1L || is.na(path) || !nzchar(path)) {
     stop("GTF path must be one non-missing, non-empty character value", call. = FALSE)
   }
@@ -150,7 +233,10 @@ read_gtf_gene_annotation <- function(path, chunk_size = 100000L) {
   if (length(gene_rows) == 0L) {
     stop("GTF annotation must contain at least one gene record", call. = FALSE)
   }
-  validate_gtf_gene_annotation(dplyr::bind_rows(gene_rows))
+  validate_gtf_gene_annotation(
+    dplyr::bind_rows(gene_rows),
+    require_gene_name = require_gene_name
+  )
 }
 
 collapse_cpm_to_gene_names <- function(cpm, annotation) {
