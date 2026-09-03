@@ -227,9 +227,17 @@ write_cell_type_beds <- function(tensor, coordinates, output_dir) {
   purrr::iwalk(paths, function(path, cell_group) {
     write_expression_bed(path, coordinates, tensor[[cell_group]])
   })
+  if (!requireNamespace("digest", quietly = TRUE)) {
+    stop("The digest package is required for SHA-256 checksums", call. = FALSE)
+  }
+  sha256 <- purrr::map_chr(
+    unname(paths),
+    ~ digest::digest(file = .x, algo = "sha256", serialize = FALSE)
+  )
   inventory <- tibble::tibble(
     logical_name = paste0(slugify_cell_group(names(paths)), "_expression"),
     path = basename(unname(paths)),
+    sha256 = sha256,
     n_genes = nrow(tensor[[1L]]),
     n_samples = ncol(tensor[[1L]]),
     scale = "cpm",

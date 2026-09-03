@@ -141,7 +141,6 @@ workflow CellTypeDeconvolution {
   call qc_tasks.BuildManifest {
     input:
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
-      cell_type_beds = ExportTcaBeds.cell_type_beds,
       export_qc_summary = ExportTcaBeds.qc_summary,
       export_qc_plots = ExportTcaBeds.qc_plots,
       model = FitTca.model,

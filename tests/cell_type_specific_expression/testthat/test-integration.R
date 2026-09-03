@@ -2,6 +2,10 @@ make_scatter_inventory <- function() {
   tibble::tibble(
     logical_name = c("cd4_t_cells_expression", "monocytes_expression"),
     path = c("cd4_t_cells.bed.gz", "monocytes.bed.gz"),
+    sha256 = c(
+      paste(rep("a", 64L), collapse = ""),
+      paste(rep("b", 64L), collapse = "")
+    ),
     n_genes = c(120L, 120L),
     n_samples = c(80L, 80L),
     scale = c("cpm", "cpm"),
@@ -149,16 +153,17 @@ testthat::test_that("scatter contract validates scale and dimensions", {
   )
 })
 
-testthat::test_that("scatter contract requires order-aligned BED basenames", {
+testthat::test_that("scatter contract restores inventory order after globbing", {
   inventory <- make_scatter_inventory()
 
-  testthat::expect_error(
-    prepare_scatter_contract(
-      inventory,
-      c("/localized/monocytes.bed.gz", "/localized/cd4_t_cells.bed.gz"),
-      "cohort"
-    ),
-    "basenames must match"
+  contract <- prepare_scatter_contract(
+    inventory,
+    c("/localized/monocytes.bed.gz", "/localized/cd4_t_cells.bed.gz"),
+    "cohort"
+  )
+  testthat::expect_identical(
+    contract$expression_bed,
+    c("/localized/cd4_t_cells.bed.gz", "/localized/monocytes.bed.gz")
   )
   testthat::expect_error(
     prepare_scatter_contract(inventory, inventory$path[-1L], "cohort"),

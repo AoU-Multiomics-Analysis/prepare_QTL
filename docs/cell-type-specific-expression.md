@@ -307,6 +307,13 @@ workflow exposes the deconvolution proportions, TCA model, weights, filter
 report, BED inventory, reconstruction results, QC results, parameters, logs,
 and provenance outputs separately.
 
+The export task exposes its dynamically generated BED files with a WDL
+`glob()`. The BED array order is not authoritative. The integration stage
+matches each BED basename to the ordered inventory before it scatters the QTL
+preparation tasks. The export stage also writes each BED SHA-256 checksum to
+the inventory while the file is local. The manifest task uses these recorded
+checksums and does not localize the large BED files onto a second worker.
+
 ## Branch integration and repository ownership
 
 Merge `feat/log2-cpm-bed-input` first. Merge

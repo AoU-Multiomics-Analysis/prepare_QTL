@@ -56,6 +56,17 @@ testthat::test_that("cell-type BED files preserve coordinates and sample order",
     c("cd4_t_cells.bed.gz", "cd8_t_cells.bed.gz")
   )
   testthat::expect_true(all(result$inventory$scale == "cpm"))
+  testthat::expect_true(all(grepl(
+    "^[0-9a-f]{64}$",
+    result$inventory$sha256
+  )))
+  testthat::expect_identical(
+    result$inventory$sha256,
+    purrr::map_chr(
+      unname(result$paths),
+      ~ digest::digest(file = .x, algo = "sha256", serialize = FALSE)
+    )
+  )
 })
 
 testthat::test_that("the exported BED path list preserves non-lexical TCA order", {
@@ -385,16 +396,16 @@ testthat::test_that("reconstruction statistics combine genes by sample", {
   testthat::expect_true(all(is.finite(metrics$correlation)))
 })
 
-testthat::test_that("manifest records hashes and dimensions", {
-  output_path <- tempfile(fileext = ".bed.gz")
-  writeBin(charToRaw("bed-output"), output_path)
+testthat::test_that("manifest uses export-time hashes without reading BED files", {
+  expected_sha256 <- "3a1f675ada651f6eac816552ee286844605f8ca131ce33002807edeef9dbd83f"
   outputs <- tibble::tibble(
     logical_name = "cd4_t_cells_expression",
-    path = output_path,
+    path = "cd4_t_cells.bed.gz",
     n_genes = 2L,
     n_samples = 3L,
     scale = "cpm",
-    cell_group = "CD4 T cells"
+    cell_group = "CD4 T cells",
+    sha256 = expected_sha256
   )
 
   manifest <- build_output_manifest(
@@ -410,21 +421,20 @@ testthat::test_that("manifest records hashes and dimensions", {
   testthat::expect_false("pipeline_version" %in% names(manifest))
   testthat::expect_identical(manifest$tca_version, "1.2.1")
   testthat::expect_identical(manifest$outputs[[1L]]$dimensions, c(2L, 3L))
-  testthat::expect_identical(manifest$outputs[[1L]]$path, basename(output_path))
-  testthat::expect_identical(manifest$outputs[[1L]]$file_name, basename(output_path))
+  testthat::expect_identical(manifest$outputs[[1L]]$path, "cd4_t_cells.bed.gz")
+  testthat::expect_identical(manifest$outputs[[1L]]$file_name, "cd4_t_cells.bed.gz")
   testthat::expect_identical(
     manifest$outputs[[1L]]$sha256,
-    digest::digest(file = output_path, algo = "sha256", serialize = FALSE)
+    expected_sha256
   )
   testthat::expect_match(manifest$outputs[[1L]]$sha256, "^[0-9a-f]{64}$")
 })
 
 testthat::test_that("manifest metadata rejects empty fields and fractional dimensions", {
-  output_path <- tempfile(fileext = ".bed.gz")
-  writeBin(charToRaw("bed-output"), output_path)
   valid <- tibble::tibble(
     logical_name = "a_expression",
-    path = output_path,
+    path = "a.bed.gz",
+    sha256 = paste(rep("a", 64L), collapse = ""),
     n_genes = 2,
     n_samples = 3,
     scale = "cpm",
@@ -586,7 +596,7 @@ testthat::test_that("pipeline QC records validation, row sums, and convergence",
 
 })
 
-testthat::test_that("manifest CLI hashes localized files and publishes basenames", {
+testthat::test_that("manifest CLI consumes export-time hashes and basenames", {
   working_directory <- tempfile("manifest cli inputs ")
   dir.create(working_directory)
   bed_path <- file.path(working_directory, "a group.bed.gz")
@@ -594,7 +604,12 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
   inventory_path <- file.path(working_directory, "checksum inventory.tsv")
   readr::write_tsv(tibble::tibble(
     logical_name = "a_group_expression",
-    path = bed_path,
+    path = basename(bed_path),
+    sha256 = digest::digest(
+      file = bed_path,
+      algo = "sha256",
+      serialize = FALSE
+    ),
     n_genes = 2L,
     n_samples = 2L,
     scale = "cpm",

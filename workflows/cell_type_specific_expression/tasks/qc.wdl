@@ -3,7 +3,6 @@ version 1.0
 task BuildManifest {
   input {
     File cell_type_bed_inventory
-    Array[File] cell_type_beds
     File export_qc_summary
     File export_qc_plots
     File model
@@ -45,120 +44,14 @@ task BuildManifest {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    localized_bed_files="$PWD/localized_bed_files"
-    checksum_inventory=checksum_inventory.localized.tsv
     public_inventory=outputs/output_inventory.tsv
     dtangle_metadata_path="~{dtangle_metadata_path}"
     dtangle_metadata_arguments=()
     if [[ -n "$dtangle_metadata_path" ]]; then
       dtangle_metadata_arguments=(--dtangle-metadata "$dtangle_metadata_path")
     fi
-    mkdir -p "$localized_bed_files" outputs
-    stage_localized_file() {
-      source_path="$1"
-      source_name="$(basename -- "$source_path")"
-      if [[ -z "$source_name" || "$source_name" == "." || "$source_name" == ".." ]]; then
-        printf 'stage=%s error_status=1 time=%s message=unsafe_output_basename\n' \
-          "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
-        exit 1
-      fi
-      source_dir="$(dirname -- "$source_path")"
-      source_absolute="$(cd -P -- "$source_dir" && pwd -P)/$source_name"
-      destination="$localized_bed_files/$source_name"
-      if [[ ! -e "$source_absolute" ]]; then
-        printf 'stage=%s error_status=1 time=%s message=missing_source_output\n' \
-          "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
-        exit 1
-      fi
-      if [[ -e "$destination" || -L "$destination" ]]; then
-        printf 'stage=%s error_status=1 time=%s message=duplicate_output_basename\n' \
-          "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
-        exit 1
-      fi
-      ln -s "$source_absolute" "$destination"
-      if [[ ! -e "$destination" ]]; then
-        printf 'stage=%s error_status=1 time=%s message=failed_to_stage_output\n' \
-          "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
-        exit 1
-      fi
-    }
-    cat > bed_output_sources.txt <<'BED_OUTPUT_SOURCES'
-~{sep='\n' cell_type_beds}
-BED_OUTPUT_SOURCES
-    : > array_basenames.txt
-    while IFS= read -r source_path; do
-      [[ -z "$source_path" ]] && continue
-      stage_localized_file "$source_path"
-      basename -- "$source_path" >> array_basenames.txt
-    done < bed_output_sources.txt
+    mkdir -p outputs
     cp '~{cell_type_bed_inventory}' "$public_inventory"
-    awk -F '\t' -v OFS='\t' -v localized_dir="$localized_bed_files" '
-      NR == 1 {
-        path_column = 0
-        for (column = 1; column <= NF; column++) {
-          if ($column == "path") {
-            path_column = column
-            break
-          }
-        }
-        if (path_column == 0) {
-          print "Missing path column in cell-type BED inventory" > "/dev/stderr"
-          exit 1
-        }
-        print
-        next
-      }
-      {
-        output_basename = $path_column
-        sub(/^.*\//, "", output_basename)
-        if (output_basename == "") {
-          print "Empty path in cell-type BED inventory" > "/dev/stderr"
-          exit 1
-        }
-        if ($path_column != output_basename) {
-          print "Cell-type BED inventory paths must be basenames" > "/dev/stderr"
-          exit 1
-        }
-        $path_column = localized_dir "/" output_basename
-        print
-      }
-    ' "$public_inventory" > "$checksum_inventory"
-    awk -F '\t' '
-      NR == 1 {
-        path_column = 0
-        for (column = 1; column <= NF; column++) {
-          if ($column == "path") {
-            path_column = column
-            break
-          }
-        }
-        if (path_column == 0) {
-          print "Missing path column in localized BED inventory" > "/dev/stderr"
-          exit 1
-        }
-        next
-      }
-      {
-        print $path_column
-        output_basename = $path_column
-        sub(/^.*\//, "", output_basename)
-        print output_basename > "inventory_basenames.txt"
-      }
-    ' "$checksum_inventory" > rewritten_paths.txt
-    while IFS= read -r rewritten_path; do
-      if [[ ! -e "$rewritten_path" ]]; then
-        printf 'stage=%s error_status=1 time=%s message=missing_localized_output\n' \
-          "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
-        exit 1
-      fi
-    done < rewritten_paths.txt
-    LC_ALL=C sort array_basenames.txt > array_basenames.sorted.txt
-    LC_ALL=C sort inventory_basenames.txt > inventory_basenames.sorted.txt
-    if ! cmp -s array_basenames.sorted.txt inventory_basenames.sorted.txt; then
-      printf 'stage=%s error_status=1 time=%s message=inventory_array_mismatch\n' \
-        "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
-      exit 1
-    fi
     printf '%s\n' \
       '~{export_qc_summary}' \
       '~{export_qc_plots}' \
@@ -169,7 +62,7 @@ BED_OUTPUT_SOURCES
       '~{tca_weights}' \
       '~{filter_report}' > supporting_inputs.txt
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/build_deconvolution_manifest.R \
-      --outputs "$checksum_inventory" \
+      --outputs "$public_inventory" \
       --export-qc-summary '~{export_qc_summary}' \
       --original-proportions '~{original_proportions}' \
       --combined-proportions '~{combined_proportions}' \

@@ -398,8 +398,29 @@ require_true(
   "The BED inventory paths must be stable unique basenames"
 )
 require_true(
-  identical(basename(cell_type_bed_paths), inventory_basenames),
+  setequal(basename(cell_type_bed_paths), inventory_basenames),
   "The BED output array does not match the authoritative inventory"
+)
+require_true(
+  all(grepl("^[0-9a-f]{64}$", inventory$sha256)),
+  "The BED inventory must contain valid SHA-256 checksums"
+)
+purrr::pwalk(
+  list(inventory_basenames, inventory$sha256),
+  function(output_basename, expected_sha256) {
+    output_path <- cell_type_bed_paths[
+      match(output_basename, basename(cell_type_bed_paths))
+    ]
+    observed_sha256 <- digest::digest(
+      file = output_path,
+      algo = "sha256",
+      serialize = FALSE
+    )
+    require_true(
+      identical(observed_sha256, expected_sha256),
+      sprintf("The BED checksum is incorrect: %s", output_basename)
+    )
+  }
 )
 public_inventory <- readr::read_tsv(
   output_value("output_inventory"),

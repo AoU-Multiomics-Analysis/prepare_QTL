@@ -103,13 +103,12 @@ task ExportTcaBeds {
       --log-file outputs/export_tca_beds.log 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=%s outputs=%s completion_time=%s\n' \
       "$stage" "$(wc -l < outputs/cell_type_bed_inventory.tsv)" \
-      "cell_type_beds,ordered_bed_paths,inventory,reconstruction,qc_summary,qc_plots" \
+      "cell_type_beds,inventory,reconstruction,qc_summary,qc_plots" \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>
 
   output {
-    Array[File] cell_type_beds = read_lines("outputs/cell_type_bed_paths.txt")
-    File cell_type_bed_paths = "outputs/cell_type_bed_paths.txt"
+    Array[File] cell_type_beds = glob("outputs/*.bed.gz")
     File cell_type_bed_inventory = "outputs/cell_type_bed_inventory.tsv"
     File reconstruction_by_sample = "outputs/reconstruction_by_sample.tsv"
     File qc_summary = "outputs/qc_summary.tsv"

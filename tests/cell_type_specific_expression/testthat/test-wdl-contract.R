@@ -315,20 +315,33 @@ testthat::test_that("every container R command target is copied into the image",
   )))
 })
 
-testthat::test_that("TCA exports its BED array from an ordered path file", {
+testthat::test_that("TCA exposes generated BED files for cloud delocalization", {
   text <- wdl_text("tasks", "tca.wdl")
 
   testthat::expect_match(
     text,
-    'Array[File] cell_type_beds = read_lines("outputs/cell_type_bed_paths.txt")',
+    'Array[File] cell_type_beds = glob("outputs/*.bed.gz")',
     fixed = TRUE
   )
-  testthat::expect_match(
-    text,
-    'File cell_type_bed_paths = "outputs/cell_type_bed_paths.txt"',
+  testthat::expect_false(grepl("read_lines", text, fixed = TRUE))
+})
+
+testthat::test_that("BuildManifest does not relocalize cell-type BED files", {
+  task_text <- wdl_text("tasks", "qc.wdl")
+  workflow_text <- wdl_text("deconvolution.wdl")
+  call_text <- stringr::str_match(
+    workflow_text,
+    "call qc_tasks[.]BuildManifest \\{[\\s\\S]*?\\n  \\}"
+  )[[1L]]
+
+  testthat::expect_false(grepl("Array[File] cell_type_beds", task_text, fixed = TRUE))
+  testthat::expect_false(grepl("localized_bed_files", task_text, fixed = TRUE))
+  testthat::expect_false(is.na(call_text))
+  testthat::expect_false(grepl(
+    "cell_type_beds = ExportTcaBeds.cell_type_beds",
+    call_text,
     fixed = TRUE
-  )
-  testthat::expect_false(grepl('glob("outputs/*.bed.gz")', text, fixed = TRUE))
+  ))
 })
 
 testthat::test_that("standalone environment artifacts are present", {
