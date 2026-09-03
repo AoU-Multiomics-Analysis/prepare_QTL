@@ -139,8 +139,8 @@ lm22_key <- paste(workflow_name, "lm22", sep = ".")
 precomputed_key <- paste(workflow_name, "precomputed_proportions", sep = ".")
 has_lm22 <- !is.null(inputs[[lm22_key]])
 has_precomputed <- !is.null(inputs[[precomputed_key]])
-require_true(xor(has_lm22, has_precomputed), "The fixture must select one proportion mode")
-expected_proportion_mode <- if (has_lm22) "dtangle" else "precomputed"
+require_true(has_lm22, "The fixture must provide the required LM22 reference")
+expected_proportion_mode <- if (has_precomputed) "precomputed" else "dtangle"
 
 proportions <- read_matrix_table("proportions_lm22", "sample_id")
 combined <- read_matrix_table("proportions_combined", "sample_id")
