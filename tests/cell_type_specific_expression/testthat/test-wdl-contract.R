@@ -33,7 +33,7 @@ testthat::test_that("workflow records and forwards the log2 pseudocount", {
 
   testthat::expect_match(text, "workflow CellTypeDeconvolution", fixed = TRUE)
   testthat::expect_match(text, "Float log2_pseudocount = 0.0", fixed = TRUE)
-  testthat::expect_match(text, "log2_pseudocount: log2_pseudocount", fixed = TRUE)
+  testthat::expect_match(text, "log2_pseudocount = log2_pseudocount", fixed = TRUE)
 
   calls <- c("RunDtangle", "FitTca", "ExportTcaBeds")
   purrr::walk(calls, function(call_name) {
@@ -49,6 +49,28 @@ testthat::test_that("workflow records and forwards the log2 pseudocount", {
       info = call_name
     )
   })
+})
+
+testthat::test_that("effective parameters are materialized inside BuildManifest", {
+  workflow_text <- wdl_text("deconvolution.wdl")
+  task_text <- wdl_text("tasks", "qc.wdl")
+
+  testthat::expect_false(grepl("write_json", workflow_text, fixed = TRUE))
+  testthat::expect_match(
+    workflow_text,
+    "File effective_parameters_file = BuildManifest.effective_parameters_file",
+    fixed = TRUE
+  )
+  testthat::expect_match(
+    task_text,
+    "--effective-parameters-output outputs/effective_parameters.json",
+    fixed = TRUE
+  )
+  testthat::expect_match(
+    task_text,
+    'File effective_parameters_file = "outputs/effective_parameters.json"',
+    fixed = TRUE
+  )
 })
 
 testthat::test_that("expression tasks forward the log2 pseudocount to scripts", {

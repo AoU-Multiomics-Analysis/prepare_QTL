@@ -70,11 +70,75 @@ run_build_manifest <- function() {
       help = "TCA package version."
     ),
     optparse::make_option(
-      "--parameters-json",
-      dest = "parameters_json",
+      "--proportion-mode",
+      dest = "proportion_mode",
       type = "character",
-      default = NULL,
-      help = "Optional JSON object with scientific and storage parameters."
+      help = "Proportion source: dtangle or precomputed."
+    ),
+    optparse::make_option(
+      "--log2-pseudocount",
+      dest = "log2_pseudocount",
+      type = "double",
+      help = "Pseudocount used before the log2 transform."
+    ),
+    optparse::make_option(
+      "--min-lm22-overlap",
+      dest = "min_lm22_overlap",
+      type = "double",
+      help = "Minimum required LM22 gene overlap."
+    ),
+    optparse::make_option(
+      "--dtangle-marker-fraction",
+      dest = "dtangle_marker_fraction",
+      type = "double",
+      help = "Fraction of markers selected for dtangle."
+    ),
+    optparse::make_option(
+      "--dtangle-marker-method",
+      dest = "dtangle_marker_method",
+      type = "character",
+      help = "Marker selection method used by dtangle."
+    ),
+    optparse::make_option(
+      "--dtangle-quantile-normalize",
+      dest = "dtangle_quantile_normalize",
+      type = "character",
+      help = "Whether dtangle quantile normalization was enabled."
+    ),
+    optparse::make_option(
+      "--group-mean-threshold",
+      dest = "group_mean_threshold",
+      type = "double",
+      help = "Mean-proportion threshold used to retain major groups."
+    ),
+    optparse::make_option(
+      "--zero-floor",
+      dest = "zero_floor",
+      type = "double",
+      help = "Replacement value used for exact zero proportions."
+    ),
+    optparse::make_option(
+      "--tca-max-iters",
+      dest = "tca_max_iters",
+      type = "integer",
+      help = "Maximum TCA iteration count."
+    ),
+    optparse::make_option(
+      "--random-seed",
+      dest = "random_seed",
+      type = "integer",
+      help = "Random seed used for TCA."
+    ),
+    optparse::make_option(
+      "--scale",
+      type = "character",
+      help = "Expression scale used by the model."
+    ),
+    optparse::make_option(
+      "--effective-parameters-output",
+      dest = "effective_parameters_output",
+      type = "character",
+      help = "Output JSON path for the effective parameters."
     ),
     optparse::make_option(
       "--container-image",
@@ -108,6 +172,10 @@ run_build_manifest <- function() {
     "outputs", "export_qc_summary",
     "original_proportions", "combined_proportions", "tca_weights",
     "filter_report", "model", "model_log",
+    "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
+    "dtangle_marker_fraction", "dtangle_marker_method",
+    "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
+    "tca_max_iters", "random_seed", "scale", "effective_parameters_output",
     "container_image", "output", "qc_output"
   )
   missing_options <- required_options[vapply(
@@ -125,7 +193,11 @@ run_build_manifest <- function() {
     )
   }
   purrr::walk(
-    unique(c(dirname(options$output), dirname(options$qc_output))),
+    unique(c(
+      dirname(options$output),
+      dirname(options$qc_output),
+      dirname(options$effective_parameters_output)
+    )),
     ~ dir.create(.x, recursive = TRUE, showWarnings = FALSE)
   )
   manifest_log_path <<- if (is.null(options$log_file)) {
@@ -182,17 +254,27 @@ run_build_manifest <- function() {
   } else {
     jsonlite::read_json(options$dtangle_metadata, simplifyVector = FALSE)
   }
-  parameters <- if (is.null(options$parameters_json) ||
-      !nzchar(options$parameters_json)) {
-    list(scale = "log2_cpm", log2_pseudocount = 0)
-  } else {
-    jsonlite::read_json(options$parameters_json, simplifyVector = FALSE)
+  quantile_normalize <- tolower(options$dtangle_quantile_normalize)
+  if (!quantile_normalize %in% c("true", "false")) {
+    stop(
+      "dtangle_quantile_normalize must be true or false",
+      call. = FALSE
+    )
   }
-  if (is.null(parameters$log2_pseudocount)) {
-    parameters$log2_pseudocount <- 0
-  }
-  parameters$log2_pseudocount <- validate_log2_pseudocount(
-    parameters$log2_pseudocount
+  parameters <- list(
+    proportion_mode = options$proportion_mode,
+    log2_pseudocount = validate_log2_pseudocount(
+      options$log2_pseudocount
+    ),
+    min_lm22_overlap = options$min_lm22_overlap,
+    dtangle_marker_fraction = options$dtangle_marker_fraction,
+    dtangle_marker_method = options$dtangle_marker_method,
+    dtangle_quantile_normalize = identical(quantile_normalize, "true"),
+    group_mean_threshold = options$group_mean_threshold,
+    zero_floor = options$zero_floor,
+    tca_max_iters = options$tca_max_iters,
+    random_seed = options$random_seed,
+    scale = options$scale
   )
   dimensions_message <- sprintf(
     paste0(
@@ -232,6 +314,12 @@ run_build_manifest <- function() {
     dtangle_metadata = dtangle_metadata
   )
   write_output_manifest(options$output, manifest)
+  jsonlite::write_json(
+    parameters,
+    options$effective_parameters_output,
+    auto_unbox = TRUE,
+    pretty = TRUE
+  )
   readr::write_tsv(qc_summary, options$qc_output, na = "")
   complete_message <- sprintf(
     paste0(
@@ -240,7 +328,14 @@ run_build_manifest <- function() {
     ),
     length(manifest$outputs),
     nrow(qc_summary),
-    paste(c(options$output, options$qc_output), collapse = ",")
+    paste(
+      c(
+        options$output,
+        options$qc_output,
+        options$effective_parameters_output
+      ),
+      collapse = ","
+    )
   )
   message(sprintf("%s utc_complete=%s", complete_message, tensor_utc_time()))
   append_tensor_log(manifest_log_path, complete_message)
