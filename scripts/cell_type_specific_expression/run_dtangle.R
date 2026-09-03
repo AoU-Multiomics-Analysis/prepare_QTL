@@ -140,8 +140,7 @@ run_dtangle_stage <- function() {
     markers = file.path(options$output_dir, "dtangle_markers.tsv"),
     metadata = file.path(options$output_dir, "dtangle_metadata.json"),
     overlap = file.path(options$output_dir, "dtangle_overlap.tsv"),
-    lm22_log = file.path(options$output_dir, "dtangle_lm22_log.tsv.gz"),
-    shared_bulk = file.path(options$output_dir, "dtangle_shared_bulk.tsv.gz")
+    lm22_log = file.path(options$output_dir, "dtangle_lm22_log.tsv.gz")
   )
   message(sprintf(
     "stage=dtangle output_paths=%s",
@@ -152,7 +151,6 @@ run_dtangle_stage <- function() {
   jsonlite::write_json(fit$metadata, output_paths$metadata, auto_unbox = TRUE, pretty = TRUE)
   readr::write_tsv(inputs$overlap_report, output_paths$overlap, na = "")
   write_numeric_matrix(inputs$transformed_lm22, output_paths$lm22_log, "gene_symbol")
-  write_numeric_matrix(inputs$shared_bulk, output_paths$shared_bulk, "gene_symbol")
   message(sprintf("stage=dtangle utc_complete=%s", utc_time()))
 }
 
