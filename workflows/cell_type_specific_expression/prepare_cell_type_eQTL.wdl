@@ -150,7 +150,6 @@ workflow PrepareCellTypeEqtlWorkflow {
     File? dtangle_metadata = CellTypeDeconvolution.dtangle_metadata
     File? dtangle_overlap_report = CellTypeDeconvolution.dtangle_overlap_report
     File? transformed_lm22 = CellTypeDeconvolution.transformed_lm22
-    File? dtangle_shared_bulk = CellTypeDeconvolution.dtangle_shared_bulk
     File? dtangle_log = CellTypeDeconvolution.dtangle_log
 
     File proportions_lm22 = CellTypeDeconvolution.proportions_lm22

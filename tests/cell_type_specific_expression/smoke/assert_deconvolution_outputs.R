@@ -277,14 +277,6 @@ require_true(
   "The TCA expression is missing a non-signature gene"
 )
 
-if (identical(expected_proportion_mode, "dtangle")) {
-  shared_bulk <- read_matrix_table("dtangle_shared_bulk", "gene_symbol")
-  require_true(
-    sum(rownames(shared_bulk) == "SYN_GENE_001") == 1L,
-    "dtangle must aggregate the duplicate synthetic symbol once"
-  )
-}
-
 reconstruction <- readr::read_tsv(
   output_value("reconstruction_by_sample"),
   show_col_types = FALSE,
@@ -511,8 +503,7 @@ if (identical(expected_proportion_mode, "dtangle")) {
   required_file_outputs <- c(
     required_file_outputs,
     "estimated_proportions", "dtangle_markers", "dtangle_metadata",
-    "dtangle_overlap_report", "transformed_lm22", "dtangle_shared_bulk",
-    "dtangle_log"
+    "dtangle_overlap_report", "transformed_lm22", "dtangle_log"
   )
 }
 purrr::walk(required_file_outputs, function(name) {

@@ -39,7 +39,7 @@ task RunDtangle {
       --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=%s outputs=%s completion_time=%s\n' \
       "$stage" "$(wc -l < outputs/dtangle_proportions.tsv)" \
-      "proportions,markers,metadata,overlap_report,transformed_lm22,shared_bulk" \
+      "proportions,markers,metadata,overlap_report,transformed_lm22" \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>
 
@@ -49,7 +49,6 @@ task RunDtangle {
     File metadata = "outputs/dtangle_metadata.json"
     File overlap_report = "outputs/dtangle_overlap.tsv"
     File transformed_lm22 = "outputs/dtangle_lm22_log.tsv.gz"
-    File shared_bulk = "outputs/dtangle_shared_bulk.tsv.gz"
     File log = "run_dtangle.log"
   }
 
