@@ -130,6 +130,12 @@ run_build_manifest <- function() {
       help = "Whether TCA parallel execution was enabled."
     ),
     optparse::make_option(
+      "--gene-types",
+      dest = "gene_types",
+      type = "character",
+      help = "Comma-separated GTF gene types retained for deconvolution."
+    ),
+    optparse::make_option(
       "--random-seed",
       dest = "random_seed",
       type = "integer",
@@ -181,7 +187,7 @@ run_build_manifest <- function() {
     "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
     "dtangle_marker_fraction", "dtangle_marker_method",
     "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
-    "tca_max_iters", "tca_parallel", "random_seed", "scale",
+    "tca_max_iters", "tca_parallel", "gene_types", "random_seed", "scale",
     "effective_parameters_output",
     "container_image", "output", "qc_output"
   )
@@ -272,6 +278,7 @@ run_build_manifest <- function() {
   if (!tca_parallel %in% c("true", "false")) {
     stop("tca_parallel must be true or false", call. = FALSE)
   }
+  gene_types <- parse_gene_types(options$gene_types)
   parameters <- list(
     proportion_mode = options$proportion_mode,
     log2_pseudocount = validate_log2_pseudocount(
@@ -285,19 +292,21 @@ run_build_manifest <- function() {
     zero_floor = options$zero_floor,
     tca_max_iters = options$tca_max_iters,
     tca_parallel = identical(tca_parallel, "true"),
+    gene_type = gene_types,
     random_seed = options$random_seed,
     scale = options$scale
   )
   dimensions_message <- sprintf(
     paste0(
       "stage=manifest input_dimensions=outputs:%d samples:%d ",
-      "lm22_types:%d retained_groups:%d log2_pseudocount:%g"
+      "lm22_types:%d retained_groups:%d log2_pseudocount:%g gene_types:%s"
     ),
     nrow(outputs),
     nrow(original_proportions),
     ncol(original_proportions),
     ncol(tca_weights),
-    parameters$log2_pseudocount
+    parameters$log2_pseudocount,
+    paste(parameters$gene_type, collapse = ",")
   )
   paths_message <- sprintf(
     "stage=manifest input_paths=%s output_paths=%s",

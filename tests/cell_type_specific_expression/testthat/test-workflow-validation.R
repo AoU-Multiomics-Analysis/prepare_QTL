@@ -390,7 +390,8 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
   prefix <- "PrepareCellTypeEqtlWorkflow."
   required_shared_inputs <- c(
     "expression", "gtf", "lm22", "SampleList", "AdditionalCovariates", "OutputPrefix",
-    "deconvolution_docker_image", "qtl_docker_image", "log2_pseudocount"
+    "deconvolution_docker_image", "qtl_docker_image", "log2_pseudocount",
+    "gene_type"
   )
   purrr::walk(list(dtangle_inputs, precomputed_inputs), function(inputs) {
     testthat::expect_true(all(paste0(prefix, required_shared_inputs) %in% names(inputs)))
@@ -403,6 +404,10 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
       "prepare-qtl:test"
     )
     testthat::expect_false(any(grepl("residual", names(inputs), ignore.case = TRUE)))
+    testthat::expect_identical(
+      inputs[[paste0(prefix, "gene_type")]],
+      c("protein_coding", "lncRNA")
+    )
   })
 
   testthat::expect_true(paste0(prefix, "lm22") %in% names(dtangle_inputs))

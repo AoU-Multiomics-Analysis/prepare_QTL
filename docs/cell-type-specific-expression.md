@@ -45,6 +45,7 @@ a value.
 | `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
 | `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
+| `gene_type` | `Array[String]` | `["protein_coding", "lncRNA"]` | Exact GTF gene types to retain before dtangle and TCA. Values must be non-empty and unique. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
 | `dtangle_memory` | `String` | `"32 GB"` | Memory for the dtangle task. |
 | `dtangle_disk_gb` | `Int` | `100` | Local disk in GB for the dtangle task. |
@@ -86,6 +87,7 @@ a value.
 | `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
 | `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
+| `gene_type` | `Array[String]` | `["protein_coding", "lncRNA"]` | Exact GTF gene types to retain before dtangle and TCA. Values must be non-empty and unique. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
 | `dtangle_memory` | `String` | `"32 GB"` | Memory for the dtangle task. |
 | `dtangle_disk_gb` | `Int` | `100` | Local disk in GB for the dtangle task. |
@@ -130,11 +132,21 @@ The first four columns must be `#chr`, `start`, `end`, and `gene_id` in that
 order. The file must have at least one sample column. Chromosome values, gene
 IDs, and sample IDs must be non-empty. Gene IDs and sample IDs must be unique.
 `start` must be a nonnegative integer that is less than `end`. The sample
-values must be linear CPM values. They must be finite and nonnegative. The
-workflow does not filter the input to protein-coding genes. It uses the GTF to
-map gene IDs to gene symbols for the LM22 intersection. The workflow removes
-constant genes before TCA. For each modeled, nonconstant gene, the exported
-cell-type BED preserves the input coordinate and modeled-gene order.
+values must be linear CPM values. They must be finite and nonnegative.
+
+The `gene_type` input defaults to `protein_coding` and `lncRNA`. The workflow
+uses gene-type filtering before dtangle and TCA. Values must match the GTF `gene_type`
+or `gene_biotype` attributes exactly. The list must contain at least one unique,
+non-empty value. A requested type can be absent from the GTF, but the workflow
+fails if no expression genes remain. The `gene_type_filter_report` output shows
+the annotation and retention status for each input gene. The
+`filtered_expression` output keeps the original coordinates and order for all
+retained genes.
+
+The workflow uses the GTF to map retained gene IDs to gene symbols for the LM22
+intersection. It removes constant genes before TCA. For each modeled,
+nonconstant gene, the exported cell-type BED preserves the input coordinate and
+modeled-gene order.
 
 `log2_pseudocount` defaults to `0`. When `log2_pseudocount` is `0`, all CPM
 values must be strictly positive. Zero CPM values are valid only when
