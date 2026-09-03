@@ -131,6 +131,43 @@ testthat::test_that("the TCA CLI does not create shard artifacts", {
   testthat::expect_false(grepl("--shard-size", text, fixed = TRUE))
 })
 
+testthat::test_that("TCA parallel execution accepts only an explicit logical flag", {
+  testthat::expect_true(validate_boolean_flag(TRUE, "parallel"))
+  testthat::expect_false(validate_boolean_flag(FALSE, "parallel"))
+  testthat::expect_error(validate_boolean_flag(1, "parallel"), "true or false")
+  testthat::expect_error(validate_boolean_flag(NA, "parallel"), "true or false")
+
+  fit_cli <- paste(readLines(
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit_tca.R"),
+    warn = FALSE
+  ), collapse = "\n")
+  fit_stage <- paste(readLines(tca_stage_path, warn = FALSE), collapse = "\n")
+  testthat::expect_match(fit_cli, '"--parallel"', fixed = TRUE)
+  testthat::expect_match(fit_cli, "parallel = tca_parallel", fixed = TRUE)
+  testthat::expect_match(fit_stage, "parallel = parallel", fixed = TRUE)
+  testthat::expect_false(grepl("parallel = num_cores > 1L", fit_stage, fixed = TRUE))
+})
+
+testthat::test_that("TCA fit arguments preserve enabled and disabled parallel settings", {
+  inputs <- make_tca_inputs()
+  common <- list(
+    X = inputs$X,
+    W = inputs$W,
+    C2 = NULL,
+    num_cores = 8L,
+    max_iters = 2L,
+    log_file = tempfile()
+  )
+
+  enabled <- do.call(build_tca_fit_arguments, c(common, list(parallel = TRUE)))
+  disabled <- do.call(build_tca_fit_arguments, c(common, list(parallel = FALSE)))
+
+  testthat::expect_true(enabled$parallel)
+  testthat::expect_false(disabled$parallel)
+  testthat::expect_identical(enabled$num_cores, 8L)
+  testthat::expect_identical(disabled$num_cores, 8L)
+})
+
 testthat::test_that("TCA fit reads a direct CPM BED", {
   text <- paste(readLines(
     testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit_tca.R"),
@@ -156,6 +193,7 @@ testthat::test_that("one model fits all genes without refitting weights", {
     W = data$W,
     C2 = NULL,
     num_cores = 1L,
+    parallel = FALSE,
     max_iters = 2L,
     random_seed = 20260901L,
     log_file = tempfile()

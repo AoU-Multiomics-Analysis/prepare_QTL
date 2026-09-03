@@ -162,7 +162,13 @@ testthat::test_that("full tensor extraction preserves model source and matrix or
     data$X, data$W, refit_W = FALSE, max_iters = 2, verbose = FALSE
   )
 
-  tensor <- extract_full_tensor(data$X, model, 1L, tempfile())
+  tensor <- extract_full_tensor(
+    X = data$X,
+    model = model,
+    num_cores = 1L,
+    parallel = FALSE,
+    log_file = tempfile()
+  )
 
   testthat::expect_identical(names(tensor), colnames(model$W))
   testthat::expect_true(all(purrr::map_lgl(
@@ -171,6 +177,49 @@ testthat::test_that("full tensor extraction preserves model source and matrix or
       identical(colnames(.x), colnames(data$X)) &&
       identical(dim(.x), dim(data$X))
   )))
+})
+
+testthat::test_that("tensor export passes the explicit parallel flag to TCA", {
+  export_cli <- paste(readLines(
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export_tca_beds.R"),
+    warn = FALSE
+  ), collapse = "\n")
+  bed_outputs <- paste(readLines(
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "R", "bed_outputs.R"),
+    warn = FALSE
+  ), collapse = "\n")
+
+  testthat::expect_match(export_cli, '"--parallel"', fixed = TRUE)
+  testthat::expect_match(export_cli, "parallel = tca_parallel", fixed = TRUE)
+  testthat::expect_match(bed_outputs, "parallel = parallel", fixed = TRUE)
+  testthat::expect_false(grepl(
+    "parallel = num_cores > 1L",
+    bed_outputs,
+    fixed = TRUE
+  ))
+})
+
+testthat::test_that("tensor arguments preserve enabled and disabled parallel settings", {
+  X <- matrix(
+    1:4,
+    nrow = 2L,
+    dimnames = list(c("g1", "g2"), c("S1", "S2"))
+  )
+  model <- list(W = matrix(
+    0.5,
+    nrow = 2L,
+    ncol = 2L,
+    dimnames = list(c("S1", "S2"), c("A", "B"))
+  ))
+  common <- list(X = X, model = model, num_cores = 8L, log_file = tempfile())
+
+  enabled <- do.call(build_tca_tensor_arguments, c(common, list(parallel = TRUE)))
+  disabled <- do.call(build_tca_tensor_arguments, c(common, list(parallel = FALSE)))
+
+  testthat::expect_true(enabled$parallel)
+  testthat::expect_false(disabled$parallel)
+  testthat::expect_identical(enabled$num_cores, 8L)
+  testthat::expect_identical(disabled$num_cores, 8L)
 })
 
 testthat::test_that("reconstruction includes the fitted C2 term", {
@@ -646,6 +695,7 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     "--group-mean-threshold", "0.0001",
     "--zero-floor", "0.000001",
     "--tca-max-iters", "10",
+    "--tca-parallel", "false",
     "--random-seed", "20260901",
     "--scale", "log2_cpm",
     "--effective-parameters-output", effective_parameters_path,
@@ -670,7 +720,7 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
       "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
       "dtangle_marker_fraction", "dtangle_marker_method",
       "dtangle_quantile_normalize", "group_mean_threshold", "zero_floor",
-      "tca_max_iters", "random_seed", "scale"
+      "tca_max_iters", "tca_parallel", "random_seed", "scale"
     )
   )
   testthat::expect_identical(effective_parameters$proportion_mode, "precomputed")
@@ -680,6 +730,7 @@ testthat::test_that("manifest CLI hashes localized files and publishes basenames
     tolerance = 1e-12
   )
   testthat::expect_identical(effective_parameters$dtangle_quantile_normalize, FALSE)
+  testthat::expect_identical(effective_parameters$tca_parallel, FALSE)
   testthat::expect_identical(
     manifest$outputs[[1L]]$path,
     basename(bed_path)

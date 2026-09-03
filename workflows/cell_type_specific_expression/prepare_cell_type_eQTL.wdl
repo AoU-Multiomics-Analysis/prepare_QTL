@@ -26,6 +26,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     Float group_mean_threshold = 0.0001
     Float zero_floor = 0.000001
     Int tca_max_iters = 10
+    Boolean tca_parallel = false
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
 
@@ -36,10 +37,10 @@ workflow PrepareCellTypeEqtlWorkflow {
     String proportions_memory = "16 GB"
     Int proportions_disk_gb = 50
     Int fit_cpu = 16
-    String fit_memory = "192 GB"
+    String fit_memory = "256 GB"
     Int fit_disk_gb = 750
     Int export_cpu = 8
-    String export_memory = "128 GB"
+    String export_memory = "256 GB"
     Int export_disk_gb = 500
     Int manifest_cpu = 4
     String manifest_memory = "32 GB"
@@ -68,6 +69,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       group_mean_threshold = group_mean_threshold,
       zero_floor = zero_floor,
       tca_max_iters = tca_max_iters,
+      tca_parallel = tca_parallel,
       random_seed = random_seed,
       log2_pseudocount = log2_pseudocount,
       dtangle_cpu = dtangle_cpu,

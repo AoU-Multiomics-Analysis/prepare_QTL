@@ -16,6 +16,7 @@
   "PrepareCellTypeEqtlWorkflow.group_mean_threshold": 0.0001,
   "PrepareCellTypeEqtlWorkflow.zero_floor": 1e-06,
   "PrepareCellTypeEqtlWorkflow.tca_max_iters": 10,
+  "PrepareCellTypeEqtlWorkflow.tca_parallel": false,
   "PrepareCellTypeEqtlWorkflow.random_seed": 20260901,
   "PrepareCellTypeEqtlWorkflow.dtangle_cpu": 2,
   "PrepareCellTypeEqtlWorkflow.dtangle_memory": "8 GB",

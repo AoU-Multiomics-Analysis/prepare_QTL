@@ -42,6 +42,7 @@ a value.
 | `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
 | `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
+| `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
 | `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
@@ -51,10 +52,10 @@ a value.
 | `proportions_memory` | `String` | `"16 GB"` | Memory for proportion processing. |
 | `proportions_disk_gb` | `Int` | `50` | Local disk in GB for proportion processing. |
 | `fit_cpu` | `Int` | `16` | CPU count for TCA fitting. |
-| `fit_memory` | `String` | `"192 GB"` | Memory for TCA fitting. |
+| `fit_memory` | `String` | `"256 GB"` | Memory for TCA fitting. |
 | `fit_disk_gb` | `Int` | `750` | Local disk in GB for TCA fitting. |
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
-| `export_memory` | `String` | `"128 GB"` | Memory for TCA BED export. |
+| `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
@@ -82,6 +83,7 @@ a value.
 | `group_mean_threshold` | `Float` | `0.0001` | Finite nonnegative cohort-mean threshold for major-group retention. |
 | `zero_floor` | `Float` | `0.000001` | Finite positive replacement for exact zero values in retained proportions. |
 | `tca_max_iters` | `Int` | `10` | Positive TCA iteration limit. |
+| `tca_parallel` | `Boolean` | `false` | If `true`, enable TCA parallel execution for model fitting and tensor export. CPU allocation is independent. |
 | `random_seed` | `Int` | `20260901` | Positive TCA random seed. |
 | `log2_pseudocount` | `Float` | `0.0` | Finite nonnegative value used in the one-time expression transform. |
 | `dtangle_cpu` | `Int` | `4` | CPU count for the dtangle task. |
@@ -91,10 +93,10 @@ a value.
 | `proportions_memory` | `String` | `"16 GB"` | Memory for proportion processing. |
 | `proportions_disk_gb` | `Int` | `50` | Local disk in GB for proportion processing. |
 | `fit_cpu` | `Int` | `16` | CPU count for TCA fitting. |
-| `fit_memory` | `String` | `"192 GB"` | Memory for TCA fitting. |
+| `fit_memory` | `String` | `"256 GB"` | Memory for TCA fitting. |
 | `fit_disk_gb` | `Int` | `750` | Local disk in GB for TCA fitting. |
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
-| `export_memory` | `String` | `"128 GB"` | Memory for TCA BED export. |
+| `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |

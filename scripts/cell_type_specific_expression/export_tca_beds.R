@@ -23,6 +23,8 @@ run_export_tca_beds <- function() {
       help = "Optional sample-by-covariate TSV with sample_id first column."),
     optparse::make_option("--num-cores", dest = "num_cores", type = "integer", default = 8L,
       help = "Number of CPU cores for tensor extraction."),
+    optparse::make_option("--parallel", action = "store_true", default = FALSE,
+      help = "Enable parallel execution in TCA tensor extraction."),
     optparse::make_option("--output-dir", dest = "output_dir", type = "character",
       help = "Output directory for cell-type BED and QC files."),
     optparse::make_option("--log-file", dest = "log_file", type = "character", default = NULL,
@@ -43,6 +45,7 @@ run_export_tca_beds <- function() {
     )
   }
   log2_pseudocount <- validate_log2_pseudocount(options$log2_pseudocount)
+  tca_parallel <- validate_boolean_flag(options$parallel, "parallel")
   dir.create(options$output_dir, recursive = TRUE, showWarnings = FALSE)
   export_log_path <<- if (is.null(options$log_file) || !nzchar(options$log_file)) {
     file.path(options$output_dir, "export_tca_beds.log")
@@ -103,8 +106,21 @@ run_export_tca_beds <- function() {
   message(paths_message)
   append_tensor_log(export_log_path, dimensions_message)
   append_tensor_log(export_log_path, paths_message)
+  settings_message <- sprintf(
+    "stage=export_tca_beds settings=num_cores:%d parallel:%s",
+    options$num_cores,
+    tolower(as.character(tca_parallel))
+  )
+  message(settings_message)
+  append_tensor_log(export_log_path, settings_message)
 
-  tensor <- extract_full_tensor(X, model, options$num_cores, export_log_path)
+  tensor <- extract_full_tensor(
+    X = X,
+    model = model,
+    num_cores = options$num_cores,
+    parallel = tca_parallel,
+    log_file = export_log_path
+  )
   bed_result <- write_cell_type_beds(tensor, coordinates, options$output_dir)
   deltas_hat <- if (is.null(C2)) {
     NULL

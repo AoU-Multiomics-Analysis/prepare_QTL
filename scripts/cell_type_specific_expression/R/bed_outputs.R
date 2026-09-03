@@ -148,9 +148,32 @@ count_excluded_constant_genes <- function(coordinates, modeled_gene_ids) {
   as.integer(nrow(coordinates) - length(modeled_gene_ids))
 }
 
-extract_full_tensor <- function(X, model, num_cores = 1L, log_file = NULL) {
+build_tca_tensor_arguments <- function(
+    X,
+    model,
+    num_cores,
+    log_file,
+    parallel) {
+  list(
+    X = X,
+    tca.mdl = model,
+    scale = FALSE,
+    parallel = parallel,
+    num_cores = num_cores,
+    log_file = log_file,
+    verbose = TRUE
+  )
+}
+
+extract_full_tensor <- function(
+    X,
+    model,
+    num_cores = 1L,
+    log_file = NULL,
+    parallel = FALSE) {
   validate_tensor_matrix(X, "TCA expression")
   num_cores <- validate_tensor_positive_integer(num_cores, "num_cores")
+  parallel <- validate_boolean_flag(parallel, "parallel")
   if (!is.list(model) || !is.matrix(model$W) ||
       !identical(colnames(X), rownames(model$W))) {
     stop("Model sample order must match expression sample order exactly", call. = FALSE)
@@ -159,20 +182,20 @@ extract_full_tensor <- function(X, model, num_cores = 1L, log_file = NULL) {
   append_tensor_log(
     log_file,
     sprintf(
-      "stage=tensor_extract event=extract_start genes=%d samples=%d sources=%d num_cores=%d scale=log2_cpm tca_version=%s",
-      nrow(X), ncol(X), ncol(model$W), num_cores, tca_version
+      "stage=tensor_extract event=extract_start genes=%d samples=%d sources=%d num_cores=%d parallel=%s scale=log2_cpm tca_version=%s",
+      nrow(X), ncol(X), ncol(model$W), num_cores,
+      tolower(as.character(parallel)), tca_version
     )
   )
+  tensor_arguments <- build_tca_tensor_arguments(
+    X = X,
+    model = model,
+    num_cores = num_cores,
+    log_file = log_file,
+    parallel = parallel
+  )
   tensor <- tryCatch(
-    TCA::tensor(
-      X = X,
-      tca.mdl = model,
-      scale = FALSE,
-      parallel = num_cores > 1L,
-      num_cores = num_cores,
-      log_file = log_file,
-      verbose = TRUE
-    ),
+    do.call(TCA::tensor, tensor_arguments),
     error = function(error) {
       append_tensor_log(
         log_file,

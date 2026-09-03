@@ -210,6 +210,7 @@ common_inputs <- list(
   "PrepareCellTypeEqtlWorkflow.group_mean_threshold" = 0.0001,
   "PrepareCellTypeEqtlWorkflow.zero_floor" = 0.000001,
   "PrepareCellTypeEqtlWorkflow.tca_max_iters" = 10L,
+  "PrepareCellTypeEqtlWorkflow.tca_parallel" = FALSE,
   "PrepareCellTypeEqtlWorkflow.random_seed" = seed,
   "PrepareCellTypeEqtlWorkflow.dtangle_cpu" = 2L,
   "PrepareCellTypeEqtlWorkflow.dtangle_memory" = "8 GB",

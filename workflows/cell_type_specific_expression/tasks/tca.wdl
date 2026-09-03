@@ -8,15 +8,17 @@ task FitTca {
     File? covariates
     Int max_iters = 10
     Int random_seed = 20260901
+    Boolean parallel = false
     String docker_image
     Int cpu = 16
-    String memory = "192 GB"
+    String memory = "256 GB"
     Int disk_gb = 750
     Int preemptible_attempts = 0
     Int max_retries = 1
   }
 
   String covariates_path = if defined(covariates) then select_first([covariates]) else ""
+  String parallel_argument = if parallel then "--parallel" else ""
 
   command <<<
     set -euo pipefail
@@ -35,6 +37,7 @@ task FitTca {
       --weights '~{tca_weights}' \
       "${covariates_arguments[@]}" \
       --num-cores '~{cpu}' \
+      ~{parallel_argument} \
       --max-iters '~{max_iters}' \
       --random-seed '~{random_seed}' \
       --log2-pseudocount '~{log2_pseudocount}' \
@@ -75,15 +78,17 @@ task ExportTcaBeds {
     File model
     File tca_weights
     File? covariates
+    Boolean parallel = false
     String docker_image
     Int cpu = 8
-    String memory = "128 GB"
+    String memory = "256 GB"
     Int disk_gb = 500
     Int preemptible_attempts = 0
     Int max_retries = 1
   }
 
   String covariates_path = if defined(covariates) then select_first([covariates]) else ""
+  String parallel_argument = if parallel then "--parallel" else ""
 
   command <<<
     set -euo pipefail
@@ -104,6 +109,7 @@ task ExportTcaBeds {
       --weights '~{tca_weights}' \
       "${covariates_arguments[@]}" \
       --num-cores '~{cpu}' \
+      ~{parallel_argument} \
       --log2-pseudocount '~{log2_pseudocount}' \
       --output-dir outputs \
       --log-file outputs/export_tca_beds.log 2>&1 | tee -a "$log"
