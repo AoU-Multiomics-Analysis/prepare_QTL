@@ -35,6 +35,7 @@ jobs:
           set -euo pipefail
           miniwdl check workflows/cell_type_specific_expression/deconvolution.wdl
           miniwdl check workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+          python tests/cell_type_specific_expression/test_hspe_batch_wdl.py
           python3 scripts/check_wdl_logging.py \
             workflows/cell_type_specific_expression \
             workflows/expression/prepare_eQTL.wdl \

@@ -23,6 +23,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     Float min_lm22_overlap = 0.80
     Float hspe_marker_fraction = 0.10
     Boolean hspe_quantile_normalize = false
+    Int hspe_batch_size = 100
+    String hspe_batch_memory = "4 GB"
+    Int hspe_batch_disk_gb = 10
     Float group_mean_threshold = 0.0001
     Float zero_floor = 0.000001
     Int tca_max_iters = 10
@@ -67,6 +70,9 @@ workflow PrepareCellTypeEqtlWorkflow {
       min_lm22_overlap = min_lm22_overlap,
       hspe_marker_fraction = hspe_marker_fraction,
       hspe_quantile_normalize = hspe_quantile_normalize,
+      hspe_batch_size = hspe_batch_size,
+      hspe_batch_memory = hspe_batch_memory,
+      hspe_batch_disk_gb = hspe_batch_disk_gb,
       group_mean_threshold = group_mean_threshold,
       zero_floor = zero_floor,
       tca_max_iters = tca_max_iters,
@@ -159,6 +165,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     File? hspe_overlap_report = CellTypeDeconvolution.hspe_overlap_report
     File? transformed_lm22 = CellTypeDeconvolution.transformed_lm22
     File? hspe_log = CellTypeDeconvolution.hspe_log
+    File? hspe_sample_diagnostics = CellTypeDeconvolution.hspe_sample_diagnostics
 
     File proportions_lm22 = CellTypeDeconvolution.proportions_lm22
     File proportions_combined = CellTypeDeconvolution.proportions_combined

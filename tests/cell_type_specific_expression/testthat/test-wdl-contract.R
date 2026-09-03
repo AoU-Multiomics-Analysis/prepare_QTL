@@ -191,7 +191,7 @@ testthat::test_that("workflow applies the log2 pseudocount only to hspe", {
 
   hspe_call <- stringr::str_extract(
     text,
-    "call [^{]+RunHspe \\{[\\s\\S]*?\\n  \\}"
+    "call [^{]+PrepareHspeBatches \\{[\\s\\S]*?\\n  \\}"
   )
   testthat::expect_match(
     hspe_call,
