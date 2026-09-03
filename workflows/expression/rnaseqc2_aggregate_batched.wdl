@@ -3,7 +3,6 @@ version 1.0
 task validate_rnaseqc_manifests {
     input {
         File sample_manifest
-        File merge_script
         File prefix_file
         Int batch_size
 
@@ -22,7 +21,7 @@ task validate_rnaseqc_manifests {
 
         log "stage=validate_manifest start_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
         log "Validating the combined RNA-SeQC sample manifest"
-        python3 "~{merge_script}" validate-manifest \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py validate-manifest \
             --input "~{sample_manifest}" \
             --batch-size ~{batch_size} \
             --prefix-file "~{prefix_file}"
@@ -52,7 +51,6 @@ task validate_rnaseqc_manifests {
 task aggregate_rnaseqc_batch {
     input {
         File sample_manifest
-        File merge_script
         File prefix_file
         Int batch_index
         Int batch_size
@@ -85,7 +83,7 @@ task aggregate_rnaseqc_batch {
         log "stage=aggregate_batch batch=$batch_number start_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
         log "Preparing batch $batch_number"
         mkdir -p individual_outputs
-        python3 "~{merge_script}" prepare-batch \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py prepare-batch \
             --input "~{sample_manifest}" \
             --batch-index ~{batch_index} \
             --batch-size ~{batch_size} \
@@ -101,33 +99,33 @@ task aggregate_rnaseqc_batch {
         done < transfers.tsv | xargs -0 -n 2 -P ~{num_threads} bash -c 'gsutil cp "$1" "$2"' _
 
         log "Merging TPM GCT files for batch $batch_number"
-        python3 "~{merge_script}" gct \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
             --input-list local_tpm.list \
             --output "$batch_prefix.gene_tpm.gct.gz" \
             --sample-output batch_samples.txt \
             --sample-names batch_sample_ids.list
 
         log "Merging count GCT files for batch $batch_number"
-        python3 "~{merge_script}" gct \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
             --input-list local_count.list \
             --output "$batch_prefix.gene_reads.gct.gz" \
             --sample-names batch_sample_ids.list
 
         log "Merging exon-count GCT files for batch $batch_number"
-        python3 "~{merge_script}" gct \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
             --input-list local_exon.list \
             --output "$batch_prefix.exon_reads.gct.gz" \
             --sample-names batch_sample_ids.list
 
         log "Merging metrics files for batch $batch_number"
-        python3 "~{merge_script}" metrics-individual \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py metrics-individual \
             --input-list local_metrics.list \
             --output "$batch_prefix.metrics.txt.gz" \
             --sample-names batch_sample_ids.list
 
         if [[ "~{include_insert_sizes}" == "true" ]]; then
             log "Merging insert-size files for batch $batch_number"
-            python3 "~{merge_script}" insert-sizes-individual \
+            python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py insert-sizes-individual \
                 --input-list local_insert.list \
                 --expected-samples batch_samples.txt \
                 --output "$batch_prefix.insert_size_hists.txt.gz"
@@ -164,7 +162,6 @@ task merge_rnaseqc_batches {
         Array[File] batch_exon_count_gcts
         Array[File] batch_metrics
         Array[File] batch_insert_size_hists
-        File merge_script
         File prefix_file
         Boolean include_insert_sizes
 
@@ -186,7 +183,7 @@ task merge_rnaseqc_batches {
 
         log "stage=merge_cohort start_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
         log "Merging batch-level TPM GCT files"
-        python3 "~{merge_script}" gct \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
             --input-list "~{write_lines(batch_tpm_gcts)}" \
             --output "$prefix.gene_tpm.gct.gz" \
             --sample-output cohort_samples.txt
@@ -195,26 +192,26 @@ task merge_rnaseqc_batches {
         log "dimensions=samples:$sample_count,batches:~{length(batch_tpm_gcts)}"
 
         log "Merging batch-level count GCT files"
-        python3 "~{merge_script}" gct \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
             --input-list "~{write_lines(batch_count_gcts)}" \
             --expected-samples cohort_samples.txt \
             --output "$prefix.gene_reads.gct.gz"
 
         log "Merging batch-level exon-count GCT files"
-        python3 "~{merge_script}" gct \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
             --input-list "~{write_lines(batch_exon_count_gcts)}" \
             --expected-samples cohort_samples.txt \
             --output "$prefix.exon_reads.gct.gz"
 
         log "Merging batch-level metrics files"
-        python3 "~{merge_script}" metrics-aggregated \
+        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py metrics-aggregated \
             --input-list "~{write_lines(batch_metrics)}" \
             --expected-samples cohort_samples.txt \
             --output "$prefix.metrics.txt.gz"
 
         if [[ "~{include_insert_sizes}" == "true" ]]; then
             log "Merging batch-level insert-size files"
-            python3 "~{merge_script}" insert-sizes-aggregated \
+            python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py insert-sizes-aggregated \
                 --input-list "~{write_lines(batch_insert_size_hists)}" \
                 --expected-samples cohort_samples.txt \
                 --output "$prefix.insert_size_hists.txt.gz"
@@ -247,11 +244,10 @@ task merge_rnaseqc_batches {
 workflow rnaseqc2_aggregate_batched_workflow {
     input {
         File sample_manifest
-        File merge_script
         String prefix
 
         Int batch_size = 100
-        String docker_image = "gcr.io/broad-cga-francois-gtex/gtex_rnaseq:V10"
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation:main"
         Int validation_memory_gb = 1
         Int validation_disk_space_gb = 10
         Int batch_memory_gb = 4
@@ -267,7 +263,6 @@ workflow rnaseqc2_aggregate_batched_workflow {
     call validate_rnaseqc_manifests {
         input:
             sample_manifest = sample_manifest,
-            merge_script = merge_script,
             prefix_file = prefix_file,
             batch_size = batch_size,
             docker_image = docker_image,
@@ -280,7 +275,6 @@ workflow rnaseqc2_aggregate_batched_workflow {
         call aggregate_rnaseqc_batch {
             input:
                 sample_manifest = sample_manifest,
-                merge_script = merge_script,
                 prefix_file = prefix_file,
                 batch_index = batch_index,
                 batch_size = batch_size,
@@ -300,7 +294,6 @@ workflow rnaseqc2_aggregate_batched_workflow {
             batch_exon_count_gcts = aggregate_rnaseqc_batch.exon_count_gct,
             batch_metrics = aggregate_rnaseqc_batch.metrics,
             batch_insert_size_hists = flatten(aggregate_rnaseqc_batch.insert_size_hists),
-            merge_script = merge_script,
             prefix_file = prefix_file,
             include_insert_sizes = validate_rnaseqc_manifests.include_insert_sizes,
             docker_image = docker_image,

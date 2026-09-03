@@ -1,4 +1,5 @@
 import gzip
+import os
 import subprocess
 import sys
 import tempfile
@@ -6,7 +7,12 @@ import unittest
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
-SCRIPT = PROJECT_DIR / "scripts" / "expression" / "merge_rnaseqc.py"
+SCRIPT = Path(
+    os.environ.get(
+        "RNASEQC_MERGE_SCRIPT",
+        PROJECT_DIR / "scripts" / "expression" / "merge_rnaseqc.py",
+    )
+)
 
 
 def write_text(path: Path, text: str) -> None:

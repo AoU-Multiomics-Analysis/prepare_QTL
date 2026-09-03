@@ -48,6 +48,23 @@ class WdlTest(unittest.TestCase):
         self.assertNotIn("rnaseqc2_aggregate_batched_workflow.tpm_gcts_list", inputs)
         self.assertNotIn("rnaseqc2_aggregate_batched_workflow.sample_ids_list", inputs)
 
+    def test_workflow_does_not_require_a_script_upload(self) -> None:
+        result = subprocess.run(
+            ["miniwdl", "input_template", str(WDL)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            set(json.loads(result.stdout)),
+            {
+                "rnaseqc2_aggregate_batched_workflow.sample_manifest",
+                "rnaseqc2_aggregate_batched_workflow.prefix",
+                "rnaseqc2_aggregate_batched_workflow.merge_disk_space_gb",
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
