@@ -274,7 +274,7 @@ workflow rnaseqc2_aggregate_batched_workflow {
         Boolean merge_exons
 
         Int batch_size = 100
-        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:680b355a6bf623636b5ecd33e1d06b1f1c7dcc5b42f4cfa3616b5cda87e3ac24"
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:c2dc991dc99d8323fe6cc22375cd6560c131afc02122f8a6b2050eb7adba7652"
         Int validation_memory_gb = 1
         Int validation_disk_space_gb = 10
         Int batch_memory_gb = 4
