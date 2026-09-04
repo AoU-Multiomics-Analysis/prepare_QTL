@@ -61,6 +61,8 @@ Import `rnaseqc2_aggregate_batched.wdl` into Terra. Set `batch_disk_space_gb` fo
 The output `prefix` must start with a letter or number. It can also contain periods, underscores, and hyphens.
 
 The workflow uses `ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation`.
+The default `docker_image` is pinned to the tested image's SHA-256 digest.
+Updating the registry's `main` tag does not change this workflow version.
 All three tasks use the same image and call the bundled script at
 `/opt/prepare_qtl/scripts/expression/merge_rnaseqc.py`. If you override
 `docker_image`, use a tested image digest that contains this script.
