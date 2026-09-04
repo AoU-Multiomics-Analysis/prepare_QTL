@@ -14,7 +14,7 @@ Use this checklist for the integrated human whole-blood pipeline,
 | `expression` | Yes | Gene-by-sample BED; finite, nonnegative **linear CPM**, not counts, TPM, log2 CPM, INT, or scaled values. | Supplies expression for HSPE and TCA. |
 | `gtf` | Yes, in both proportion modes | GTF with gene records, `gene_id`, and `gene_type` or `gene_biotype`. HSPE also needs usable `gene_name` values. | Filters gene types and maps gene IDs to LM22 symbols. |
 | `lm22` | Yes, even with supplied proportions | Original positive, linear LM22 reference values; genes in rows and the 22 LM22 cell types in columns. Do not pre-log this file. | Supplies the HSPE reference when proportions are estimated. |
-| `SampleList` | Yes | Headerless text file; one sample ID per line. | Selects and orders samples for downstream eQTL preparation, **not** for HSPE or TCA. |
+| `SampleList` | Yes | One sample ID per line, with no header or an optional `research_id`, `sample_id`, or `ID` header. | Selects and orders samples for downstream eQTL preparation, **not** for HSPE or TCA. |
 | `AdditionalCovariates` | Yes | Sample-by-covariate TSV with `sample_id`; numeric covariate columns. | Merges supplied covariates with phenotype PCs for each cell type and output branch. |
 | `precomputed_proportions` | No | Sample-by-cell-type TSV; `sample_id` first, followed by all 22 LM22 columns. Fractions, not percentages. | Skips HSPE estimation. Grouping and TCA still run. |
 | `deconvolution_covariates` | No | Sample-by-covariate TSV; `sample_id` first, followed by finite numeric columns. | Supplies covariates to the TCA model. It is not a substitute for `AdditionalCovariates`. |
@@ -183,8 +183,16 @@ sample_2
 sample_3
 ```
 
-Do not add a header. Each ID must occur once and must match an expression
-sample column. The eQTL BED modes require every listed sample to be present.
+The header is optional. The first row can be `research_id`, `sample_id`, or
+`ID`, in any letter case. A recognized header is removed only when it is not
+an actual sample column in the expression file. The log records its removal.
+Other first-row values are treated as sample IDs, not guessed headers.
+
+Use exactly one column. Each ID must occur once and must match an expression
+sample column. Blank IDs and empty lists cause an error. Sample order and
+leading zeros are preserved. All three eQTL expression input modes require
+every listed sample to be present; raw-count mode no longer silently drops
+unmatched IDs.
 The list selects and orders samples only after deconvolution. HSPE, TCA,
 and the CPM gene summaries use all samples in the input expression BED.
 To change that modeling cohort, prepare the expression BED and associated
@@ -389,7 +397,7 @@ a value.
 | `haemopedia_counts` | `File?` | `None` | Raw human Haemopedia counts; absence means negative-only post-export filtering. |
 | `reference_min_mean_log2_cpm1` | `Float` | `0.01` | Strict mean-log expression threshold in both datasets. |
 | `reference_residual_cutoff` | `Float?` | `None` | Optional positive absolute standardized-residual cutoff; one pass, off by default. Requires the reference. |
-| `SampleList` | `File` | Required | Headerless sample list passed to every scattered expression-QTL call. Does not subset HSPE or TCA. |
+| `SampleList` | `File` | Required | Sample list with an optional `research_id`, `sample_id`, or `ID` header; passed to every scattered expression-QTL call. Does not subset HSPE or TCA. |
 | `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
 | `OutputPrefix` | `String` | Required | Basename-safe token. It must start with an ASCII letter or number. It can contain only letters, numbers, dots, underscores, and hyphens. Each scatter call adds the cell-type slug. |
 | `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for deconvolution and integration tasks. |

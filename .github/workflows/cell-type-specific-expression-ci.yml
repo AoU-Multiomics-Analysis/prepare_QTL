@@ -98,6 +98,13 @@ jobs:
             --workdir /workspace \
             --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
             prepare-qtl:test \
+            Rscript tests/test_prepare_expression_sample_list.R
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
+            prepare-qtl:test \
             Rscript tests/test_reference_filtered_expression.R
 
       - name: Run the hspe end-to-end smoke workflow

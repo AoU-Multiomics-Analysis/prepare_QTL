@@ -57,6 +57,12 @@ jobs:
             -e PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
             "${{ fromJSON(steps.meta.outputs.json).tags[0] }}" \
             Rscript tests/test_prepare_expression_log2_cpm.R
+          docker run --rm \
+            -v "${{ github.workspace }}:/workspace:ro" \
+            -w /workspace \
+            -e PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
+            "${{ fromJSON(steps.meta.outputs.json).tags[0] }}" \
+            Rscript tests/test_prepare_expression_sample_list.R
 
   build_cell_type_specific_expression:
     runs-on: ubuntu-latest
