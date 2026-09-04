@@ -63,11 +63,11 @@ task FilterCellTypeBeds {
   }
 
   File config_json = write_json(object {
-    "inventory": cell_type_bed_inventory,
-    "bed_paths": cell_type_beds,
-    "reference_summary": reference_summary,
-    "min_mean_log2_cpm1": min_mean_log2_cpm1,
-    "residual_cutoff": residual_cutoff
+    inventory: cell_type_bed_inventory,
+    bed_paths: cell_type_beds,
+    reference_summary: reference_summary,
+    min_mean_log2_cpm1: min_mean_log2_cpm1,
+    residual_cutoff: residual_cutoff
   })
 
   command <<<

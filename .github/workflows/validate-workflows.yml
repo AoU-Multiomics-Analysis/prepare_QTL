@@ -8,6 +8,36 @@ on:
   workflow_dispatch:
 
 jobs:
+  validate_cell_type_cromwell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download Cromwell Womtool 87
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://github.com/broadinstitute/cromwell/releases/download/87/womtool-87.jar \
+            --output "$RUNNER_TEMP/womtool-87.jar"
+          echo "73b63098ac0a87d586b7c5b8729b6e8b440de3df0f5c8b0daafd796dc4ff734c  $RUNNER_TEMP/womtool-87.jar" | sha256sum --check
+
+      - name: Validate cell-type workflows with Cromwell
+        env:
+          WOMTOOL_JAR: ${{ runner.temp }}/womtool-87.jar
+        run: python tests/cell_type_specific_expression/test_cromwell_wdl.py
+
   validate:
     runs-on: ubuntu-latest
     steps:
