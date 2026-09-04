@@ -37,7 +37,9 @@ def read_gzip(path: str) -> str:
         return handle.read()
 
 
-def check_wdl_tasks(image: str, temp: Path, include_inserts: bool) -> None:
+def check_wdl_tasks(
+    image: str, temp: Path, include_inserts: bool, merge_exons: bool,
+) -> None:
     temp.mkdir()
     manifest = temp / "samples.tsv"
     header = "sample_id\ttpm_gct\tcount_gct\texon_count_gct\tmetrics_tsv"
@@ -62,10 +64,14 @@ def check_wdl_tasks(image: str, temp: Path, include_inserts: bool) -> None:
         "sample_count": 3, "batch_count": 2, "include_insert_sizes": include_inserts,
     }, validated
 
-    inputs = {"prefix_file": prefix_file, "include_insert_sizes": include_inserts}
+    inputs = {"prefix_file": prefix_file, "include_insert_sizes": include_inserts,
+              "merge_exons": merge_exons}
     expected_gcts = {}
     for kind, label in (("tpm", "gene_tpm"), ("count", "gene_reads"),
                         ("exon_count", "exon_reads")):
+        if kind == "exon_count" and not merge_exons:
+            inputs["batch_exon_count_gcts"] = []
+            continue
         paths = []
         for batch, columns, values in (
             (1, "sample_1\tsample_2", "1\t2"), (2, "sample_3", "3"),
@@ -100,7 +106,14 @@ def check_wdl_tasks(image: str, temp: Path, include_inserts: bool) -> None:
             inputs["batch_insert_size_hists"].append(str(path))
     outputs = run_task(image, "merge_rnaseqc_batches", inputs, temp / "merge")
     for name, expected in expected_gcts.items():
-        assert read_gzip(outputs[name]) == expected, name
+        if name == "exon_count_gct":
+            assert len(outputs[name]) == 1
+            assert read_gzip(outputs[name][0]) == expected, name
+        else:
+            assert read_gzip(outputs[name]) == expected, name
+    if not merge_exons:
+        assert outputs["exon_count_gct"] == []
+        assert not list((temp / "merge").rglob("*.exon_reads.gct.gz"))
     assert read_gzip(outputs["metrics"]) == (
         "sample_id\tTotal Reads\nsample_1\t10\nsample_2\t20\nsample_3\t30\n"
     )
@@ -126,6 +139,7 @@ def check_workflow_rejects_unsafe_prefix(
         workflow + "prefix": "x$(touch prefix_injection_marker)",
         workflow + "docker_image": image,
         workflow + "merge_disk_space_gb": 1,
+        workflow + "merge_exons": False,
         workflow + "num_preempt": 0,
     }))
     result = subprocess.run(
@@ -181,9 +195,13 @@ date -u '+%Y-%m-%dT%H:%M:%SZ'
     with tempfile.TemporaryDirectory(prefix="rnaseqc-container-") as temp_dir:
         temp = Path(temp_dir)
         for include_inserts in (False, True):
-            check_wdl_tasks(args.image, temp / str(include_inserts), include_inserts)
+            for merge_exons in (False, True):
+                check_wdl_tasks(
+                    args.image, temp / f"{include_inserts}-{merge_exons}",
+                    include_inserts, merge_exons,
+                )
         check_workflow_rejects_unsafe_prefix(
-            args.image, temp / "unsafe_prefix", temp / "False" / "samples.tsv",
+            args.image, temp / "unsafe_prefix", temp / "False-False" / "samples.tsv",
         )
     print("Container and WDL smoke checks passed.")
 

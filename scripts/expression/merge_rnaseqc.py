@@ -247,6 +247,7 @@ def prepare_manifest_batch(
     batch_index: int,
     batch_size: int,
     staging_directory: Path,
+    merge_exons: bool = True,
 ) -> None:
     if batch_index < 0:
         raise MergeError("Batch index must be nonnegative")
@@ -258,22 +259,18 @@ def prepare_manifest_batch(
     if not records:
         raise MergeError(f"Batch {batch_index + 1} is empty")
 
-    local_lists: dict[str, list[str]] = {
-        "local_tpm.list": [],
-        "local_count.list": [],
-        "local_exon.list": [],
-        "local_metrics.list": [],
-    }
+    file_specs = [
+        ("tpm_gct", "gene_tpm.gct", "local_tpm.list"),
+        ("count_gct", "gene_reads.gct", "local_count.list"),
+        ("metrics_tsv", "metrics.tsv", "local_metrics.list"),
+    ]
+    if merge_exons:
+        file_specs.insert(2, ("exon_count_gct", "exon_reads.gct", "local_exon.list"))
+    local_lists: dict[str, list[str]] = {name: [] for _, _, name in file_specs}
     if manifest.include_insert_sizes:
         local_lists["local_insert.list"] = []
     transfers: list[str] = []
     sample_ids: list[str] = []
-    file_specs = (
-        ("tpm_gct", "gene_tpm.gct", "local_tpm.list"),
-        ("count_gct", "gene_reads.gct", "local_count.list"),
-        ("exon_count_gct", "exon_reads.gct", "local_exon.list"),
-        ("metrics_tsv", "metrics.tsv", "local_metrics.list"),
-    )
 
     for offset, record in enumerate(records):
         record_number = start + offset + 1
@@ -603,6 +600,10 @@ def build_parser() -> argparse.ArgumentParser:
     prepare_batch_parser.add_argument("--batch-index", type=int, required=True)
     prepare_batch_parser.add_argument("--batch-size", type=int, required=True)
     prepare_batch_parser.add_argument("--staging-directory", type=Path, required=True)
+    prepare_batch_parser.add_argument(
+        "--skip-exons", action="store_true",
+        help="Omit exon files from transfer and local-file lists; keep QC metrics",
+    )
 
     gct_parser = subparsers.add_parser("gct", help="Merge GCT sample columns")
     gct_parser.add_argument("--input-list", type=Path, required=True)
@@ -663,6 +664,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.batch_index,
                 args.batch_size,
                 args.staging_directory,
+                merge_exons=not args.skip_exons,
             )
         elif args.command == "gct":
             if args.expected_samples and args.sample_names:
