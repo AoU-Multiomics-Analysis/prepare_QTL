@@ -1,5 +1,13 @@
 version 1.0
 
+struct ReferenceFilterConfig {
+  File inventory
+  Array[File] bed_paths
+  File? reference_summary
+  Float min_mean_log2_cpm1
+  Float? residual_cutoff
+}
+
 task PrepareHaemopedia {
   input {
     File counts
@@ -11,8 +19,6 @@ task PrepareHaemopedia {
     Int max_retries = 2
   }
 
-  File counts_path_file = write_lines([counts])
-
   command <<<
     set -euo pipefail
     stage="prepare_haemopedia"
@@ -22,7 +28,8 @@ task PrepareHaemopedia {
     trap 'status=$?; printf "stage=%s status=failed error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs
     export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-    IFS= read -r counts_path < '~{counts_path_file}'
+    # Resolve the File here, after localization; quote apostrophes for the shell.
+    counts_path='~{sub(counts, "'", "'\"'\"'")}'
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/prepare_haemopedia.R \
       "$counts_path" outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=reference_prepared outputs=%s completion_time=%s\n' "$stage" \
@@ -62,13 +69,14 @@ task FilterCellTypeBeds {
     Int max_retries = 2
   }
 
-  File config_json = write_json(object {
+  # Preserve File values so Cromwell can localize them before serialization.
+  ReferenceFilterConfig filter_config = object {
     inventory: cell_type_bed_inventory,
     bed_paths: cell_type_beds,
     reference_summary: reference_summary,
     min_mean_log2_cpm1: min_mean_log2_cpm1,
     residual_cutoff: residual_cutoff
-  })
+  }
 
   command <<<
     set -euo pipefail
@@ -79,8 +87,10 @@ task FilterCellTypeBeds {
     trap 'status=$?; printf "stage=%s status=failed error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs
     export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+    # Serialize only while rendering the command, when File inputs are localized.
+    # Writing JSON in a declaration would store cloud URIs without rewriting them.
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/filter_cell_type_beds.R \
-      '~{config_json}' outputs 2>&1 | tee -a "$log"
+      '~{sub(write_json(filter_config), "'", "'\"'\"'")}' outputs 2>&1 | tee -a "$log"
     retained_count="$(awk 'END { print NR - 1 }' outputs/filtered_inventory.tsv)"
     printf 'stage=%s dimensions=cell_types:%s outputs=%s completion_time=%s\n' "$stage" \
       "$retained_count" 'filtered_beds,filtered_inventory,negative_summary,gene_comparison,filter_metrics,plots' \

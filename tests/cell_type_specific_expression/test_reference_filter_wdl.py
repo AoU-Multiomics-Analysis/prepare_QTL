@@ -1,7 +1,9 @@
 """Typed contracts for reference preparation and post-export BED filtering."""
 import gzip
 import hashlib
+import json
 import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -17,6 +19,36 @@ ROOT = Path(__file__).resolve().parents[2]
 class TaskStdLib(WDL.StdLib.Base):
     def _virtualize_filename(self, filename):
         return filename
+
+
+def render_after_localization(task, local_inputs, directory):
+    """Evaluate declarations with cloud Files, then localize inputs for the command.
+
+    Serialized file contents are deliberately NOT rewritten. This models the
+    boundary which local-input-only tests miss; it is not a Terra execution.
+    """
+    paths = {}
+
+    def cloud_path(value):
+        uri = "gs://test-bucket/inputs" + value.value
+        paths[uri] = value.value
+        return uri
+
+    env = WDL.Env.Bindings()
+    for binding in local_inputs:
+        cloud_value = WDL.Value.rewrite_paths(binding.value, cloud_path)
+        env = env.bind(binding.name, cloud_value)
+    stdlib = TaskStdLib("1.0", write_dir=directory)
+    for decl in task.postinputs:
+        env = env.bind(decl.name, decl.expr.eval(env, stdlib))
+    # Cromwell's WomFileMapper recursively maps Files in objects, arrays and
+    # optionals too. It cannot map strings embedded in a previously written file.
+    localized = WDL.Env.Bindings()
+    for binding in env:
+        localized = localized.bind(binding.name, WDL.Value.rewrite_paths(
+            binding.value, lambda value: paths.get(value.value, value.value)
+        ))
+    return task.command.eval(localized, stdlib).value
 
 
 class ReferenceFilterWdlTest(unittest.TestCase):
@@ -86,15 +118,71 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         filter_task = tasks["FilterCellTypeBeds"]
         self.assertEqual(str({decl.name: decl.type for decl in filter_task.inputs}["reference_summary"]),
                          "File?")
-        source = task_path.read_text()
         command = str(filter_task.command)
-        self.assertIn("File config_json = write_json(object", source)
         self.assertIn("filter_cell_type_beds.R", command)
         self.assertIn("status=failed", command)
         self.assertIn("completion_time", command)
 
+    def test_prepare_command_passes_localized_counts_as_literal_shell_data(self):
+        document = WDL.load(str(
+            ROOT / "workflows/cell_type_specific_expression/tasks/reference_filter.wdl"
+        ))
+        task = next(task for task in document.tasks if task.name == "PrepareHaemopedia")
+        with tempfile.TemporaryDirectory() as directory:
+            counts = Path(directory) / "counts ' $(touch unexpected_side_effect) $literal.tsv"
+            counts.touch()
+            env = WDL.Env.Bindings().bind("counts", WDL.Value.File(str(counts)))
+            command = render_after_localization(task, env, directory)
+            # Exercise the real command's path setup without needing R on the
+            # WDL-only CI host. The integration tests below also run the R CLI.
+            setup = command.split("Rscript ", 1)[0]
+            result = subprocess.run(
+                ["bash", "-c", setup + '\nprintf "%s\\n" "$counts_path"'],
+                cwd=directory, text=True, capture_output=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stdout.splitlines()[-1], str(counts))
+            self.assertFalse((Path(directory) / "unexpected_side_effect").exists())
+
+    def test_filter_command_serializes_localized_files_and_optional_values(self):
+        document = WDL.load(str(
+            ROOT / "workflows/cell_type_specific_expression/tasks/reference_filter.wdl"
+        ))
+        task = next(task for task in document.tasks if task.name == "FilterCellTypeBeds")
+        for use_reference in (False, True):
+            with self.subTest(reference=use_reference), tempfile.TemporaryDirectory() as directory:
+                inventory = directory + "/inventory's.tsv"
+                beds = [directory + "/first/b_cells.bed.gz",
+                        directory + '/second $literal "quoted"/cd4_t_cells.bed.gz']
+                reference = directory + "/reference's.tsv.gz" if use_reference else None
+                env = WDL.Env.Bindings().bind(
+                    "cell_type_bed_inventory", WDL.Value.File(inventory)
+                ).bind(
+                    "cell_type_beds", WDL.Value.Array(WDL.Type.File(), [WDL.Value.File(p) for p in beds])
+                ).bind(
+                    "reference_summary", WDL.Value.File(reference) if reference else WDL.Value.Null()
+                ).bind("min_mean_log2_cpm1", WDL.Value.Float(0.0123456789)).bind(
+                    "residual_cutoff", WDL.Value.Float(3.5) if use_reference else WDL.Value.Null()
+                )
+                command = render_after_localization(task, env, directory)
+                tokens = shlex.split(command.replace("\\\n", ""))
+                config_path = tokens[tokens.index("Rscript") + 2]
+                config = json.loads(Path(config_path).read_text())
+                self.assertEqual(config, {
+                    "inventory": inventory, "bed_paths": beds, "reference_summary": reference,
+                    "min_mean_log2_cpm1": 0.0123456789,
+                    "residual_cutoff": 3.5 if use_reference else None,
+                })
+
     @unittest.skipUnless(shutil.which("Rscript"), "Rscript is required")
     def test_rendered_tasks_use_localized_paths_and_return_filter_outputs(self):
+        self.run_rendered_tasks(use_reference=True)
+
+    @unittest.skipUnless(shutil.which("Rscript"), "Rscript is required")
+    def test_rendered_filter_without_reference_preserves_bed_values(self):
+        self.run_rendered_tasks(use_reference=False)
+
+    def run_rendered_tasks(self, use_reference):
         dependency_check = subprocess.run(
             ["Rscript", "-e", 'quit(status=as.integer(!requireNamespace("edgeR", quietly=TRUE)))'],
             capture_output=True,
@@ -110,7 +198,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="reference-filter-task-") as directory:
             work = Path(directory)
             (work / "pipeline").symlink_to(script_root, target_is_directory=True)
-            counts = work / "counts with apostrophe's.tsv"
+            counts = work / "counts with apostrophe's $(touch unexpected_side_effect).tsv"
             populations = [
                 "NveB", "MemB", "CD4T", "CD8T", "NK", "Mono",
                 "MonoNonClassical", "Neut", "Eo", "myDC", "myDC123", "pDC",
@@ -120,15 +208,9 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                               "ENSG000002\t" + "\t".join(["20"] * 12) + "\n" +
                               "ENSG000003\t" + "\t".join(["40"] * 12) + "\n")
             prepare_env = WDL.Env.Bindings().bind("counts", WDL.Value.File(str(counts)))
-            stdlib = TaskStdLib("1.0", write_dir=directory)
-            counts_path_decl = next(decl for decl in tasks["PrepareHaemopedia"].postinputs
-                                    if decl.name == "counts_path_file")
-            prepare_env = prepare_env.bind(
-                "counts_path_file", counts_path_decl.expr.eval(prepare_env, stdlib)
-            )
-            prepare_command = tasks["PrepareHaemopedia"].command.eval(
-                prepare_env, stdlib
-            ).value.replace(
+            prepare_command = render_after_localization(
+                tasks["PrepareHaemopedia"], prepare_env, directory
+            ).replace(
                 "/opt/prepare_qtl/scripts/cell_type_specific_expression/prepare_haemopedia.R",
                 "pipeline/prepare_haemopedia.R",
             )
@@ -136,6 +218,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             result = subprocess.run(["bash", "-c", prepare_command], cwd=work,
                                     env=process_env, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse((work / "unexpected_side_effect").exists())
             reference_summary = work / "outputs/reference_summary.tsv.gz"
             self.assertTrue(reference_summary.exists())
 
@@ -145,27 +228,30 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                 handle.write("chr1\t0\t1\tENSG000001\t1\t2\n")
                 handle.write("chr1\t1\t2\tENSG000002\t2\t3\n")
                 handle.write("chr1\t2\t3\tENSG000003\t4\t5\n")
-            inventory = work / "inventory.tsv"
+            second_bed = work / "cd4_t_cells.bed.gz"
+            shutil.copyfile(bed, second_bed)
+            inventory = work / "inventory's.tsv"
             bed_sha256 = hashlib.sha256(bed.read_bytes()).hexdigest()
             inventory.write_text(
                 "logical_name\tpath\tsha256\tn_genes\tn_samples\tscale\tcell_group\tslug\n"
                 f"b_cells\t{bed.name}\t{bed_sha256}\t3\t2\tcpm\tB cells\tb_cells\n"
+                f"cd4_t_cells\t{second_bed.name}\t{bed_sha256}\t3\t2\tcpm\tCD4 T cells\tcd4_t_cells\n"
             )
             filter_env = WDL.Env.Bindings().bind(
                 "cell_type_bed_inventory", WDL.Value.File(str(inventory))
             ).bind(
-                "cell_type_beds", WDL.Value.Array(WDL.Type.File(), [WDL.Value.File(str(bed))])
+                "cell_type_beds", WDL.Value.Array(WDL.Type.File(), [
+                    WDL.Value.File(str(bed)), WDL.Value.File(str(second_bed))
+                ])
             ).bind(
                 "reference_summary", WDL.Value.File(str(reference_summary))
+                if use_reference else WDL.Value.Null()
             ).bind("min_mean_log2_cpm1", WDL.Value.Float(0.01)).bind(
                 "residual_cutoff", WDL.Value.Null()
             )
-            stdlib = TaskStdLib("1.0", write_dir=directory)
-            config_decl = next(decl for decl in tasks["FilterCellTypeBeds"].postinputs
-                               if decl.name == "config_json")
-            config_value = config_decl.expr.eval(filter_env, stdlib)
-            filter_env = filter_env.bind("config_json", config_value)
-            filter_command = tasks["FilterCellTypeBeds"].command.eval(filter_env, stdlib).value.replace(
+            filter_command = render_after_localization(
+                tasks["FilterCellTypeBeds"], filter_env, directory
+            ).replace(
                 "/opt/prepare_qtl/scripts/cell_type_specific_expression/filter_cell_type_beds.R",
                 "pipeline/filter_cell_type_beds.R",
             )
@@ -178,6 +264,12 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                 "outputs/filter_metrics.tsv",
             ):
                 self.assertTrue((work / relative_path).exists(), relative_path)
+            output_paths = (work / "outputs/filtered_beds.txt").read_text().splitlines()
+            self.assertEqual(len(output_paths), 2)
+            for output_path in output_paths:
+                with gzip.open(work / output_path, "rt") as handle, gzip.open(bed, "rt") as original:
+                    self.assertEqual(handle.read(), original.read())
+            self.assertFalse((work / "unexpected_side_effect").exists())
 
 
 if __name__ == "__main__":
