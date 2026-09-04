@@ -10,6 +10,43 @@ library(edgeR)
 library(WGCNA)
 
 
+read_expression_sample_list <- function(path, expression_samples, expression_label) {
+    sample_table <- readr::read_tsv(path, col_names = FALSE,
+        col_types = readr::cols(.default = readr::col_character()),
+        na = character(), trim_ws = TRUE, skip_empty_rows = FALSE,
+        show_col_types = FALSE, progress = FALSE)
+    if (ncol(sample_table) == 0L || nrow(sample_table) == 0L) {
+        stop('Sample list is empty', call. = FALSE)
+    }
+    if (ncol(sample_table) != 1L || nrow(readr::problems(sample_table)) > 0L) {
+        stop('Sample list must contain exactly one column', call. = FALSE)
+    }
+    samples <- dplyr::pull(sample_table, 1)
+    if (anyNA(samples) || any(!nzchar(samples))) {
+        stop('Sample list contains a blank sample ID', call. = FALSE)
+    }
+    first <- samples[[1L]]
+    if (tolower(first) %in% c('research_id', 'sample_id', 'id') &&
+        !(first %in% expression_samples)) {
+        message(paste0("Sample list: removed header '", first, "'"))
+        samples <- samples[-1L]
+    }
+    if (length(samples) == 0L) {
+        stop('Sample list contains no sample IDs after removing the header', call. = FALSE)
+    }
+    if (anyDuplicated(samples)) {
+        stop('Sample list contains duplicate sample IDs', call. = FALSE)
+    }
+    missing_samples <- setdiff(samples, expression_samples)
+    if (length(missing_samples) > 0L) {
+        stop(paste0('Samples missing from ', expression_label, ': ',
+            paste(missing_samples, collapse = ', ')), call. = FALSE)
+    }
+    message(paste0('Number of sample in sample list:', length(samples)))
+    samples
+}
+
+
 # use rtracklayer to import GTF file and extract TSS locations.
 # This should run on the collapsed GTF that has been generated
 # but might work with any GTF
@@ -98,7 +135,7 @@ option_list <- list(
     optparse::make_option(c("--AnnotationGTF"), type="character", default=NULL,
                         help="GTF file used to TSS locations for each gene", metavar = "type"),
     optparse::make_option(c("--SampleList"), type="character", default=NULL,
-                        help="File containing list of samples to run processing on", metavar = "type"),
+                        help="One sample ID per line; optional research_id, sample_id, or ID header", metavar = "type"),
     optparse::make_option(c("--RankNormalize"), type="character", default="true",
                         help="Deprecated; both INT and scaled BED outputs are always written", metavar = "type")
 )
@@ -124,19 +161,6 @@ if (!has_count_gct && !is.null(opt$AnnotationGTF) && nzchar(opt$AnnotationGTF)) 
 
 ########### LOAD DATA #####################
 
-SampleList <- fread(opt$SampleList, header = FALSE, colClasses = 'character') %>%
-    dplyr::rename('ID' = 1) %>%
-    pull(ID)
-if (any(is.na(SampleList)) || any(!nzchar(SampleList))) {
-    stop('Sample list contains a blank sample ID')
-}
-if (anyDuplicated(SampleList)) {
-    stop('Sample list contains duplicate sample IDs')
-}
-nSamples <- SampleList %>% length()
-message(paste0('Number of sample in sample list:',nSamples))
-
-
 IntOutputFile <- paste0(opt$OutputPrefix,'.expression.INT.bed.gz')
 ScaledOutputFile <- paste0(opt$OutputPrefix,'.expression.scaled.bed.gz')
 RawOutputFile <- paste0(opt$OutputPrefix,'.expression.raw.bed.gz')
@@ -147,6 +171,8 @@ message(paste0('Writing raw bed file to: ', RawOutputFile ))
 if (has_count_gct) {
     message('Loading count data')
     CountData <- fread(opt$CountGCT, skip = 2, header = TRUE)
+    SampleList <- read_expression_sample_list(opt$SampleList,
+        setdiff(names(CountData), c('Name', 'Description')), 'count GCT')
     PositionTSS <- extract_TSS_pos(opt$AnnotationGTF)
 
     # transpose read count data such that
@@ -190,10 +216,8 @@ if (has_count_gct) {
     if (anyDuplicated(ExpressionBed$gene_id)) {
         stop(paste(bed_label, 'gene_id values must be unique'))
     }
-    missing_samples <- setdiff(SampleList, names(ExpressionBed))
-    if (length(missing_samples) > 0) {
-        stop(paste0('Samples missing from ', bed_label, ': ', paste(missing_samples, collapse = ', ')))
-    }
+    SampleList <- read_expression_sample_list(opt$SampleList,
+        names(ExpressionBed)[-(seq_along(metadata_columns))], bed_label)
 
     DataCPM <- ExpressionBed %>%
         dplyr::select(gene_id, all_of(SampleList)) %>%
