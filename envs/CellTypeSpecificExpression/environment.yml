@@ -15,3 +15,4 @@ dependencies:
   - r-testthat=3.3.1
   - r-lintr=3.4.0
   - bioconductor-limma=3.66.0
+  - bioconductor-edger=4.8.2

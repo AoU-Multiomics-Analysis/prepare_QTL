@@ -39,6 +39,7 @@ jobs:
           python tests/cell_type_specific_expression/test_gene_summary_wdl.py
           python tests/cell_type_specific_expression/test_tca_cleanup_wdl.py
           python tests/cell_type_specific_expression/test_qtl_manifest_wdl.py
+          python tests/cell_type_specific_expression/test_reference_filter_wdl.py
           python tests/cell_type_specific_expression/test_terra_file_paths.py
           python tests/test_expression_input_wdl.py
           python scripts/check_wdl_file_scope.py workflows
@@ -91,6 +92,13 @@ jobs:
             --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
             prepare-qtl:test \
             Rscript tests/test_prepare_expression_log2_cpm.R
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
+            prepare-qtl:test \
+            Rscript tests/test_reference_filtered_expression.R
 
       - name: Run the hspe end-to-end smoke workflow
         run: |
@@ -135,6 +143,14 @@ jobs:
       - name: Run the precomputed end-to-end smoke workflow
         run: |
           set -euo pipefail
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            cell-type-specific-expression:test \
+            Rscript tests/cell_type_specific_expression/generate_reference_fixture.R \
+            tests/cell_type_specific_expression/fixtures/synthetic_expression.bed \
+            ci-runs/reference-counts.tsv.gz
           run_directory="$PWD/ci-runs/precomputed"
           mkdir -p "$run_directory"
           miniwdl run \
@@ -189,4 +205,9 @@ jobs:
             ci-runs/**/qc*.tsv
             ci-runs/**/qc*.pdf
             ci-runs/**/*outliers*.tsv
+            ci-runs/**/*filter*.tsv
+            ci-runs/**/gene_comparison.tsv.gz
+            ci-runs/**/negative_summary.tsv.gz
+            ci-runs/**/reference_metadata.json
+            ci-runs/**/plots/*.pdf
           if-no-files-found: warn
