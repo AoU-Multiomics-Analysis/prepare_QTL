@@ -37,6 +37,7 @@ jobs:
           miniwdl check workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
           python tests/cell_type_specific_expression/test_hspe_batch_wdl.py
           python tests/cell_type_specific_expression/test_gene_summary_wdl.py
+          python tests/cell_type_specific_expression/test_tca_cleanup_wdl.py
           python tests/cell_type_specific_expression/test_terra_file_paths.py
           python tests/test_expression_input_wdl.py
           python scripts/check_wdl_file_scope.py workflows

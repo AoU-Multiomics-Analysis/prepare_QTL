@@ -542,6 +542,29 @@ require_true(
 )
 
 tca_model <- readRDS(output_value("tca_model"))
+unfiltered_model <- readRDS(output_value("tca_model_unfiltered"))
+numerical_exclusions <- readr::read_tsv(output_value("tca_numerical_excluded_genes"),
+                                       show_col_types = FALSE, col_types = readr::cols(gene_id = readr::col_character()))
+retained_genes <- rownames(tca_model$mus_hat)
+require_true(
+  identical(tca_model$gene_filter$original_gene_ids, rownames(unfiltered_model$mus_hat)) &&
+    identical(tca_model$gene_filter$excluded_gene_ids, numerical_exclusions$gene_id) &&
+    identical(retained_genes, setdiff(rownames(unfiltered_model$mus_hat), numerical_exclusions$gene_id)),
+  "The final TCA model must contain exactly the numerically retained genes"
+)
+require_true(
+  identical(tca_model$W, unfiltered_model$W) &&
+    identical(tca_model$tau_hat, unfiltered_model$tau_hat) &&
+    identical(tca_model$mus_hat, unfiltered_model$mus_hat[retained_genes, , drop = FALSE]) &&
+    identical(tca_model$sigmas_hat, unfiltered_model$sigmas_hat[retained_genes, , drop = FALSE]),
+  "TCA cleanup must preserve the fitted parameters without refitting"
+)
+for (bed_path in output_value("cell_type_beds")) {
+  bed_genes <- readr::read_tsv(bed_path, col_types = readr::cols(.default = readr::col_character()),
+                              show_col_types = FALSE)[[4L]]
+  require_true(identical(bed_genes, retained_genes),
+               "Every exported BED must match the final model gene order")
+}
 require_true(
   identical(tca_model$tca_parallel, expected_tca_parallel),
   "The TCA model metadata has an incorrect parallel setting"
@@ -601,7 +624,8 @@ required_file_outputs <- c(
   "filtered_expression", "gene_type_filter_report", "gene_type_filter_log",
   "proportion_mode_validation_log", "proportions_lm22",
   "proportions_combined", "tca_weights", "cell_group_filter_report",
-  "proportions_log", "tca_model", "tca_model_log",
+  "proportions_log", "tca_model", "tca_model_unfiltered", "tca_numerical_excluded_genes",
+  "tca_cleanup_log", "tca_model_log",
   "tca_excluded_genes", "fit_tca_log", "cell_type_bed_inventory",
   "reconstruction_by_sample", "qc_summary", "qc_plots", "export_log",
   "export_detail_log", "output_manifest", "output_inventory", "manifest_log",
