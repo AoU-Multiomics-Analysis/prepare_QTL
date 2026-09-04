@@ -41,7 +41,7 @@ class QtlManifestWdlTest(unittest.TestCase):
                          if isinstance(n, WDL.Tree.Call) and n.name == "BuildQtlManifest")
         self.task = self.call.callee
 
-    def task_inputs(self):
+    def task_inputs(self, directory=None):
         source_env = WDL.Env.Bindings()
         expected = {}
         for name, source in SOURCES.items():
@@ -57,14 +57,51 @@ class QtlManifestWdlTest(unittest.TestCase):
             "PrepareScatterInputs.cell_type_slugs", WDL.Value.Array(
                 WDL.Type.String(), [WDL.Value.String(s) for s in ("monocytes", "cd4_t_cells")])
         )
+        metadata = {
+            "source_beds": ["gs://test-bucket/raw/monocytes.bed.gz",
+                            "gs://test-bucket/raw/cd4_t_cells.bed.gz"],
+            "filtered_beds": ["gs://test-bucket/filtered/monocytes.filtered.bed.gz",
+                              "gs://test-bucket/filtered/cd4_t_cells.filtered.bed.gz"],
+            "negative_summary": "gs://test-bucket/reports/negative_summary.tsv.gz",
+            "gene_comparison": "gs://test-bucket/reports/gene_comparison.tsv.gz",
+            "filter_metrics": "gs://test-bucket/reports/filter_metrics.tsv",
+        }
+        for name in ("source_beds", "filtered_beds"):
+            expected["source_cpm_bed" if name == "source_beds" else "filtered_cpm_bed"] = metadata[name]
+            source_env = source_env.bind(
+                f"CellTypeDeconvolution.{'cell_type_beds' if name == 'source_beds' else 'filtered_cell_type_beds'}",
+                WDL.Value.Array(WDL.Type.File(), [WDL.Value.File(path) for path in metadata[name]])
+            )
+        for name, output_name in (("negative_summary", "negative_expression_summary"),
+                                  ("gene_comparison", "reference_gene_comparison"),
+                                  ("filter_metrics", "reference_filter_metrics")):
+            expected[output_name] = [metadata[name], metadata[name]]
+            source_env = source_env.bind(
+                f"CellTypeDeconvolution.{output_name}", WDL.Value.File(metadata[name]))
+        inventory_dir = Path(directory or "/tmp")
+        for filtered, expression in (
+            (False, "CellTypeDeconvolution.cell_type_bed_inventory"),
+            (True, "CellTypeDeconvolution.filtered_cell_type_bed_inventory"),
+        ):
+            path = inventory_dir / ("filtered_inventory.tsv" if filtered else "source_inventory.tsv")
+            if directory:
+                suffix = ".filtered" if filtered else ""
+                path.write_text("path\tslug\nmonocytes%s.bed.gz\tmonocytes\ncd4_t_cells%s.bed.gz\tcd4_t_cells\n" %
+                                (suffix, suffix))
+            source_env = source_env.bind(expression, WDL.Value.File(str(path)))
         task_env = WDL.Env.Bindings()
         for decl in self.task.inputs:
-            if decl.name not in (*SOURCES, "cell_types", "cell_type_slugs"):
+            if decl.name in ("docker_image", "cpu", "memory", "disk_gb",
+                             "preemptible_attempts", "max_retries"):
                 continue
             value = self.call.inputs[decl.name].eval(source_env, WDL.StdLib.Base("1.0"))
             value = value.coerce(decl.type)
-            # Metadata must not be File-typed: localization would replace the cloud URLs.
-            self.assertIsInstance(value.type.item_type, WDL.Type.String)
+            # Path metadata must not be File-typed: localization would replace cloud URLs.
+            if decl.name not in ("source_bed_inventory", "filtered_bed_inventory"):
+                if isinstance(value.type, WDL.Type.Array):
+                    self.assertIsInstance(value.type.item_type, WDL.Type.String)
+                else:
+                    self.assertIsInstance(value.type, WDL.Type.String)
             task_env = task_env.bind(decl.name, value)
         return task_env, expected
 
@@ -84,13 +121,15 @@ class QtlManifestWdlTest(unittest.TestCase):
         )
         if dependencies.returncode != 0:
             self.skipTest("R manifest packages are unavailable; the container smoke runs the task")
-        env, expected = self.task_inputs()
-        quoted_path = "gs://test-bucket/path with spaces/it's-$(touch unexpected_side_effect).tsv"
-        expected["int_bed"][0] = quoted_path
-        env = env.bind("int_beds", WDL.Value.Array(
-            WDL.Type.String(), [WDL.Value.String(p) for p in expected["int_bed"]]))
         with tempfile.TemporaryDirectory(prefix="qtl-manifest-task-") as directory:
+            env, expected = self.task_inputs(directory)
+            quoted_path = "gs://test-bucket/path with spaces/it's-$(touch unexpected_side_effect).tsv"
+            expected["int_bed"][0] = quoted_path
+            env = env.bind("int_beds", WDL.Value.Array(
+                WDL.Type.String(), [WDL.Value.String(p) for p in expected["int_bed"]]))
             stdlib = TaskStdLib("1.0", write_dir=directory)
+            for decl in self.task.postinputs:
+                env = env.bind(decl.name, decl.expr.eval(env, stdlib))
             command = self.task.command.eval(env, stdlib).value
             script = ROOT / "scripts/cell_type_specific_expression/build_qtl_manifest.R"
             # Rscript can encode spaces in --file before the script sees it.

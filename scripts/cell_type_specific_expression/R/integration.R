@@ -119,7 +119,14 @@ build_cell_type_qtl_manifest <- function(
     int_covariates,
     scaled_covariates,
     int_outliers,
-    scaled_outliers) {
+    scaled_outliers,
+    source_beds = NULL,
+    source_bed_slugs = NULL,
+    filtered_beds = NULL,
+    filtered_bed_slugs = NULL,
+    negative_summary = NULL,
+    gene_comparison = NULL,
+    filter_metrics = NULL) {
   file_lists <- list(
     int_bed = int_beds,
     scaled_bed = scaled_beds,
@@ -177,11 +184,60 @@ build_cell_type_qtl_manifest <- function(
     )
   }
 
+  filter_metadata <- list(
+    source_beds = source_beds,
+    source_bed_slugs = source_bed_slugs,
+    filtered_beds = filtered_beds,
+    filtered_bed_slugs = filtered_bed_slugs,
+    negative_summary = negative_summary,
+    gene_comparison = gene_comparison,
+    filter_metrics = filter_metrics
+  )
+  metadata_provided <- !vapply(filter_metadata, is.null, logical(1))
+  if (any(metadata_provided) && !all(metadata_provided)) {
+    stop("Filter manifest metadata must be supplied together", call. = FALSE)
+  }
+  if (all(metadata_provided)) {
+    for (name in c("source_bed_slugs", "filtered_bed_slugs")) {
+      slugs <- filter_metadata[[name]]
+      if (!is.character(slugs) || length(slugs) != expected_length || anyNA(slugs) ||
+          any(!nzchar(slugs)) || anyDuplicated(slugs) > 0L ||
+          !setequal(slugs, cell_type_slugs)) {
+        stop("Filter BED slugs must uniquely match manifest cell-type slugs", call. = FALSE)
+      }
+    }
+    source_beds <- source_beds[match(cell_type_slugs, source_bed_slugs)]
+    filtered_beds <- filtered_beds[match(cell_type_slugs, filtered_bed_slugs)]
+    new_paths <- c(source_beds, filtered_beds, negative_summary, gene_comparison, filter_metrics)
+    new_cloud_paths <- grepl("^gs://[^/[:space:]]+/[^[:cntrl:]]+$", new_paths) &
+      !endsWith(new_paths, "/")
+    new_local_paths <- startsWith(new_paths, "/")
+    if (length(source_beds) != expected_length || length(filtered_beds) != expected_length ||
+        anyNA(new_paths) || any(!nzchar(new_paths)) ||
+        any(!new_cloud_paths & !new_local_paths)) {
+      stop("Filter manifest paths must be full gs:// object URLs or absolute local paths",
+           call. = FALSE)
+    }
+  } else {
+    source_beds <- rep(NA_character_, expected_length)
+    filtered_beds <- rep(NA_character_, expected_length)
+    negative_summary <- NA_character_
+    gene_comparison <- NA_character_
+    filter_metrics <- NA_character_
+  }
+
   file_columns <- tibble::as_tibble(file_lists)
   tibble::tibble(
     `entity:cell_type_id` = cell_type_slugs,
     cell_type = cell_types,
     cell_type_slug = cell_type_slugs
   ) |>
-    dplyr::bind_cols(file_columns)
+    dplyr::bind_cols(file_columns) |>
+    dplyr::mutate(
+      source_cpm_bed = source_beds,
+      filtered_cpm_bed = filtered_beds,
+      negative_expression_summary = negative_summary,
+      reference_gene_comparison = gene_comparison,
+      reference_filter_metrics = filter_metrics
+    )
 }

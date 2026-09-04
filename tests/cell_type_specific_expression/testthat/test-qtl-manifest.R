@@ -3,7 +3,9 @@ qtl_manifest_columns <- c(
   "int_phenotype_pcs", "int_phenotype_pcs_all",
   "scaled_phenotype_pcs", "scaled_phenotype_pcs_all",
   "int_merged_covariates", "scaled_merged_covariates",
-  "int_connectivity_outliers", "scaled_connectivity_outliers"
+  "int_connectivity_outliers", "scaled_connectivity_outliers", "source_cpm_bed",
+  "filtered_cpm_bed", "negative_expression_summary", "reference_gene_comparison",
+  "reference_filter_metrics"
 )
 
 make_qtl_manifest_inputs <- function() {
@@ -36,7 +38,34 @@ testthat::test_that("QTL manifest preserves cloud URLs and scatter identity with
     "gs://test-bucket/submission/call-eqtl/shard-1/outputs/int_beds.tsv",
     "gs://test-bucket/submission/call-eqtl/shard-0/outputs/int_beds.tsv"
   ))
-  testthat::expect_identical(unname(as.list(manifest[-(1:3)])), unname(inputs[-(1:2)]))
+  testthat::expect_identical(unname(as.list(manifest[4:13])), unname(inputs[-(1:2)]))
+  testthat::expect_true(all(is.na(manifest[14:18])))
+})
+
+testthat::test_that("QTL manifest aligns filter BED metadata by slug and permits shared reports", {
+  inputs <- make_qtl_manifest_inputs()
+  inputs$source_beds <- c(
+    "gs://bucket/raw/b_cells.bed.gz", "gs://bucket/raw/cd4_t_cells.bed.gz"
+  )
+  inputs$source_bed_slugs <- c("b_cells", "cd4_t_cells")
+  inputs$filtered_beds <- c(
+    "gs://bucket/filtered/cd4_t_cells.filtered.bed.gz",
+    "gs://bucket/filtered/b_cells.filtered.bed.gz"
+  )
+  inputs$filtered_bed_slugs <- c("cd4_t_cells", "b_cells")
+  inputs$cell_types <- c("B cells", "CD4 T cells")
+  inputs$cell_type_slugs <- c("b_cells", "cd4_t_cells")
+  inputs$negative_summary <- "gs://bucket/reports/negative_summary.tsv.gz"
+  inputs$gene_comparison <- "gs://bucket/reports/gene_comparison.tsv.gz"
+  inputs$filter_metrics <- "gs://bucket/reports/filter_metrics.tsv"
+
+  manifest <- do.call(build_cell_type_qtl_manifest, inputs)
+  testthat::expect_identical(manifest$source_cpm_bed, inputs$source_beds)
+  testthat::expect_identical(manifest$filtered_cpm_bed, rev(inputs$filtered_beds))
+  testthat::expect_identical(
+    manifest$reference_filter_metrics,
+    rep(inputs$filter_metrics, 2L)
+  )
 })
 
 testthat::test_that("QTL manifest requires equal nonzero array lengths", {
@@ -127,5 +156,6 @@ testthat::test_that("QTL manifest CLI preserves cloud URLs from safely serialize
   manifest <- readr::read_tsv(output, show_col_types = FALSE, name_repair = "minimal")
   testthat::expect_identical(names(manifest), qtl_manifest_columns)
   testthat::expect_identical(manifest[["entity:cell_type_id"]], c("monocytes", "cd4_t_cells"))
-  testthat::expect_identical(unname(as.list(manifest[-(1:3)])), unname(inputs[-(1:2)]))
+  testthat::expect_identical(unname(as.list(manifest[4:13])), unname(inputs[-(1:2)]))
+  testthat::expect_true(all(is.na(manifest[14:18])))
 })
