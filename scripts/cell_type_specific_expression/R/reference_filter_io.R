@@ -36,13 +36,15 @@ scan_bed_summary <- function(path, cell_type, expected_genes, expected_samples, 
   list(summary = result, samples = samples)
 }
 
-write_filtered_bed <- function(input_path, output_path, retained_ids, samples, chunk_size) {
+write_filtered_bed <- function(input_path, output_path, retained_ids, chunk_size) {
   input_connection <- if (grepl("[.]gz$", input_path, ignore.case = TRUE)) {
     gzfile(input_path, "rt")
   } else {
     file(input_path, "rt")
   }
+  on.exit(try(close(input_connection), silent = TRUE), add = TRUE)
   output_connection <- gzfile(output_path, "wt")
+  on.exit(try(close(output_connection), silent = TRUE), add = TRUE)
   header <- readLines(input_connection, n = 1L, warn = FALSE)
   if (length(header) != 1L) stop("BED is empty", call. = FALSE)
   writeLines(header, output_connection)
@@ -96,6 +98,19 @@ reference_comparison_status <- function(reference_summary, cell_type) {
   "available"
 }
 
+validate_inventory_reference_lineages <- function(inventory, reference_summary) {
+  if (is.null(reference_summary)) return(invisible(TRUE))
+  needed <- intersect(inventory$cell_group, reference_supported_cell_types)
+  missing <- setdiff(needed, unique(reference_summary$cell_type))
+  if (length(missing) > 0L) {
+    stop(sprintf(
+      "Supplied reference is missing required mapped lineage(s): %s",
+      paste(missing, collapse = ", ")
+    ), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_summary = NULL,
                                   min_mean_log2_cpm1 = 0.01, residual_cutoff = NULL,
                                   chunk_size = 256L) {
@@ -120,6 +135,7 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
     duplicate_pairs <- paste(reference_summary$gene_id, reference_summary$cell_type, sep = "\r")
     if (anyDuplicated(duplicate_pairs) > 0L) stop("Reference gene and cell-type pairs must be unique", call. = FALSE)
   }
+  validate_inventory_reference_lineages(inventory, reference_summary)
   dir.create(file.path(output_dir, "beds"), recursive = TRUE, showWarnings = FALSE)
   dir.create(file.path(output_dir, "plots"), recursive = TRUE, showWarnings = FALSE)
   comparisons <- list()
@@ -185,7 +201,7 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
       ), call. = FALSE)
     }
     output_paths[[i]] <- file.path(output_dir, "beds", sprintf("%s.filtered.bed.gz", slug))
-    write_filtered_bed(bed_paths[[i]], output_paths[[i]], retained_ids, scanned$samples, chunk_size)
+    write_filtered_bed(bed_paths[[i]], output_paths[[i]], retained_ids, chunk_size)
     comparisons[[i]] <- decision
     metric_rows <- make_filter_metric(baseline, cell_type, slug, status,
       nrow(decision), sum(!decision$nonnegative),

@@ -886,6 +886,12 @@ Each reference sample has equal weight, not each subtype. For example, five
 naive-B samples contribute more than three memory-B samples. All expected
 subpopulations must be present for a compared lineage. Mast and gamma-delta
 T cells have no matching reference here: only their negative filter applies.
+When a reference is supplied, it must contain every mapped lineage used by the
+BED inventory. A missing required lineage is an input error; the workflow does
+not silently switch that lineage to negative-only filtering. A reference can
+contain only a subset of mapped lineages when the BED inventory uses only that
+same subset. This requirement does not apply when the complete reference input
+is omitted, or to mast and gamma-delta T cells.
 
 For each eligible gene, compute **the mean of sample-level `log2(CPM + 1)`**
 in each dataset. This differs from `log2(mean(CPM) + 1)` and from the existing

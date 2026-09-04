@@ -23,7 +23,8 @@ save_negative_plots <- function(negative_summary, plot_dir) {
     ggplot2::labs(x = NULL, y = "Gene ID") + ggplot2::theme_minimal() +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
   ggplot2::ggsave(file.path(plot_dir, "negative_fraction_heatmap.pdf"), heat,
-                  width = 7, height = max(4, min(14, nrow(ranked) * 0.13)), units = "in", limitsize = FALSE)
+                  width = 7, height = max(5.5, min(16, 2.5 + nrow(ranked) * 0.13)),
+                  units = "in", limitsize = FALSE)
 }
 
 save_reference_plots <- function(comparison, cell_type, slug, plot_dir, post = FALSE) {

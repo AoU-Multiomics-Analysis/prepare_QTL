@@ -1,5 +1,6 @@
 invisible(lapply(file.path(script_root, "R", c(
-  "reference_expression.R", "reference_filter.R", "reference_filter_plots.R",
+  "bed_outputs.R", "tca_stage.R", "expression_bed.R", "reference_expression.R",
+  "reference_filter.R", "reference_filter_plots.R",
   "reference_filter_io.R"
 )), source, local = .GlobalEnv))
 
@@ -155,7 +156,7 @@ testthat::test_that("filtered BED writing preserves the original text exactly", 
     "2\t2\t3\tg3\t4.50\t6.700000000000001"
   )
   writeLines(lines, input)
-  write_filtered_bed(input, output, c("g1", "g3"), c("s1", "s2"), chunk_size = 2L)
+  write_filtered_bed(input, output, c("g1", "g3"), chunk_size = 2L)
   testthat::expect_identical(readLines(gzfile(output)), lines[c(1L, 2L, 4L)])
 })
 
@@ -180,4 +181,39 @@ testthat::test_that("filter metrics preserve unavailable reference states and sa
     n_samples = 4L, mean_log2_cpm1 = 1, median_log2_cpm1 = 1)
   testthat::expect_identical(reference_comparison_status(other_lineage, "B cells"),
                              "reference_cell_type_unavailable")
+})
+
+testthat::test_that("a supplied reference must contain each supported inventory lineage", {
+  directory <- tempfile("lineage validation ")
+  dir.create(directory)
+  bed <- file.path(directory, "cell.bed.gz")
+  values <- tibble::tibble(`#chr` = "1", start = 0:2, end = 1:3,
+    gene_id = paste0("g", 1:3), s1 = c(1, 2, 3), s2 = c(2, 3, 5))
+  readr::write_tsv(values, bed)
+  inventory <- tibble::tibble(
+    logical_name = "cell_type_bed", path = basename(bed),
+    sha256 = digest::digest(file = bed, algo = "sha256", serialize = FALSE),
+    n_genes = 3L, n_samples = 2L, scale = "cpm",
+    cell_group = "B cells", slug = "b_cells"
+  )
+  cd4_reference <- tibble::tibble(
+    gene_id = paste0("g", 1:3), cell_type = "CD4 T cells", n_samples = 2L,
+    mean_log2_cpm1 = c(1, 2, 3), median_log2_cpm1 = c(1, 2, 3)
+  )
+  testthat::expect_error(
+    filter_cell_type_beds(inventory, bed, file.path(directory, "missing-no-cutoff"),
+                          reference_summary = cd4_reference),
+    "missing.*B cells"
+  )
+  testthat::expect_error(
+    filter_cell_type_beds(inventory, bed, file.path(directory, "missing-with-cutoff"),
+                          reference_summary = cd4_reference, residual_cutoff = 2),
+    "missing.*B cells"
+  )
+
+  cd4_inventory <- dplyr::mutate(inventory, cell_group = "CD4 T cells", slug = "cd4_t_cells")
+  testthat::expect_no_error(
+    filter_cell_type_beds(cd4_inventory, bed, file.path(directory, "valid-subset"),
+                          reference_summary = cd4_reference)
+  )
 })
