@@ -3,7 +3,7 @@ version 1.0
 task validate_rnaseqc_manifests {
     input {
         File sample_manifest
-        File prefix_file
+        String prefix
         Int batch_size
 
         String docker_image
@@ -11,6 +11,10 @@ task validate_rnaseqc_manifests {
         Int disk_space_gb
         Int num_preempt
     }
+
+    # Keep file creation in task scope for Terra's backend filesystem.
+    # Serialize the string without inserting its contents into shell source.
+    File prefix_input_file = write_lines([prefix])
 
     command <<<
         set -euo pipefail
@@ -24,12 +28,15 @@ task validate_rnaseqc_manifests {
         python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py validate-manifest \
             --input "~{sample_manifest}" \
             --batch-size ~{batch_size} \
-            --prefix-file "~{prefix_file}"
+            --prefix-file "~{prefix_input_file}"
+
+        log "Saving the validated output prefix"
+        cp -- "~{prefix_input_file}" prefix.txt
 
         sample_count=$(<sample_count.txt)
         batch_count=$(<batch_count.txt)
         log "dimensions=samples:$sample_count,batches:$batch_count"
-        log "outputs=sample_count.txt,batch_count.txt,include_insert_sizes.txt"
+        log "outputs=sample_count.txt,batch_count.txt,include_insert_sizes.txt,prefix.txt"
         log "stage=validate_manifest completion_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     >>>
 
@@ -37,6 +44,7 @@ task validate_rnaseqc_manifests {
         Int sample_count = read_int("sample_count.txt")
         Int batch_count = read_int("batch_count.txt")
         Boolean include_insert_sizes = read_boolean("include_insert_sizes.txt")
+        File prefix_file = "prefix.txt"
     }
 
     runtime {
@@ -258,12 +266,10 @@ workflow rnaseqc2_aggregate_batched_workflow {
         Int num_preempt = 2
     }
 
-    File prefix_file = write_lines([prefix])
-
     call validate_rnaseqc_manifests {
         input:
             sample_manifest = sample_manifest,
-            prefix_file = prefix_file,
+            prefix = prefix,
             batch_size = batch_size,
             docker_image = docker_image,
             memory_gb = validation_memory_gb,
@@ -275,7 +281,7 @@ workflow rnaseqc2_aggregate_batched_workflow {
         call aggregate_rnaseqc_batch {
             input:
                 sample_manifest = sample_manifest,
-                prefix_file = prefix_file,
+                prefix_file = validate_rnaseqc_manifests.prefix_file,
                 batch_index = batch_index,
                 batch_size = batch_size,
                 include_insert_sizes = validate_rnaseqc_manifests.include_insert_sizes,
@@ -294,7 +300,7 @@ workflow rnaseqc2_aggregate_batched_workflow {
             batch_exon_count_gcts = aggregate_rnaseqc_batch.exon_count_gct,
             batch_metrics = aggregate_rnaseqc_batch.metrics,
             batch_insert_size_hists = flatten(aggregate_rnaseqc_batch.insert_size_hists),
-            prefix_file = prefix_file,
+            prefix_file = validate_rnaseqc_manifests.prefix_file,
             include_insert_sizes = validate_rnaseqc_manifests.include_insert_sizes,
             docker_image = docker_image,
             memory_gb = merge_memory_gb,

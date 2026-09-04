@@ -39,8 +39,6 @@ def read_gzip(path: str) -> str:
 
 def check_wdl_tasks(image: str, temp: Path, include_inserts: bool) -> None:
     temp.mkdir()
-    prefix = temp / "prefix.txt"
-    prefix.write_text("smoke\n")
     manifest = temp / "samples.tsv"
     header = "sample_id\ttpm_gct\tcount_gct\texon_count_gct\tmetrics_tsv"
     if include_inserts:
@@ -55,14 +53,16 @@ def check_wdl_tasks(image: str, temp: Path, include_inserts: bool) -> None:
     manifest.write_text(header + "\n" + "\n".join(rows) + "\n")
     validated = run_task(
         image, "validate_rnaseqc_manifests",
-        dict(sample_manifest=str(manifest), prefix_file=str(prefix), batch_size=2),
+        dict(sample_manifest=str(manifest), prefix="smoke", batch_size=2),
         temp / "validate",
     )
+    prefix_file = validated.pop("prefix_file")
+    assert Path(prefix_file).read_text() == "smoke\n"
     assert validated == {
         "sample_count": 3, "batch_count": 2, "include_insert_sizes": include_inserts,
     }, validated
 
-    inputs = {"prefix_file": str(prefix), "include_insert_sizes": include_inserts}
+    inputs = {"prefix_file": prefix_file, "include_insert_sizes": include_inserts}
     expected_gcts = {}
     for kind, label in (("tpm", "gene_tpm"), ("count", "gene_reads"),
                         ("exon_count", "exon_reads")):
@@ -114,6 +114,35 @@ def check_wdl_tasks(image: str, temp: Path, include_inserts: bool) -> None:
         assert outputs["insert_size_hists"] == []
 
 
+def check_workflow_rejects_unsafe_prefix(
+    image: str, temp: Path, manifest: Path,
+) -> None:
+    """Start the whole workflow; validation must fail before any GCS transfer."""
+    temp.mkdir()
+    input_json = temp / "inputs.json"
+    workflow = "rnaseqc2_aggregate_batched_workflow."
+    input_json.write_text(json.dumps({
+        workflow + "sample_manifest": str(manifest),
+        workflow + "prefix": "x$(touch prefix_injection_marker)",
+        workflow + "docker_image": image,
+        workflow + "merge_disk_space_gb": 1,
+        workflow + "num_preempt": 0,
+    }))
+    result = subprocess.run(
+        [
+            "miniwdl", "run", str(WDL), "--input", str(input_json),
+            "--dir", str(temp / "run"), "--no-cache", "--verbose",
+        ],
+        capture_output=True, text=True, check=False,
+    )
+    assert result.returncode != 0, "The workflow accepted an unsafe prefix"
+    task_errors = "\n".join(path.read_text() for path in temp.rglob("stderr.txt"))
+    assert "invalid output prefix" in task_errors, result.stdout + result.stderr
+    assert not list(temp.rglob("prefix_injection_marker")), "Prefix ran as shell code"
+    assert not list(temp.rglob("prefix.txt")), "Invalid prefix was published"
+    print("The workflow rejected an unsafe prefix in the validation task.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", required=True)
@@ -153,6 +182,9 @@ date -u '+%Y-%m-%dT%H:%M:%SZ'
         temp = Path(temp_dir)
         for include_inserts in (False, True):
             check_wdl_tasks(args.image, temp / str(include_inserts), include_inserts)
+        check_workflow_rejects_unsafe_prefix(
+            args.image, temp / "unsafe_prefix", temp / "False" / "samples.tsv",
+        )
     print("Container and WDL smoke checks passed.")
 
 
