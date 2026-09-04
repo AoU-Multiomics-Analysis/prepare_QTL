@@ -20,6 +20,7 @@ prepare_QTL/
 
 ## Documentation
 
+- **[Start here: cell-type pipeline files and expression scales](docs/cell-type-specific-expression.md#start-here-required-files):** Required files, example formats, CPM versus log2 CPM, HSPE and TCA handling, Terra inputs, and which outputs to use.
 - [RNA-SeQC aggregation](docs/rnaseqc2-aggregation.md): One sample manifest, collision-free file staging, batch aggregation, and a row-streaming cohort merge.
 - [R scripts](docs/scripts.md): Command-line script inputs, outputs, and processing behavior.
 - [Phenotype normalization and filtering](docs/phenotype-normalization-filtering.md): Modality-specific filtering, normalization, transformations, and WGCNA outlier removal.

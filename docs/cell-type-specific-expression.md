@@ -4,6 +4,253 @@ These WDL 1.0 workflows prepare cell-type-specific expression from human
 whole blood. `prepare_QTL` is the only maintained and canonical source for
 this implementation.
 
+## Start here: required files
+
+Use this checklist for the integrated human whole-blood pipeline,
+`PrepareCellTypeEqtlWorkflow`. Input names are case-sensitive.
+
+| Input | Required? | File contents and scale | Use |
+| --- | --- | --- | --- |
+| `expression` | Yes | Gene-by-sample BED; finite, nonnegative **linear CPM**, not counts, TPM, log2 CPM, INT, or scaled values. | Supplies expression for HSPE and TCA. |
+| `gtf` | Yes, in both proportion modes | GTF with gene records, `gene_id`, and `gene_type` or `gene_biotype`. HSPE also needs usable `gene_name` values. | Filters gene types and maps gene IDs to LM22 symbols. |
+| `lm22` | Yes, even with supplied proportions | Original positive, linear LM22 reference values; genes in rows and the 22 LM22 cell types in columns. Do not pre-log this file. | Supplies the HSPE reference when proportions are estimated. |
+| `SampleList` | Yes | Headerless text file; one sample ID per line. | Selects and orders samples for downstream eQTL preparation, **not** for HSPE or TCA. |
+| `AdditionalCovariates` | Yes | Sample-by-covariate TSV with `sample_id`; numeric covariate columns. | Merges supplied covariates with phenotype PCs for each cell type and output branch. |
+| `precomputed_proportions` | No | Sample-by-cell-type TSV; `sample_id` first, followed by all 22 LM22 columns. Fractions, not percentages. | Skips HSPE estimation. Grouping and TCA still run. |
+| `deconvolution_covariates` | No | Sample-by-covariate TSV; `sample_id` first, followed by finite numeric columns. | Supplies covariates to the TCA model. It is not a substitute for `AdditionalCovariates`. |
+
+Also supply `OutputPrefix`, a safe filename prefix such as `whole_blood`.
+The other integrated inputs have defaults. See the
+[complete input tables](#public-input-contracts) for parameters and resources.
+
+For **standalone deconvolution**, supply `expression`, `gtf`, and `lm22`.
+Optional TCA covariates are named `covariates` in that workflow. It does not
+take `SampleList`, `AdditionalCovariates`, or `OutputPrefix`.
+
+For **eQTL preparation of one existing matrix**, use `eQTLPrepareData`.
+Its inputs differ from the integrated pipeline. See
+[CountGCT, CpmBed, and Log2CpmBed](#choose-the-expression-input-for-eqtl-preparation).
+
+Quick links:
+
+- [Scales and transformations](#scales-and-transformations)
+- [File formats and sample matching](#file-formats-and-sample-matching)
+- [Expression validation and gene filtering](#expression-input)
+- [Proportions and major cell types](#proportion-modes)
+- [Terra input examples](#terra-input-examples)
+- [Output selection](#which-output-should-i-use)
+- [Terra validation limits](#terra-file-handling-and-validation)
+
+## Scales and transformations
+
+Supply linear CPM to the deconvolution workflow. The workflow creates the
+log2 values needed by HSPE internally. It does **not** pass those log2 values
+to TCA.
+
+```text
+Gene-ID BED: linear CPM
+  → GTF gene-type filter → filtered_expression: linear CPM
+      ├─ HSPE: gene symbols → log2(CPM + p) → LM22 marker batches → proportions
+      └─ TCA: linear CPM + grouped proportions → cell-type BEDs: linear CPM
+                                                  ├─ CPM gene summaries
+                                                  └─ CpmBed → eQTL preparation
+                                                       ├─ ranks → INT BED
+                                                       └─ log2(CPM + 1) → center/scale → scaled BED
+```
+
+The HSPE branch is skipped when `precomputed_proportions` is supplied.
+`p` means `log2_pseudocount`, whose default is `0`.
+
+| Stage or file | Input scale | Handling | Output scale |
+| --- | --- | --- | --- |
+| Gene-type filtering | Linear CPM | Retains selected GTF gene types; preserves expression values. | Linear CPM |
+| HSPE bulk input | Linear CPM | Sums gene IDs that map to the same symbol, then applies `log2(CPM + p)`. Uses shared LM22 genes and selected markers. | Log2 expression used internally |
+| HSPE reference input | Original linear LM22 values | Applies `log2(LM22 + p)` internally. LM22 is a signature matrix, not this cohort's CPM matrix. | Log2 reference values used internally |
+| HSPE estimates or supplied proportions | Fractions | Combines LM22 subtypes, filters major groups, floors exact zeros in retained groups, and normalizes each sample's weights to sum to one. | Fractions |
+| TCA fitting and export | Linear CPM and grouped fractions | Removes constant input genes and fits the cohort model. Does not apply the HSPE log transform. | Estimated cell-type expression on the linear-CPM model scale |
+| Gene summary | Exported TCA CPM | Computes mean, median, SD, standard error of the mean, quartiles, and IQR. | CPM units, except identifiers and sample counts |
+| eQTL INT branch | Supplied expression values | Applies rank-based inverse normal transformation per gene across selected samples. | Dimensionless INT values |
+| eQTL scaled branch from `CpmBed` | Linear CPM | Applies `log2(CPM + 1)`, then centers and scales each gene across selected samples. | Dimensionless standardized values |
+
+HSPE quantile normalization is **off by default**. If enabled, it applies to
+the joined log2 bulk and reference profiles, before marker selection and
+batching. It does not change the linear CPM supplied to TCA.
+
+The two pseudocount uses are separate:
+
+- `log2_pseudocount` affects only the HSPE bulk and reference transformations.
+  It does not change TCA expression or exported TCA BEDs.
+- The eQTL `CpmBed` scaled branch uses a fixed `+1`. It does not use
+  `log2_pseudocount`. `log2(CPM + 1)` is not the same as `log2(CPM) + 1`.
+
+At the default `p = 0`, HSPE checks the retained bulk CPM matrix for zeros
+before the LM22 intersection. A zero outside the eventual marker set can
+therefore stop HSPE preparation. Use a positive `p` when that matrix contains
+zeros. LM22 values must be strictly positive even when `p` is positive.
+TCA itself accepts zero CPM. Neither stage accepts negative bulk CPM input.
+
+There is no automatic scale detection. Positive log2 values can look like
+linear values to a numeric validator. Confirm the scale before submission;
+do not choose an input name from the filename alone.
+
+### Choose the expression input for eQTL preparation
+
+The reusable `workflows/expression/prepare_eQTL.wdl` workflow accepts exactly
+one of these three expression inputs:
+
+| Input | Supplied values | Required annotation | Processing before scaled output |
+| --- | --- | --- | --- |
+| `CountGCT` | Raw gene counts in GCT format | `AnnotationGTF` required | Count filtering → TMM → CPM → `log2(CPM + 1)` → center and scale |
+| `CpmBed` | Finite, nonnegative linear CPM in BED format | No GTF; supplying one is rejected | Skip count normalization; apply `log2(CPM + 1)` → center and scale |
+| `Log2CpmBed` | Finite, already-log2 expression in BED format | No GTF; supplying one is rejected | Skip count normalization and log transformation; center and scale directly |
+
+For counts, the current gene filter retains genes with counts greater than
+6 in at least 20% of selected samples. BED modes do not repeat this filter.
+Both BED modes preserve the supplied coordinates and reject zero-variance
+genes. Finite negative log2 values are valid in `Log2CpmBed`; negative linear
+CPM values are invalid in `CpmBed`.
+
+Every mode creates an INT branch without a preceding log transform. The raw
+output preserves supplied values for BED inputs; it contains TMM-normalized
+CPM for count inputs. Thus, a file named `.raw.bed.gz` is not necessarily a
+raw-count matrix. Its scale depends on the input mode.
+
+The integrated pipeline automatically passes TCA BEDs through `CpmBed`.
+You do not set `CpmBed` or `Log2CpmBed` at its top level. Its public
+`expression` input must still be linear CPM. In the reusable single-matrix
+workflow, `SampleList`, `OutputPrefix`, `memory`, `disk_space`, and
+`num_threads` are required; `AdditionalCovariates` is optional there.
+
+## File formats and sample matching
+
+Use actual tab characters for BED, TSV, and GTF fields. The examples below
+show formats, not a complete biological test dataset. Localized files may
+have different paths in Terra, but sample and gene identifiers must remain
+unchanged.
+
+### Expression BED
+
+```text
+#chr	start	end	gene_id	sample_1	sample_2	sample_3
+chr1	999	1000	gene_A	1	7	3
+chr2	1999	2000	gene_B	8	2	5
+```
+
+Rows are genes; sample columns contain linear CPM for `expression` or
+`CpmBed`. Use the same layout, with already-transformed values, for
+`Log2CpmBed`. BED coordinates use a zero-based start and an exclusive end.
+The deconvolution workflow preserves these coordinates; it does not rebuild
+them from the GTF. Use coordinates appropriate for the later QTL analysis.
+Plain BED and gzip-compressed BED files are supported.
+
+### Gene annotation GTF
+
+```text
+chr1	example	gene	1000	1500	.	+	.	gene_id "gene_A"; gene_name "ABCB4"; gene_type "protein_coding";
+chr2	example	gene	2000	2400	.	+	.	gene_id "gene_B"; gene_name "EXAMPLE_LNC"; gene_type "lncRNA";
+```
+
+GTF records have nine tab-separated fields. The parser uses `gene` records,
+not exon-only records. It accepts plain or gzip-compressed GTF files.
+Use gene IDs that match the expression BED exactly, including version
+suffixes. The pipeline does not remove version suffixes to make a match.
+`gene_type` is preferred; `gene_biotype` is the fallback attribute.
+
+The GTF is needed even with precomputed proportions because gene-type
+filtering still runs. In HSPE mode, `gene_name` supplies the symbols used to
+match LM22. Missing symbols prevent HSPE use of those genes, but do not by
+themselves exclude an otherwise retained gene from TCA.
+
+### LM22 reference
+
+The first column is `Gene symbol` or `gene_symbol`. The remaining columns
+must be all 22 standard LM22 cell types, with their original names, including
+spaces and parentheses. Genes are rows. Values must be finite and strictly
+positive; gene symbols must be unique. Column order can differ.
+
+Supply the original linear reference values. Do not apply a log transform,
+convert them to percentages, or treat them as the bulk CPM input. The
+workflow performs its own log transformation. In precomputed-proportion
+mode, `lm22` remains a required WDL input even though HSPE does not use it.
+
+### Sample list
+
+```text
+sample_1
+sample_2
+sample_3
+```
+
+Do not add a header. Each ID must occur once and must match an expression
+sample column. The eQTL BED modes require every listed sample to be present.
+The list selects and orders samples only after deconvolution. HSPE, TCA,
+and the CPM gene summaries use all samples in the input expression BED.
+To change that modeling cohort, prepare the expression BED and associated
+proportion/covariate matrices with the intended samples before submission.
+
+### QTL covariates: `AdditionalCovariates`
+
+```text
+sample_id	age	batch_B	genotype_pc1
+sample_1	45	0	0.12
+sample_2	52	1	-0.08
+sample_3	39	0	0.03
+```
+
+Use one row per sample, a `sample_id` column, and uniquely named numeric
+covariate columns. Encode categorical variables before submission; the
+merge script does not encode them. Include every sample selected for QTL
+preparation, with no missing covariate values. Avoid names such as `PC1`
+that collide with the phenotype PC columns.
+
+The merge joins `sample_id` to the phenotype-PC `ID` column. It is an inner
+join: missing sample IDs can be dropped rather than cause an error.
+Check coverage before submission. Input row order need not match the BED.
+The merged output has covariates in rows, an `ID` first column, and sample
+IDs in the remaining column headers. It sorts samples by ID. Always align
+merged covariates and phenotype BEDs by sample ID, not by column position.
+
+These covariates are not passed automatically to TCA. Merging them also does
+not residualize the phenotype BEDs. The integrated workflow disables
+residualized outputs; covariates are supplied separately for QTL analysis.
+
+### Optional TCA covariates
+
+Use the same sample-by-covariate layout shown above, with `sample_id` first.
+The input is `deconvolution_covariates` in the integrated workflow and
+`covariates` in standalone deconvolution. Unlike QTL covariates, its sample
+rows must match **all expression BED sample columns in exactly the same
+order**, not only the `SampleList` subset. Values must be finite numeric
+values. Do not include an intercept or any constant covariate column.
+The workflow does not log-transform or encode these covariates.
+
+### Optional precomputed proportions
+
+Use `sample_id` first, followed by all 22 LM22 column names listed in
+[Precomputed LM22 schema](#precomputed-lm22-schema). Each row contains
+fractions summing to one, within `1e-6`. For example, 15% is stored as
+`0.15`, not `15`. Do not log-transform the values.
+
+Include every expression sample in the same order as its BED column.
+Do not supply only grouped CD4, CD8, or other major-lineage columns: the
+workflow requires the 22 subtypes and performs the grouping itself.
+
+### Raw-count GCT for the reusable eQTL workflow only
+
+```text
+#1.2
+2	3
+Name	Description	sample_1	sample_2	sample_3
+gene_A	ABCB4	10	70	30
+gene_B	EXAMPLE_LNC	80	20	50
+```
+
+The first two lines precede the table header; the second line gives the
+gene and sample counts. The table must contain `Name`, `Description`, and
+sample columns. Supply `AnnotationGTF` with matching gene IDs. This route
+derives a one-base TSS interval from the GTF strand. Do not pass this GCT
+to the deconvolution workflow's `expression` input.
+
 ## Public workflows
 
 Use
@@ -88,7 +335,7 @@ a value.
 | Input | Type | Default | Contract |
 | --- | --- | --- | --- |
 | `expression` | `File` | Required | Linear-CPM BED described below. |
-| `gtf` | `File` | Required | Gene annotation used to map gene IDs to symbols in hspe mode. The WDL requires it in both modes. |
+| `gtf` | `File` | Required | Gene annotation for gene-type filtering in both modes and gene-ID-to-symbol mapping in hspe mode. |
 | `lm22` | `File` | Required | LM22 reference matrix. The workflow requires it in both proportion modes. |
 | `precomputed_proportions` | `File?` | `None` | Optional sample-by-LM22 proportion matrix. If provided, the workflow skips hspe. |
 | `covariates` | `File?` | `None` | Optional TCA covariates with `sample_id` first. Samples must match the expression order. Values must be finite numeric values, with no intercept or constant column. |
@@ -130,11 +377,11 @@ a value.
 | Input | Type | Default | Contract |
 | --- | --- | --- | --- |
 | `expression` | `File` | Required | Linear-CPM BED described below. |
-| `gtf` | `File` | Required | Gene annotation used to map gene IDs to symbols in hspe mode. The WDL requires it in both modes. |
+| `gtf` | `File` | Required | Gene annotation for gene-type filtering in both modes and gene-ID-to-symbol mapping in hspe mode. |
 | `lm22` | `File` | Required | LM22 reference matrix. The workflow requires it in both proportion modes. |
 | `precomputed_proportions` | `File?` | `None` | Optional sample-by-LM22 proportion matrix. If provided, the workflow skips hspe. |
 | `deconvolution_covariates` | `File?` | `None` | Optional TCA covariates. This is the integrated alias of standalone `covariates`. |
-| `SampleList` | `File` | Required | Sample list passed to every scattered expression-QTL call. |
+| `SampleList` | `File` | Required | Headerless sample list passed to every scattered expression-QTL call. Does not subset HSPE or TCA. |
 | `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
 | `OutputPrefix` | `String` | Required | Basename-safe token. It must start with an ASCII letter or number. It can contain only letters, numbers, dots, underscores, and hyphens. Each scatter call adds the cell-type slug. |
 | `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for deconvolution and integration tasks. |
@@ -308,6 +555,37 @@ workflow fails. `zero_floor` replaces exact zero values only in retained
 proportions. It does not clamp other small positive values. The workflow then
 normalizes the TCA weights by sample.
 
+The default `group_mean_threshold = 0.0001` means **0.01%**, not 1%.
+It applies to each major group's mean fraction across the full expression
+cohort, not to individual samples. Genes missing from LM22 are not removed
+from TCA for that reason. HSPE alone uses the reference intersection; the
+default `min_lm22_overlap = 0.80` is the fraction of genes in the supplied
+LM22 reference that match the retained, symbol-mapped bulk matrix.
+
+| Major group | LM22 columns that are summed |
+| --- | --- |
+| B cells | B cells naive; B cells memory; Plasma cells |
+| CD4 T cells | T cells CD4 naive; T cells CD4 memory resting; T cells CD4 memory activated; T cells follicular helper; T cells regulatory (Tregs) |
+| CD8 T cells | T cells CD8 |
+| Gamma-delta T cells | T cells gamma delta |
+| NK cells | NK cells resting; NK cells activated |
+| Monocyte/myeloid | Monocytes; Macrophages M0; Macrophages M1; Macrophages M2 |
+| Neutrophils | Neutrophils |
+| Eosinophils | Eosinophils |
+| Dendritic cells | Dendritic cells resting; Dendritic cells activated |
+| Mast cells | Mast cells resting; Mast cells activated |
+
+These are the pipeline's group definitions. The labels, particularly
+Monocyte/myeloid, describe combined signatures rather than a measured count
+of a single sorted population.
+
+## Terra input examples
+
+Replace `gs://bucket/...` with accessible files in your workspace storage.
+The examples use `log2_pseudocount = 0.0`, so the retained bulk matrix must
+have no zeros when HSPE runs. Set this parameter to a positive value if
+needed. Do not add that pseudocount to the BED beforehand.
+
 This example runs the standalone workflow with hspe:
 
 ```json
@@ -360,6 +638,81 @@ To use precomputed proportions in the integrated workflow, keep the required
 merges it with the selected phenotype PCs for each output branch.
 `deconvolution_covariates` is optional and has a different role in the TCA
 model.
+
+To run only eQTL preparation on an existing **linear CPM BED**, use this
+input object with `workflows/expression/prepare_eQTL.wdl`:
+
+```json
+{
+  "eQTLPrepareData.CpmBed": "gs://bucket/cd4_t_cells.bed.gz",
+  "eQTLPrepareData.SampleList": "gs://bucket/samples.txt",
+  "eQTLPrepareData.AdditionalCovariates": "gs://bucket/covariates.tsv",
+  "eQTLPrepareData.OutputPrefix": "cohort.cd4_t_cells",
+  "eQTLPrepareData.memory": 64,
+  "eQTLPrepareData.disk_space": 200,
+  "eQTLPrepareData.num_threads": 8
+}
+```
+
+For an already-log2 BED, replace the `CpmBed` entry with `Log2CpmBed`.
+Do not provide both. For counts, provide `CountGCT` and `AnnotationGTF`
+instead of either BED input. `AdditionalCovariates` is optional only in this
+single-matrix workflow. The integrated workflow requires it.
+
+Use the WDL and images from a matching release. The integrated workflow's
+`qtl_docker_image` must contain the `CpmBed` implementation added in
+[PR #34](https://github.com/AoU-Multiomics-Analysis/prepare_QTL/pull/34).
+It uses `deconvolution_docker_image` for HSPE/TCA and `qtl_docker_image` for
+eQTL preparation. A mutable `:main` tag can change; record the resolved
+image digest and workflow revision for each run.
+
+Memory input types differ. For example, `fit_memory` and `export_memory`
+are strings such as `"256 GB"`. `eqtl_memory` is an integer such as `64`;
+the expression task adds the GB unit. `tca_parallel = false` remains the
+default even when multiple CPUs are allocated. Global `max_retries` does
+not by itself request more memory on a retry.
+
+Before a Terra submission, check:
+
+1. The expression scale matches the selected workflow input.
+2. BED and GTF gene IDs use matching identifiers and version suffixes.
+3. Proportions and TCA covariates match all BED samples in the correct order.
+4. QTL covariates cover every sample selected in `SampleList`.
+5. The HSPE pseudocount is suitable for zeros in the retained bulk matrix.
+6. The workflow revision and both image versions are recorded.
+
+## Which output should I use?
+
+| Output | Contents or scale | Use |
+| --- | --- | --- |
+| `cell_type_beds` | One gene-by-sample BED per retained cell type; estimated linear CPM. | Compare cell-type expression profiles. Keep the matching gene IDs, sample IDs, and inventory. |
+| `cell_type_gene_summary` | Per-cell-type, per-gene CPM summaries across all exported samples. | Compare mean or median expression profiles; inspect variability. See the standard-error limitations below. |
+| `estimated_proportions` | HSPE's sample-by-22-cell-type fractions; absent when precomputed proportions are used. | Inspect the proportion estimates before grouping. |
+| `proportions_lm22`, `proportions_combined`, `tca_weights` | Original 22-type fractions, summed major groups, and filtered/renormalized model weights. | Inspect the changes made before TCA. These are not expression matrices. |
+| `int_beds` | Dimensionless inverse-normal-transformed phenotypes after outlier removal. | Run QTL analysis with matching INT PCs, covariates, and sample IDs. |
+| `scaled_beds` | Dimensionless standardized log2(CPM + 1) phenotypes after outlier removal. | Run QTL analysis with matching scaled PCs, covariates, and sample IDs. |
+| `int_phenotype_pcs`, `scaled_phenotype_pcs` | Selected phenotype PC scores for the corresponding branch. | Inspect PCs and use the matching merged covariates. The `_all` outputs contain the full PC sets. |
+| `int_merged_covariates`, `scaled_merged_covariates` | Supplied QTL covariates plus selected phenotype PCs; covariates in rows. | Adjust QTL association models. Align samples by ID. |
+| `int_connectivity_outliers`, `scaled_connectivity_outliers` | Removed `SampleID` values and connectivity `Z_score`. | Check why sample sets differ across cell types or branches. |
+| `cell_type_qtl_manifest` | One row per cell type, with filenames for the ten QTL output categories. | Find each cell type's matched outputs. Use the public file arrays for cloud paths. |
+
+Do not interpret INT values, scaled values, PCs, or proportions as CPM or
+TPM. For external expression comparisons, start with `cell_type_beds` or
+`cell_type_gene_summary`, not the transformed QTL BEDs. These outputs are
+model estimates, not directly measured sorted-cell expression. Match gene
+identifiers, cell-group definitions, and expression units before comparing
+datasets. This pipeline does not calculate TPM or convert CPM to TPM.
+
+The integrated workflow does not publish the nested eQTL `.raw` BEDs as
+top-level outputs. Use its original TCA `cell_type_beds` for the untransformed
+cell-type profiles. A separate run of `eQTLPrepareData` exposes `RawBedFile`;
+that file has already been subset to its `SampleList`.
+
+For troubleshooting, retain `gene_type_filter_report`, `cell_group_filter_report`,
+`tca_excluded_genes`, HSPE overlap/marker diagnostics, reconstruction results,
+QC plots, and task logs. TCA can export negative estimates; the summary keeps
+them, but `CpmBed` rejects them before QTL preparation. A successful TCA export
+does not therefore guarantee that every downstream cell-type QTL call passes.
 
 ## Per-gene CPM summaries
 
@@ -464,14 +817,27 @@ submission requires user approval.
 
 ## Branch integration and repository ownership
 
-Merge `feat/log2-cpm-bed-input` first. Merge
-`codex/cell-type-specific-expression` after that branch reaches `main`. The
-cell-type branch depends on the pre-normalized expression interface.
+The maintained workflows are now in `prepare_QTL` on `main`. New users do
+not need to merge the old development branches.
 
-The old CellTypeDeconvolution repository is deprecated only after these
-canonical workflows reach `prepare_QTL` on `main`. Do not delete the old
-repository. Add its deprecation notice only after this integration is on
-`main`.
+The expression-scale changes have this history:
+
+- [Commit 9edfbdb, June 25, 2026](https://github.com/AoU-Multiomics-Analysis/prepare_QTL/commit/9edfbdb43a8ad7c63f216b4224df0153639d8ad0)
+  added `log2(CPM + 1)` before scaling in the count-input route. Immediately
+  before that change, the scaled branch used linear CPM, not `log2(CPM)`.
+- [Commit f8552c6, September 2, 2026](https://github.com/AoU-Multiomics-Analysis/prepare_QTL/commit/f8552c6e7709ea02d4ae0acc02d5729e8af0084c)
+  added `Log2CpmBed` and skipped the log transform for that input.
+- [PR #34](https://github.com/AoU-Multiomics-Analysis/prepare_QTL/pull/34)
+  added `CpmBed` and routed linear TCA output through it. This corrected the
+  earlier connection to `Log2CpmBed`, which had scaled TCA CPM directly.
+  It did not change TCA fitting or export.
+
+Historical integration order: `feat/log2-cpm-bed-input` first, then
+`codex/cell-type-specific-expression` after the expression interface was
+available. The old CellTypeDeconvolution repository was to be deprecated
+only after the canonical workflows reached `prepare_QTL` on `main`.
+Do not delete the old repository. Use `prepare_QTL` for current development;
+the historical plan files are not current operator instructions.
 
 ## QTL manifest
 
@@ -483,7 +849,7 @@ retained cell type and these exact columns:
 | `cell_type` | Cell-type display name. |
 | `cell_type_slug` | Stable identifier used in filenames. |
 | `int_bed` | Rank-based inverse-normal-transformed expression BED. |
-| `scaled_bed` | Centered and scaled expression BED. |
+| `scaled_bed` | Expression BED after log2(CPM + 1), centering, scaling, and connectivity-outlier removal. |
 | `int_phenotype_pcs` | Selected INT phenotype PCs. |
 | `int_phenotype_pcs_all` | Complete INT phenotype PCs. |
 | `scaled_phenotype_pcs` | Selected scaled phenotype PCs. |
