@@ -9,7 +9,7 @@ All scripts are written in R and are invoked from the command line with `Rscript
 [`PrepareExpression.R`](../scripts/expression/PrepareExpression.R), [`PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R), and [`PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) each write three BED files:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
-- `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`. Raw-count expression mode transforms CPMs with `log2(CPM + 1)` first. Pre-normalized log2-CPM expression, proteomics, and splicing values are scaled directly.
+- `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`. Raw-count and linear-CPM BED expression modes transform CPMs with `log2(CPM + 1)` first. Pre-normalized log2-CPM expression, proteomics, and splicing values are scaled directly.
 - `.raw`: Untransformed phenotype values after sample/feature filtering and BED formatting.
 
 For each `.INT` and `.scaled` matrix, the scripts compute WGCNA sample connectivity outliers from the feature-by-sample matrix before writing the BED. Raw BEDs keep all samples after the initial sample-list filter.
@@ -35,19 +35,24 @@ Prepares an existing merged methylation BED. It accepts a headerless one-column 
 Prepares RNA-seq gene expression data for eQTL analysis.
 
 **What it does:**
-1. Loads either raw count data from a GCT-formatted file or a coordinate-preserving BED of pre-normalized log2 CPM values.
+1. Loads either raw count data from a GCT-formatted file or a coordinate-preserving BED of pre-normalized CPM or log2 CPM values.
 2. In raw-count mode, extracts TSS positions from a GENCODE GTF, filters genes, and applies edgeR TMM and CPM normalization.
 3. Filters and orders samples using the supplied sample list.
-4. Creates rank-based inverse normal transformed, centered/scaled, and untransformed matrices. Raw-count mode applies `log2(CPM + 1)` before scaling. Log2-CPM BED mode scales the supplied values directly.
+4. Creates rank-based inverse normal transformed, centered/scaled, and untransformed matrices. Raw-count and CPM BED modes apply `log2(CPM + 1)` before scaling. Log2-CPM BED mode scales the supplied values directly.
 5. Removes connectivity outliers from the transformed matrices and writes compressed BED files.
 
 **Inputs:**
 - Exactly one expression mode:
   - `--CountGCT`: GCT or TSV file of raw RNA-seq count data. This mode also requires `--AnnotationGTF` to extract TSS locations.
+  - `--CpmBed`: BED with the same coordinate and sample columns as `--Log2CpmBed`, but containing finite, nonnegative linear CPM values. It skips count filtering, TMM, CPM calculation, and GTF mapping. Only the scaled output applies `log2(CPM + 1)`. Negative values stop preparation with example gene IDs; they are not clipped.
   - `--Log2CpmBed`: BED with `#chr`, `start`, `end`, `gene_id`, and sample columns containing pre-normalized log2 CPM values. This mode preserves the supplied coordinates and does not apply count filtering, TMM, CPM calculation, GTF mapping, or another log transform.
 - `--SampleList`: File containing the list of sample IDs to include.
 - `--OutputPrefix`: Prefix for the output file.
 - `--RankNormalize`: Deprecated compatibility option. Both `.INT` and `.scaled` outputs are always written.
+
+Supply exactly one expression input. Neither BED mode accepts `--AnnotationGTF`.
+The raw BED preserves the input BED values. Both BED modes reject non-finite
+values and zero-variance genes before writing expression outputs.
 
 **Outputs:**
 - `<OutputPrefix>.expression.INT.bed.gz`

@@ -1,4 +1,4 @@
-testthat::test_that("the eQTL workflow declares optional raw-count and log2 CPM inputs", {
+testthat::test_that("the eQTL workflow declares optional raw-count, CPM, and log2 CPM inputs", {
     miniwdl <- Sys.which("miniwdl")
     testthat::skip_if(!nzchar(miniwdl), "miniwdl is not installed")
     workflow <- testthat::test_path(
@@ -25,6 +25,7 @@ testthat::test_that("the eQTL workflow declares optional raw-count and log2 CPM 
 
     template <- jsonlite::read_json(template_path, simplifyVector = TRUE)
     testthat::expect_identical(template[["Log2CpmBed"]], "File?")
+    testthat::expect_identical(template[["CpmBed"]], "File?")
     testthat::expect_identical(template[["CountGCT"]], "File?")
     testthat::expect_identical(template[["AnnotationGTF"]], "File?")
 })

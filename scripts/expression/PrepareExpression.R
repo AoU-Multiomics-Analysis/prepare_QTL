@@ -89,6 +89,8 @@ remove_connectivity_outliers <- function(phenotype_matrix, output_file, transfor
 option_list <- list(
     optparse::make_option(c("--CountGCT"), type="character", default=NULL,
                         help="Parquet or TSV of normalzied protein expression data", metavar = "type"),
+    optparse::make_option(c("--CpmBed"), type="character", default=NULL,
+                        help="Coordinate-preserving BED of pre-normalized linear CPM values", metavar = "type"),
     optparse::make_option(c("--Log2CpmBed"), type="character", default=NULL,
                         help="Coordinate-preserving BED of pre-normalized log2 CPM values", metavar = "type"),
     optparse::make_option(c("--OutputPrefix"), type="character", default=NULL,
@@ -105,16 +107,18 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 
 
 has_count_gct <- !is.null(opt$CountGCT) && nzchar(opt$CountGCT)
+has_cpm_bed <- !is.null(opt$CpmBed) && nzchar(opt$CpmBed)
 has_log2_cpm_bed <- !is.null(opt$Log2CpmBed) && nzchar(opt$Log2CpmBed)
 
-if (has_count_gct == has_log2_cpm_bed) {
-    stop('Provide exactly one of --CountGCT or --Log2CpmBed')
+if (sum(c(has_count_gct, has_cpm_bed, has_log2_cpm_bed)) != 1L) {
+    stop('Provide exactly one of --CountGCT, --CpmBed, or --Log2CpmBed')
 }
 if (has_count_gct && (is.null(opt$AnnotationGTF) || !nzchar(opt$AnnotationGTF))) {
     stop('--AnnotationGTF is required with --CountGCT')
 }
-if (has_log2_cpm_bed && !is.null(opt$AnnotationGTF) && nzchar(opt$AnnotationGTF)) {
-    stop('--AnnotationGTF cannot be used with --Log2CpmBed')
+if (!has_count_gct && !is.null(opt$AnnotationGTF) && nzchar(opt$AnnotationGTF)) {
+    bed_option <- if (has_cpm_bed) '--CpmBed' else '--Log2CpmBed'
+    stop(paste('--AnnotationGTF cannot be used with', bed_option))
 }
 
 
@@ -171,31 +175,40 @@ if (has_count_gct) {
     message('Computing CPMs')
     DataCPM <- edgeR::cpm(DataEdgeR, log = FALSE) %>% data.frame(check.names = FALSE)
 } else {
-    message('Loading pre-normalized log2 CPM BED')
-    Log2CpmBed <- fread(
-        opt$Log2CpmBed,
+    bed_label <- if (has_cpm_bed) 'CPM BED' else 'Log2 CPM BED'
+    message(paste('Loading pre-normalized', bed_label))
+    ExpressionBed <- fread(
+        if (has_cpm_bed) opt$CpmBed else opt$Log2CpmBed,
         header = TRUE,
         check.names = FALSE,
         colClasses = list(character = c('#chr', 'gene_id'))
     )
     metadata_columns <- c('#chr', 'start', 'end', 'gene_id')
-    if (!identical(names(Log2CpmBed)[seq_along(metadata_columns)], metadata_columns)) {
-        stop('Log2 CPM BED must start with #chr, start, end, and gene_id columns')
+    if (!identical(names(ExpressionBed)[seq_along(metadata_columns)], metadata_columns)) {
+        stop(paste(bed_label, 'must start with #chr, start, end, and gene_id columns'))
     }
-    if (anyDuplicated(Log2CpmBed$gene_id)) {
-        stop('Log2 CPM BED gene_id values must be unique')
+    if (anyDuplicated(ExpressionBed$gene_id)) {
+        stop(paste(bed_label, 'gene_id values must be unique'))
     }
-    missing_samples <- setdiff(SampleList, names(Log2CpmBed))
+    missing_samples <- setdiff(SampleList, names(ExpressionBed))
     if (length(missing_samples) > 0) {
-        stop(paste0('Samples missing from log2 CPM BED: ', paste(missing_samples, collapse = ', ')))
+        stop(paste0('Samples missing from ', bed_label, ': ', paste(missing_samples, collapse = ', ')))
     }
 
-    DataCPM <- Log2CpmBed %>%
+    DataCPM <- ExpressionBed %>%
         dplyr::select(gene_id, all_of(SampleList)) %>%
         column_to_rownames('gene_id') %>%
         data.frame(check.names = FALSE)
     if (!all(vapply(DataCPM, is.numeric, logical(1))) || any(!is.finite(as.matrix(DataCPM)))) {
-        stop('Log2 CPM BED sample values must be finite numeric values')
+        stop(paste(bed_label, 'sample values must be finite numeric values'))
+    }
+    if (has_cpm_bed && any(as.matrix(DataCPM) < 0)) {
+        negative_genes <- rownames(DataCPM)[rowSums(as.matrix(DataCPM) < 0) > 0]
+        stop(paste0(
+            'CPM BED contains negative values; linear CPM must be nonnegative. ',
+            'Values were not clipped. Example gene IDs: ',
+            paste(head(negative_genes, 10), collapse = ', ')
+        ))
     }
     zero_variance_genes <- DataCPM %>%
         rownames_to_column('gene_id') %>%
@@ -207,12 +220,12 @@ if (has_count_gct) {
     if (length(zero_variance_genes) > 0) {
         displayed_genes <- head(zero_variance_genes, 10)
         stop(paste0(
-            'Log2 CPM BED contains genes with zero variance: ',
+            bed_label, ' contains genes with zero variance: ',
             paste(displayed_genes, collapse = ', ')
         ))
     }
 
-    PositionTSS <- Log2CpmBed %>%
+    PositionTSS <- ExpressionBed %>%
         dplyr::select(all_of(metadata_columns)) %>%
         dplyr::rename(seqnames = '#chr') %>%
         dplyr::mutate(.input_order = dplyr::row_number())
@@ -278,5 +291,5 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
 }
 
 write_expression_bed(DataCPM, PositionTSS, IntOutputFile, 'rank-normalized', TRUE)
-write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = has_count_gct)
+write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = !has_log2_cpm_bed)
 write_expression_bed(DataCPM, PositionTSS, RawOutputFile, 'raw', remove_outliers = FALSE)

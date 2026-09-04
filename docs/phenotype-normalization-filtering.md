@@ -47,6 +47,18 @@ Expression preparation is implemented in [`scripts/expression/PrepareExpression.
 
 As an alternative, `Log2CpmBed` accepts a BED with leading columns `#chr`, `start`, `end`, and `gene_id`, followed by sample columns in log2-CPM space. This mode preserves the supplied coordinates and gene order. It skips count filtering, TMM normalization, CPM calculation, GTF mapping, and the `log2(CPM + 1)` transform. The workflow rank-normalizes these values for `.INT`, centers and scales them directly for `.scaled`, and writes the supplied log2-CPM values to `.raw`.
 
+`CpmBed` accepts the same BED layout with linear CPM values. It skips count
+filtering, TMM normalization, CPM calculation, and GTF mapping. It applies
+`log2(CPM + 1)` only before centering and scaling for `.scaled`. The `.INT`
+branch rank-normalizes the supplied CPM values, and `.raw` preserves them.
+Both transformed branches keep their existing connectivity-outlier checks.
+
+Supply exactly one of `CountGCT`, `CpmBed`, or `Log2CpmBed`. A GTF is required
+only for counts and is rejected for either BED input. `CpmBed` requires finite,
+nonnegative values; negative estimates stop preparation with example gene IDs.
+No values are silently clipped. Finite negative log2-CPM values remain valid
+in `Log2CpmBed`. Neither BED mode accepts zero-variance genes.
+
 ## Proteomics
 
 Proteomics has an optional Olink preprocessing workflow in [`scripts/proteomics/NormalizeProteomics.R`](../scripts/proteomics/NormalizeProteomics.R), followed by pQTL BED preparation in [`scripts/proteomics/PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R) and [`workflows/proteomics/prepare_pQTL.wdl`](../workflows/proteomics/prepare_pQTL.wdl).

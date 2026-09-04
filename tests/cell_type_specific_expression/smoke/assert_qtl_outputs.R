@@ -230,6 +230,36 @@ purrr::walk2(int_bed_tables, scaled_bed_tables, function(int_bed, scaled_bed) {
   )
 })
 
+# Compare the final QTL values with the exported linear-CPM matrices. Compute
+# scaling on all selected samples first, then select the non-outlier samples.
+# This catches a pipeline that passes CPM through Log2CpmBed and skips the log.
+tca_paths <- output_value("cell_type_beds")
+purrr::walk(seq_len(nrow(manifest)), function(index) {
+  tca_path <- tca_paths[basename(tca_paths) == paste0(manifest$cell_type_slug[[index]], ".bed.gz")]
+  require_true(length(tca_path) == 1L, "Each QTL cell type must match one exported TCA BED")
+  tca_bed <- read_qtl_bed(tca_path, "TCA CPM")
+  scaled_bed <- scaled_bed_tables[[index]]
+  require_true(identical(tca_bed$gene_id, scaled_bed$gene_id),
+               "The QTL scaled BED changed the TCA gene order")
+  cpm <- tca_bed |>
+    dplyr::select(dplyr::all_of(expected_samples)) |>
+    as.matrix()
+  require_true(all(cpm >= 0), "CPM inputs must not contain negative TCA estimates")
+  logged <- log2(cpm + 1)
+  centered <- sweep(logged, 1L, rowMeans(logged), "-")
+  deviations <- sqrt(rowSums(centered^2) / (ncol(centered) - 1L))
+  expected <- sweep(centered, 1L, deviations, "/")
+  kept_samples <- names(scaled_bed)[-(1:4)]
+  observed <- scaled_bed |>
+    dplyr::select(dplyr::all_of(kept_samples)) |>
+    as.matrix()
+  require_true(
+    isTRUE(all.equal(unname(observed), unname(expected[, kept_samples, drop = FALSE]),
+                     tolerance = 1e-7)),
+    "The QTL scaled BED must use log2(CPM + 1) before centering and scaling"
+  )
+})
+
 read_pc_table <- function(path, expected_bed, label) {
   table <- readr::read_tsv(
     path,
