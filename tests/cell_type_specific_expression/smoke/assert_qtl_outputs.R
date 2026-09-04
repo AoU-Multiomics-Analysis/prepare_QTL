@@ -52,7 +52,7 @@ expected_samples <- readLines(
   warn = FALSE
 )
 manifest_columns <- c(
-  "cell_type", "cell_type_slug", "int_bed", "scaled_bed",
+  "entity:cell_type_id", "cell_type", "cell_type_slug", "int_bed", "scaled_bed",
   "int_phenotype_pcs", "int_phenotype_pcs_all",
   "scaled_phenotype_pcs", "scaled_phenotype_pcs_all",
   "int_merged_covariates", "scaled_merged_covariates",
@@ -67,7 +67,7 @@ manifest <- readr::read_tsv(
 )
 require_true(
   identical(names(manifest), manifest_columns),
-  "The QTL manifest must have the exact 12-column schema"
+  "The QTL manifest must have the exact 13-column schema"
 )
 require_true(
   identical(manifest$cell_type, expected_groups),
@@ -90,13 +90,16 @@ require_true(
     anyDuplicated(manifest$cell_type_slug) == 0L,
   "The QTL manifest slugs must be safe and unique"
 )
-file_columns <- manifest_columns[-c(1L, 2L)]
+require_true(
+  identical(manifest[["entity:cell_type_id"]], manifest$cell_type_slug),
+  "The Terra entity IDs must match the ordered cell-type slugs"
+)
+file_columns <- manifest_columns[-c(1L, 2L, 3L)]
 file_values <- unlist(manifest[file_columns], use.names = FALSE)
 require_true(
   all(nzchar(file_values)) &&
-    all(basename(file_values) == file_values) &&
-    !any(grepl("[/\\\\]", file_values)),
-  "The QTL manifest file fields must contain stable basenames"
+    all(grepl("^(/|gs://[^/]+/)", file_values)),
+  "The QTL manifest file fields must contain full paths"
 )
 require_true(
   !any(grepl("residual", names(manifest), ignore.case = TRUE)),
@@ -122,7 +125,10 @@ authoritative_paths <- purrr::imap(array_outputs, function(output_name, column_n
     sprintf("The %s authoritative array has an incorrect length", output_name)
   )
   require_true(
-    identical(basename(paths), manifest[[column_name]]),
+    identical(
+      normalizePath(paths, mustWork = TRUE),
+      normalizePath(manifest[[column_name]], mustWork = TRUE)
+    ),
     sprintf("The %s authoritative array does not match the manifest", output_name)
   )
   require_true(
@@ -172,7 +178,7 @@ expected_manifest_files <- list(
 )
 purrr::iwalk(expected_manifest_files, function(expected_files, column_name) {
   require_true(
-    identical(manifest[[column_name]], expected_files),
+    identical(basename(manifest[[column_name]]), expected_files),
     sprintf("The %s manifest basenames do not match the output contract", column_name)
   )
 })

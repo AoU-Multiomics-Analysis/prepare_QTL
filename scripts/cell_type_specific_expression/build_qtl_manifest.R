@@ -71,7 +71,9 @@ run_qtl_manifest_stage <- function() {
   }
 
   input_option_names <- setdiff(required_options, "output")
-  inputs <- purrr::map(options[input_option_names], readLines, warn = FALSE)
+  # Each CLI input is a JSON array serialized inside the WDL task. Keep paths
+  # as metadata; never open the upstream cloud files from this script.
+  inputs <- purrr::map(options[input_option_names], jsonlite::read_json, simplifyVector = TRUE)
   message(sprintf(
     "stage=build_qtl_manifest start_time=%s",
     tensor_utc_time()

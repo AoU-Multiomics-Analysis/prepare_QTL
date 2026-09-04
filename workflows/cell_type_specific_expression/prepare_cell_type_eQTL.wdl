@@ -132,6 +132,8 @@ workflow PrepareCellTypeEqtlWorkflow {
     File scaled_merged_covariate = select_first([PrepareCellTypeEqtl.ScaledQtlCovariates])
   }
 
+  # The manifest consumes only paths. Its Array[String] inputs preserve the
+  # completed calls' cloud URLs; public outputs below remain Array[File].
   call integration.BuildQtlManifest as BuildQtlManifest {
     input:
       cell_types = PrepareScatterInputs.cell_types,
