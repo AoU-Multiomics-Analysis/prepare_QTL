@@ -424,6 +424,27 @@ preparation tasks. The export stage also writes each BED SHA-256 checksum to
 the inventory while the file is local. The manifest task uses these recorded
 checksums and does not localize the large BED files onto a second worker.
 
+## Terra file handling and validation
+
+Optional HSPE metadata and TCA covariates remain `File?` values until command
+rendering. Do not convert them to WDL `String` declarations: a string can
+retain a `gs://` URI after Cromwell localizes the file. The command uses the
+localized optional file directly, escapes apostrophes for the shell, and
+omits the corresponding argument when the file is absent. The manifest task
+checks that supplied HSPE metadata is readable before starting R.
+
+Files must be created in task scope, not workflow scope. The static check
+`python scripts/check_wdl_file_scope.py workflows` inspects all local WDL
+sources. It rejects file-writing functions in workflow input defaults,
+declarations, call inputs, outputs, scatters, and conditionals. Task-level
+file creation is permitted. GitHub Actions runs this check and tests that
+model file localization before command rendering, with optional files both
+present and absent.
+
+These local and CI checks do not execute Terra-managed Cromwell. The complete
+workflow with this localization fix has not been tested on Terra. A Terra
+submission requires user approval.
+
 ## Branch integration and repository ownership
 
 Merge `feat/log2-cpm-bed-input` first. Merge

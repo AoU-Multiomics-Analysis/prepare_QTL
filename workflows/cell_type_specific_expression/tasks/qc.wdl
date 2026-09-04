@@ -35,8 +35,6 @@ task BuildManifest {
     Int max_retries = 2
   }
 
-  String hspe_metadata_path = if defined(hspe_metadata) then select_first([hspe_metadata]) else ""
-
   command <<<
     set -euo pipefail
     stage="build_manifest"
@@ -45,9 +43,14 @@ task BuildManifest {
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     public_inventory=outputs/output_inventory.tsv
-    hspe_metadata_path="~{hspe_metadata_path}"
+    # Convert the File only here, after localization, and escape shell apostrophes.
+    hspe_metadata_path='~{if defined(hspe_metadata) then sub(select_first([hspe_metadata]), "'", "'\"'\"'") else ""}'
     hspe_metadata_arguments=()
     if [[ -n "$hspe_metadata_path" ]]; then
+      if [[ ! -r "$hspe_metadata_path" ]]; then
+        printf 'stage=%s error=hspe_metadata_not_readable\n' "$stage" >&2
+        exit 1
+      fi
       hspe_metadata_arguments=(--hspe-metadata "$hspe_metadata_path")
     fi
     mkdir -p outputs
