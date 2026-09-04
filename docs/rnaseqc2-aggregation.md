@@ -60,6 +60,14 @@ Import `rnaseqc2_aggregate_batched.wdl` into Terra. Set `batch_disk_space_gb` fo
 
 The output `prefix` must start with a letter or number. It can also contain periods, underscores, and hyphens.
 
+The validation task creates the prefix file and checks its contents. It returns
+that file to the batch and final-merge tasks. Do not move `write_lines([prefix])`
+to workflow scope. Terra can reject the relative temporary path before a task
+starts. Cromwell uses separate [engine and backend filesystem settings](https://cromwell.readthedocs.io/en/latest/filesystems/Filesystems/).
+Keep file-writing functions in task scope, including writes for call inputs.
+The regression test checks workflow expressions, including scatters and
+conditionals. Local WDL checks do not prove that a workflow will run on Terra.
+
 The workflow uses `ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation`.
 The default `docker_image` is pinned to the tested image's SHA-256 digest.
 Updating the registry's `main` tag does not change this workflow version.
@@ -115,8 +123,10 @@ the repository. They also check compiled checksum support and local file
 copying with `gsutil`. A credential-selection check replaces only the metadata
 server call and verifies that `gsutil` creates VM service-account credentials.
 Real WDL validation and final-merge tasks run with
-synthetic files, with and without insert-size tables. These checks do not
-access private buckets or submit jobs to Terra.
+synthetic files, with and without insert-size tables. The final-merge test uses
+the prefix file returned by validation. A whole-workflow check supplies an unsafe
+prefix. It must fail in the validation task without executing the prefix as shell
+code. These checks do not access private buckets or submit jobs to Terra.
 
 Only a trusted branch push publishes the tested image to GHCR, with a
 `sha-<full-commit>` tag. A push to `main` also updates the `main` tag.
