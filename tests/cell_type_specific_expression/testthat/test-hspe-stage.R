@@ -318,11 +318,13 @@ testthat::test_that("hspe returns normalized proportions and nonempty markers", 
 testthat::test_that("the hspe CLI writes its five declared outputs", {
   testthat::skip_if_not_installed("hspe")
   lm22 <- make_synthetic_lm22()
-  expression_cpm <- matrix(
-    5,
-    nrow = nrow(lm22),
-    ncol = 1,
-    dimnames = list(rownames(lm22), "S1")
+  # A flat profile can give HSPE a zero initial loss (and optimizer scale).
+  # Use a deterministic, unequal mixture for this output-writing test.
+  weights <- seq_len(ncol(lm22))
+  weights <- weights / sum(weights)
+  expression_cpm <- lm22 %*% matrix(
+    weights, ncol = 1,
+    dimnames = list(colnames(lm22), "S1")
   )
   lm22_path <- tempfile(fileext = ".tsv")
   expression_path <- tempfile(fileext = ".bed")
@@ -367,6 +369,13 @@ testthat::test_that("the hspe CLI writes its five declared outputs", {
     "hspe_overlap.tsv", "hspe_lm22_log.tsv.gz"
   )))))
   testthat::expect_false(file.exists(file.path(output_dir, "hspe_shared_bulk.tsv.gz")))
+  proportions <- read_numeric_matrix(
+    file.path(output_dir, "hspe_proportions.tsv"), "sample_id"
+  )
+  testthat::expect_identical(rownames(proportions), "S1")
+  testthat::expect_identical(colnames(proportions), lm22_cell_types())
+  testthat::expect_true(all(is.finite(proportions) & proportions >= 0))
+  testthat::expect_equal(unname(rowSums(proportions)), 1, tolerance = 1e-8)
   metadata <- jsonlite::read_json(file.path(output_dir, "hspe_metadata.json"))
   testthat::expect_equal(metadata$random_seed, 123)
   testthat::expect_identical(metadata$hspe_version, "0.1")
