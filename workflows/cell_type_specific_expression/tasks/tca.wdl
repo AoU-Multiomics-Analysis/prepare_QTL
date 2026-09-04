@@ -16,7 +16,6 @@ task FitTca {
     Int max_retries = 1
   }
 
-  String covariates_path = if defined(covariates) then select_first([covariates]) else ""
   String parallel_argument = if parallel then "--parallel" else ""
 
   command <<<
@@ -26,7 +25,8 @@ task FitTca {
     status=0
     printf 'stage=%s start_time=%s dimensions=pending\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    covariates_path="~{covariates_path}"
+    # Convert the File only here, after localization, and escape shell apostrophes.
+    covariates_path='~{if defined(covariates) then sub(select_first([covariates]), "'", "'\"'\"'") else ""}'
     covariates_arguments=()
     if [[ -n "$covariates_path" ]]; then
       covariates_arguments=(--covariates "$covariates_path")
@@ -77,7 +77,6 @@ task ExportTcaBeds {
     Int max_retries = 1
   }
 
-  String covariates_path = if defined(covariates) then select_first([covariates]) else ""
   String parallel_argument = if parallel then "--parallel" else ""
 
   command <<<
@@ -87,7 +86,8 @@ task ExportTcaBeds {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    covariates_path="~{covariates_path}"
+    # Convert the File only here, after localization, and escape shell apostrophes.
+    covariates_path='~{if defined(covariates) then sub(select_first([covariates]), "'", "'\"'\"'") else ""}'
     covariates_arguments=()
     if [[ -n "$covariates_path" ]]; then
       covariates_arguments=(--covariates "$covariates_path")
