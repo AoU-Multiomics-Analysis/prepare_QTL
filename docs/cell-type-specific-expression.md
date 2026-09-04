@@ -51,7 +51,7 @@ to TCA.
 Gene-ID BED: linear CPM
   → GTF gene-type filter → filtered_expression: linear CPM
       ├─ HSPE: gene symbols → log2(CPM + p) → LM22 marker batches → proportions
-      └─ TCA: linear CPM + grouped proportions → cell-type BEDs: linear CPM
+      └─ TCA: linear CPM + grouped proportions → fit → model cleanup → cell-type BEDs: linear CPM
                                                   ├─ CPM gene summaries
                                                   └─ CpmBed → eQTL preparation
                                                        ├─ ranks → INT BED
@@ -67,7 +67,7 @@ The HSPE branch is skipped when `precomputed_proportions` is supplied.
 | HSPE bulk input | Linear CPM | Sums gene IDs that map to the same symbol, then applies `log2(CPM + p)`. Uses shared LM22 genes and selected markers. | Log2 expression used internally |
 | HSPE reference input | Original linear LM22 values | Applies `log2(LM22 + p)` internally. LM22 is a signature matrix, not this cohort's CPM matrix. | Log2 reference values used internally |
 | HSPE estimates or supplied proportions | Fractions | Combines LM22 subtypes, filters major groups, floors exact zeros in retained groups, and normalizes each sample's weights to sum to one. | Fractions |
-| TCA fitting and export | Linear CPM and grouped fractions | Removes constant input genes and fits the cohort model. Does not apply the HSPE log transform. | Estimated cell-type expression on the linear-CPM model scale |
+| TCA fitting and export | Linear CPM and grouped fractions | Removes constant input genes, fits the cohort model, and excludes numerically singular genes before extraction. Does not apply the HSPE log transform. | Estimated cell-type expression on the linear-CPM model scale |
 | Gene summary | Exported TCA CPM | Computes mean, median, SD, standard error of the mean, quartiles, and IQR. | CPM units, except identifiers and sample counts |
 | eQTL INT branch | Supplied expression values | Applies rank-based inverse normal transformation per gene across selected samples. | Dimensionless INT values |
 | eQTL scaled branch from `CpmBed` | Linear CPM | Applies `log2(CPM + 1)`, then centers and scales each gene across selected samples. | Dimensionless standardized values |
@@ -459,8 +459,8 @@ retained genes.
 
 The workflow uses the GTF to map retained gene IDs to gene symbols for the LM22
 intersection. It removes constant genes before TCA. For each modeled,
-nonconstant gene, the exported cell-type BED preserves the input coordinate and
-modeled-gene order.
+nonconstant gene retained after post-fit numerical cleanup, the exported
+cell-type BED preserves the input coordinate and modeled-gene order.
 
 `log2_pseudocount` defaults to `0` and applies only to hspe. In hspe
 mode, zero bulk CPM requires a positive pseudocount. Negative CPM values are
@@ -474,8 +474,9 @@ TCA uses valid, nonconstant gene-ID rows directly in linear CPM. Each exported
 cell-type BED is on the linear-CPM model scale. The workflow does not store a
 full transformed bulk-expression matrix. Marker-only batches are temporary
 HSPE task files. The export task rebuilds the
-linear TCA view from `filtered_expression` and removes the same constant genes
-before tensor extraction.
+linear TCA view from `filtered_expression`, removes the same constant genes,
+and applies the cleaned model's recorded numerical exclusions before tensor
+extraction. See [post-fit cleanup](#post-fit-numerical-cleanup).
 
 The integrated workflow sends each linear-scale TCA BED to the `CpmBed` input
 of `prepare_eQTL.wdl`. This input skips count filtering, TMM normalization,
@@ -685,6 +686,9 @@ Before a Terra submission, check:
 
 | Output | Contents or scale | Use |
 | --- | --- | --- |
+| `tca_model` | Final cleaned TCA model RDS; gene-specific parameters for retained genes only. | Use for downstream tensor extraction or other analyses of the final model. |
+| `tca_model_unfiltered` | Original fitted TCA model RDS, before numerical cleanup. | Audit the fit or repeat cleanup without fitting again. Do not substitute it for the final model. |
+| `tca_numerical_excluded_genes` | Gene IDs, reasons, variance ranges, reciprocal condition numbers, and threshold. | Audit numerical exclusions after fitting. This is separate from the pre-fit constant-gene report, `tca_excluded_genes`. |
 | `cell_type_beds` | One gene-by-sample BED per retained cell type; estimated linear CPM. | Compare cell-type expression profiles. Keep the matching gene IDs, sample IDs, and inventory. |
 | `cell_type_gene_summary` | Per-cell-type, per-gene CPM summaries across all exported samples. | Compare mean or median expression profiles; inspect variability. See the standard-error limitations below. |
 | `estimated_proportions` | HSPE's sample-by-22-cell-type fractions; absent when precomputed proportions are used. | Inspect the proportion estimates before grouping. |
@@ -713,6 +717,78 @@ For troubleshooting, retain `gene_type_filter_report`, `cell_group_filter_report
 QC plots, and task logs. TCA can export negative estimates; the summary keeps
 them, but `CpmBed` rejects them before QTL preparation. A successful TCA export
 does not therefore guarantee that every downstream cell-type QTL call passes.
+
+## Post-fit numerical cleanup
+
+Both public workflows run `CleanTcaModel` after `FitTca` and before
+`ExportTcaBeds`. The public `tca_model` output is
+`tca_model_cleaned.rds`. Export and manifest generation use this final model.
+The original `tca_model.rds` remains available as `tca_model_unfiltered`.
+The cleanup task uses one CPU, 4 GB memory, and a 20 GB disk, with the global
+preemptible and retry settings.
+
+For each gene, cleanup squares the fitted standard deviations in
+`sigmas_hat`. It then calculates:
+
+```text
+reciprocal_condition = min(cell-type variances) / max(cell-type variances)
+exclude when reciprocal_condition < .Machine$double.eps
+```
+
+The threshold is approximately `2.220446049250313e-16`, the default
+tolerance used by R's matrix solver. For the diagonal variance matrix used
+by TCA, the ratio is its reciprocal condition number. An all-zero variance
+row receives a ratio of zero and is excluded. Nonfinite or negative standard
+deviations, overflow during squaring, and invalid model identifiers cause an
+error instead of a silent exclusion. Cleanup also fails if no genes remain.
+The shared residual standard deviation, `tau_hat`, must be finite and
+positive because the unchanged TCA exporter divides by its square. An
+invalid `tau_hat` stops cleanup; it does not trigger gene exclusions.
+
+Cleanup does not refit TCA, change fitted values, add a pseudocount, alter
+cell-type weights, or change the statistical model. It subsets all known
+gene-specific parameter matrices, including covariate effects and p-values.
+Sample-level matrices and the shared residual standard deviation remain
+unchanged. The final RDS records the original gene order, excluded gene IDs,
+filter method, and threshold in `gene_filter`.
+
+Before extraction, the exporter checks the original variable-gene order
+against that record. It removes only the recorded exclusions and aligns
+the BED coordinates to the retained model rows. It does not use an unchecked
+gene intersection. Cell-type BEDs, reconstruction QC, gene summaries, and
+downstream QTL preparation therefore use the same retained gene set before
+any QTL-specific processing. The earlier `filtered_expression` output is
+still the GTF-filtered input BED, not a numerically cleaned BED.
+
+`tca_numerical_excluded_genes.tsv` contains these columns:
+`gene_id`, `reason`, `min_variance`, `max_variance`,
+`reciprocal_condition`, and `threshold`. Variances are in squared CPM units;
+the ratio and threshold are dimensionless. A run with no exclusions writes
+a header-only report. `tca_cleanup_log` records the input, retained, and
+excluded gene counts. Numerical filtering is not proof that the remaining
+cell-specific estimates are biologically reliable, and it does not remove
+negative expression estimates.
+
+To clean an existing fit without refitting, run this command inside the
+matching updated cell-type image:
+
+```bash
+Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/clean_tca_model.R \
+  --model /path/to/tca_model.rds \
+  --output-dir /path/to/cleaned
+```
+
+Use the resulting `tca_model_cleaned.rds` with the original GTF-filtered CPM
+BED and matching sample weights when running the updated exporter. Do not
+manually remove expression rows first: the exporter uses the recorded
+original gene order to check alignment. Existing complete models without
+cleanup metadata remain supported by the direct export script only when
+their gene order exactly matches the variable expression rows. The public
+workflows always run cleanup.
+
+The cleanup change has local model and export regression tests. The complete
+updated workflow has not been tested on Terra; no Terra job was submitted
+for this change.
 
 ## Per-gene CPM summaries
 

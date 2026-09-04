@@ -176,6 +176,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     File proportions_log = CellTypeDeconvolution.proportions_log
 
     File tca_model = CellTypeDeconvolution.tca_model
+    File tca_model_unfiltered = CellTypeDeconvolution.tca_model_unfiltered
+    File tca_numerical_excluded_genes = CellTypeDeconvolution.tca_numerical_excluded_genes
+    File tca_cleanup_log = CellTypeDeconvolution.tca_cleanup_log
     File tca_model_log = CellTypeDeconvolution.tca_model_log
     File tca_excluded_genes = CellTypeDeconvolution.tca_excluded_genes
     File fit_tca_log = CellTypeDeconvolution.fit_tca_log

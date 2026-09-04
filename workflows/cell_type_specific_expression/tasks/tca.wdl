@@ -62,6 +62,45 @@ task FitTca {
   }
 }
 
+task CleanTcaModel {
+  input {
+    File unfiltered_model
+    String docker_image
+    Int preemptible_attempts = 0
+    Int max_retries = 1
+  }
+
+  command <<<
+    set -euo pipefail
+    stage="clean_tca_model"
+    log="$stage.log"
+    status=0
+    printf 'stage=%s start_time=%s dimensions=pending\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
+    trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/clean_tca_model.R \
+      --model '~{sub(unfiltered_model, "'", "'\"'\"'")}' \
+      --output-dir outputs 2>&1 | tee -a "$log"
+    printf 'stage=%s outputs=%s completion_time=%s\n' \
+      "$stage" "cleaned_model,numerical_excluded_genes" \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
+  >>>
+
+  output {
+    File model = "outputs/tca_model_cleaned.rds"
+    File excluded_genes = "outputs/tca_numerical_excluded_genes.tsv"
+    File log = "clean_tca_model.log"
+  }
+
+  runtime {
+    docker: docker_image
+    cpu: 1
+    memory: "4 GB"
+    disks: "local-disk 20 HDD"
+    preemptible: preemptible_attempts
+    maxRetries: max_retries
+  }
+}
+
 task ExportTcaBeds {
   input {
     File expression

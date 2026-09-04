@@ -62,6 +62,7 @@ run_export_tca_beds <- function() {
   coordinates <- expression$coordinates
   weights <- read_numeric_matrix(options$weights, "sample_id")
   model <- readRDS(options$model)
+  X <- align_expression_to_tca_model(X, model)
   C2 <- if (is.null(options$covariates) || !nzchar(options$covariates)) {
     model$C2
   } else {

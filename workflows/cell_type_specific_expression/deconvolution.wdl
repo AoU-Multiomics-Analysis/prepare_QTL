@@ -154,10 +154,18 @@ workflow CellTypeDeconvolution {
       max_retries = max_retries
   }
 
+  call tca_tasks.CleanTcaModel {
+    input:
+      unfiltered_model = FitTca.model,
+      docker_image = deconvolution_docker_image,
+      preemptible_attempts = preemptible_attempts,
+      max_retries = max_retries
+  }
+
   call tca_tasks.ExportTcaBeds {
     input:
       expression = FilterExpressionGenes.expression,
-      model = FitTca.model,
+      model = CleanTcaModel.model,
       tca_weights = ProcessProportions.tca_weights,
       covariates = covariates,
       parallel = tca_parallel,
@@ -185,7 +193,7 @@ workflow CellTypeDeconvolution {
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
       export_qc_summary = ExportTcaBeds.qc_summary,
       export_qc_plots = ExportTcaBeds.qc_plots,
-      model = FitTca.model,
+      model = CleanTcaModel.model,
       model_log = FitTca.model_log,
       original_proportions = ProcessProportions.original,
       combined_proportions = ProcessProportions.combined,
@@ -236,7 +244,10 @@ workflow CellTypeDeconvolution {
     File cell_group_filter_report = ProcessProportions.filter_report
     File proportions_log = ProcessProportions.log
 
-    File tca_model = FitTca.model
+    File tca_model = CleanTcaModel.model
+    File tca_model_unfiltered = FitTca.model
+    File tca_numerical_excluded_genes = CleanTcaModel.excluded_genes
+    File tca_cleanup_log = CleanTcaModel.log
     File tca_model_log = FitTca.model_log
     File tca_excluded_genes = FitTca.excluded_genes
     File fit_tca_log = FitTca.log

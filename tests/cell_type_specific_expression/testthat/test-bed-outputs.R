@@ -345,6 +345,8 @@ testthat::test_that("TCA export reconstructs without optional covariates", {
     ),
     test_tensor = tensor
   )
+  model$mus_hat <- matrix(0, nrow = length(gene_ids), ncol = length(cell_groups),
+                          dimnames = list(gene_ids, cell_groups))
   saveRDS(model, model_path)
   script <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export_tca_beds.R")
   arguments <- c(
