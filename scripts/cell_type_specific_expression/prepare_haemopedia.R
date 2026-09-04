@@ -7,7 +7,8 @@ source(file.path(dirname(normalizePath(script_path)), "bootstrap.R"))
 tryCatch({
   arguments <- commandArgs(trailingOnly = TRUE)
   if (length(arguments) != 2L) stop("Usage: prepare_haemopedia.R COUNTS OUTPUT_DIR", call. = FALSE)
-  input_path <- arguments[[1L]]; output_dir <- arguments[[2L]]
+  input_path <- arguments[[1L]]
+  output_dir <- arguments[[2L]]
   message(sprintf("stage=prepare_haemopedia start_time=%s", tensor_utc_time()))
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   counts <- read_reference_counts(input_path)

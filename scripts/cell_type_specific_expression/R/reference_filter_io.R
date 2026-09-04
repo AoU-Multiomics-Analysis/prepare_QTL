@@ -37,36 +37,63 @@ scan_bed_summary <- function(path, cell_type, expected_genes, expected_samples, 
 }
 
 write_filtered_bed <- function(input_path, output_path, retained_ids, samples, chunk_size) {
-  temporary_path <- tempfile("filtered-bed-", tmpdir = dirname(output_path), fileext = ".bed")
-  on.exit(unlink(temporary_path), add = TRUE)
-  state <- new.env(parent = emptyenv())
-  state$wrote <- FALSE
-  callback <- readr::SideEffectChunkCallback$new(function(chunk, position) {
-    kept <- dplyr::filter(chunk, .data$gene_id %in% retained_ids)
-    if (nrow(kept) > 0L) {
-      chunk_connection <- file(temporary_path, if (state$wrote) "ab" else "wb")
-      if (!state$wrote) writeLines(paste(names(kept), collapse = "\t"), chunk_connection)
-      lines <- apply(kept, 1L, function(row) paste(row, collapse = "\t"))
-      writeLines(lines, chunk_connection)
-      close(chunk_connection)
-      state$wrote <- TRUE
-    }
-  })
-  readr::read_tsv_chunked(input_path, callback = callback, chunk_size = chunk_size,
-    col_types = readr::cols(`#chr` = readr::col_character(), start = readr::col_integer(),
-      end = readr::col_integer(), gene_id = readr::col_character(), .default = readr::col_double()),
-    progress = FALSE)
-  if (!state$wrote) stop("Filtering left an empty BED", call. = FALSE)
-  input_connection <- file(temporary_path, "rt")
+  input_connection <- if (grepl("[.]gz$", input_path, ignore.case = TRUE)) {
+    gzfile(input_path, "rt")
+  } else {
+    file(input_path, "rt")
+  }
   output_connection <- gzfile(output_path, "wt")
+  header <- readLines(input_connection, n = 1L, warn = FALSE)
+  if (length(header) != 1L) stop("BED is empty", call. = FALSE)
+  writeLines(header, output_connection)
+  retained_count <- 0L
   repeat {
-    lines <- readLines(input_connection, n = 1024L, warn = FALSE)
+    lines <- readLines(input_connection, n = chunk_size, warn = FALSE)
     if (length(lines) == 0L) break
-    writeLines(lines, output_connection)
+    fields <- strsplit(lines, "\t", fixed = TRUE)
+    gene_ids <- vapply(fields, function(row) row[[4L]], character(1))
+    kept_lines <- lines[gene_ids %in% retained_ids]
+    if (length(kept_lines) > 0L) writeLines(kept_lines, output_connection)
+    retained_count <- retained_count + length(kept_lines)
   }
   close(input_connection)
   close(output_connection)
+  if (retained_count == 0L) {
+    unlink(output_path)
+    stop("Filtering left an empty BED", call. = FALSE)
+  }
   invisible(output_path)
+}
+
+validate_residual_cutoff <- function(residual_cutoff) {
+  if (is.null(residual_cutoff)) return(NULL)
+  if (!is.numeric(residual_cutoff) || length(residual_cutoff) != 1L ||
+      !is.finite(residual_cutoff) || residual_cutoff <= 0) {
+    stop("Residual cutoff must be one positive finite number", call. = FALSE)
+  }
+  residual_cutoff
+}
+
+make_filter_metric <- function(metric, cell_type, slug, comparison_status,
+                               n_original, n_negative_excluded,
+                               n_reference_excluded, n_residual_excluded,
+                               n_retained, deconvolution_n_samples,
+                               reference_n_samples, metric_set) {
+  dplyr::mutate(metric, cell_type = cell_type, slug = slug,
+    comparison_status = comparison_status,
+    deconvolution_n_samples = deconvolution_n_samples,
+    reference_n_samples = reference_n_samples, n_original = n_original,
+    n_negative_excluded = n_negative_excluded,
+    n_reference_excluded = n_reference_excluded,
+    n_residual_excluded = n_residual_excluded, n_retained = n_retained,
+    metric_set = metric_set, .before = 1)
+}
+
+reference_comparison_status <- function(reference_summary, cell_type) {
+  if (is.null(reference_summary)) return("reference_not_provided")
+  if (!(cell_type %in% reference_supported_cell_types)) return("no_reference_cell_type")
+  if (!any(reference_summary$cell_type == cell_type)) return("reference_cell_type_unavailable")
+  "available"
 }
 
 filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_summary = NULL,
@@ -74,6 +101,7 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
                                   chunk_size = 256L) {
   validate_scatter_inventory(inventory)
   chunk_size <- validate_tensor_positive_integer(chunk_size, "chunk_size")
+  residual_cutoff <- validate_residual_cutoff(residual_cutoff)
   bed_paths <- validate_scatter_bed_paths(bed_paths, inventory$path)
   if (!all(file.exists(bed_paths))) stop("Every cell-type BED must exist", call. = FALSE)
   actual_hashes <- purrr::map_chr(bed_paths, ~ digest::digest(file = .x, algo = "sha256", serialize = FALSE))
@@ -94,10 +122,13 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
   }
   dir.create(file.path(output_dir, "beds"), recursive = TRUE, showWarnings = FALSE)
   dir.create(file.path(output_dir, "plots"), recursive = TRUE, showWarnings = FALSE)
-  comparisons <- list(); metrics <- list(); output_paths <- character(nrow(inventory))
+  comparisons <- list()
+  metrics <- list()
+  output_paths <- character(nrow(inventory))
   cohort_samples <- NULL
   for (i in seq_len(nrow(inventory))) {
-    cell_type <- inventory$cell_group[[i]]; slug <- inventory$slug[[i]]
+    cell_type <- inventory$cell_group[[i]]
+    slug <- inventory$slug[[i]]
     message(sprintf("stage=filter_cell_type_beds cell_type=%s start_time=%s", cell_type, tensor_utc_time()))
     scanned <- scan_bed_summary(bed_paths[[i]], cell_type, inventory$n_genes[[i]],
                                 inventory$n_samples[[i]], chunk_size)
@@ -107,11 +138,22 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
                                       min_mean_log2_cpm1)
     decision$cell_type <- cell_type
     decision$residual_excluded <- FALSE
-    decision$fitted_value <- NA_real_; decision$residual <- NA_real_
+    decision$fitted_value <- NA_real_
+    decision$residual <- NA_real_
     decision$standardized_residual <- NA_real_
     fit_rows <- which(decision$retained & decision$comparison_status == "compared")
-    status <- if (is.null(reference_summary)) "reference_not_provided" else
-      if (!(cell_type %in% reference_supported_cell_types)) "no_reference_cell_type" else "available"
+    reference_rows <- if (is.null(reference_summary)) NULL else
+      dplyr::filter(reference_summary, .data$cell_type == .env$cell_type)
+    status <- reference_comparison_status(reference_summary, cell_type)
+    reference_n_samples <- if (is.null(reference_rows) || nrow(reference_rows) == 0L) {
+      NA_integer_
+    } else {
+      unique_counts <- unique(reference_rows$n_samples)
+      if (length(unique_counts) != 1L) {
+        stop(sprintf("Reference sample count is inconsistent for '%s'", cell_type), call. = FALSE)
+      }
+      as.integer(unique_counts)
+    }
     baseline <- tibble::tibble(n_genes = length(fit_rows), pearson_r = NA_real_, spearman_rho = NA_real_,
       r_squared = NA_real_, intercept = NA_real_, slope = NA_real_)
     if (length(fit_rows) >= 3L && stats::var(decision$reference_mean_log2_cpm1[fit_rows]) > 0 &&
@@ -134,33 +176,41 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
       stop(sprintf("Cell type '%s' has unavailable regression residuals", cell_type), call. = FALSE)
     } else if (status == "available") status <- "insufficient_genes_or_variation"
     retained_ids <- decision$gene_id[decision$retained]
+    if (length(retained_ids) == 0L) {
+      stop(sprintf(
+        "Cell type '%s' has no retained genes (original=%d, negative=%d, reference_or_expression=%d, residual=%d)",
+        cell_type, nrow(decision), sum(!decision$nonnegative),
+        sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
+        sum(decision$residual_excluded)
+      ), call. = FALSE)
+    }
     output_paths[[i]] <- file.path(output_dir, "beds", sprintf("%s.filtered.bed.gz", slug))
     write_filtered_bed(bed_paths[[i]], output_paths[[i]], retained_ids, scanned$samples, chunk_size)
     comparisons[[i]] <- decision
-    metric_rows <- dplyr::mutate(baseline, cell_type = cell_type, slug = slug,
-      comparison_status = status, n_original = nrow(decision),
-      n_negative_excluded = sum(!decision$nonnegative),
-      n_reference_excluded = sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
-      n_residual_excluded = sum(decision$residual_excluded), n_retained = sum(decision$retained),
-      metric_set = "baseline", .before = 1)
+    metric_rows <- make_filter_metric(baseline, cell_type, slug, status,
+      nrow(decision), sum(!decision$nonnegative),
+      sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
+      sum(decision$residual_excluded), sum(decision$retained),
+      inventory$n_samples[[i]], reference_n_samples, "baseline")
     if (!is.null(residual_cutoff) && status == "available") {
       retained_rows <- which(decision$retained)
       retained_input <- tibble::tibble(gene_id = decision$gene_id[retained_rows],
         reference_mean_log2_cpm1 = decision$reference_mean_log2_cpm1[retained_rows],
         deconvolution_mean_log2_cpm1 = decision$mean_log2_cpm1[retained_rows])
-      retained_metrics <- if (nrow(retained_input) >= 3L &&
+      retained_available <- nrow(retained_input) >= 3L &&
           stats::var(retained_input$reference_mean_log2_cpm1) > 0 &&
-          stats::var(retained_input$deconvolution_mean_log2_cpm1) > 0) {
+          stats::var(retained_input$deconvolution_mean_log2_cpm1) > 0
+      retained_metrics <- if (retained_available) {
         fit_reference_regression(retained_input)$metrics
       } else tibble::tibble(n_genes = nrow(retained_input), pearson_r = NA_real_, spearman_rho = NA_real_,
         r_squared = NA_real_, intercept = NA_real_, slope = NA_real_)
       metric_rows <- dplyr::bind_rows(metric_rows,
-        dplyr::mutate(retained_metrics, cell_type = cell_type, slug = slug,
-          comparison_status = if (nrow(retained_input) >= 3L) "available" else "insufficient_retained_genes",
-          n_original = nrow(decision), n_negative_excluded = sum(!decision$nonnegative),
-          n_reference_excluded = sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
-          n_residual_excluded = sum(decision$residual_excluded), n_retained = sum(decision$retained),
-          metric_set = "retained", .before = 1))
+        make_filter_metric(retained_metrics, cell_type, slug,
+          if (retained_available) "available" else "insufficient_retained_genes_or_variation",
+          nrow(decision), sum(!decision$nonnegative),
+          sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
+          sum(decision$residual_excluded), sum(decision$retained),
+          inventory$n_samples[[i]], reference_n_samples, "retained"))
     }
     metrics[[i]] <- metric_rows
     message(sprintf("stage=filter_cell_type_beds cell_type=%s retained=%d completion_time=%s",
@@ -190,6 +240,6 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
       sha256 = purrr::map_chr(output_paths, ~ digest::digest(file = .x, algo = "sha256", serialize = FALSE)),
       n_genes = purrr::map_int(comparisons, ~ sum(.x$retained)))
   readr::write_tsv(filtered_inventory, file.path(output_dir, "filtered_inventory.tsv"))
-  writeLines(file.path("beds", output_basenames), file.path(output_dir, "filtered_beds.txt"))
+  writeLines(output_paths, file.path(output_dir, "filtered_beds.txt"))
   invisible(list(inventory = filtered_inventory, comparisons = all_comparisons, metrics = dplyr::bind_rows(metrics)))
 }

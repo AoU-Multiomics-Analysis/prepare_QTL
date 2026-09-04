@@ -57,6 +57,12 @@ testthat::test_that("reference decisions use strict thresholds and explicit unav
   absent <- apply_reference_rules(bed, "B cells", NULL, 0.01)
   testthat::expect_true(all(absent$retained))
   testthat::expect_true(all(absent$comparison_status == "reference_not_provided"))
+  multi_lineage <- dplyr::bind_rows(ref,
+    dplyr::mutate(ref, cell_type = "CD4 T cells", mean_log2_cpm1 = 10))
+  testthat::expect_equal(
+    apply_reference_rules(bed, "B cells", multi_lineage, 0.01)$reference_mean_log2_cpm1[1:2],
+    c(1, 0.01)
+  )
 })
 
 testthat::test_that("baseline regression uses rstandard and one pass cutoff", {
@@ -111,6 +117,8 @@ testthat::test_that("filter CLI preserves retained BED rows across chunks and pa
   testthat::expect_equal(new_inventory$n_genes, 2)
   testthat::expect_equal(new_inventory$sha256,
     digest::digest(file = file.path(output, "beds", "b_cells.filtered.bed.gz"), algo = "sha256", serialize = FALSE))
+  testthat::expect_identical(readLines(file.path(output, "filtered_beds.txt")),
+                             file.path(output, "beds", "b_cells.filtered.bed.gz"))
 })
 
 testthat::test_that("reference preparation CLI writes normalized provenance outputs", {
@@ -133,4 +141,43 @@ testthat::test_that("reference preparation CLI writes normalized provenance outp
   metadata <- jsonlite::read_json(file.path(output, "reference_metadata.json"), simplifyVector = TRUE)
   testthat::expect_match(metadata$normalization, "full raw count matrix")
   testthat::expect_equal(metadata$input$n_genes, 2L)
+})
+
+testthat::test_that("filtered BED writing preserves the original text exactly", {
+  directory <- tempfile("exact bed ")
+  dir.create(directory)
+  input <- file.path(directory, "input.bed")
+  output <- file.path(directory, "output.bed.gz")
+  lines <- c(
+    "#chr\tstart\tend\tgene_id\ts1\ts2",
+    "1\t0\t1\tg1\t0.12345678901234567\t10000000000000003",
+    "1\t1\t2\tg2\t2.0000000000000000\t3e-09",
+    "2\t2\t3\tg3\t4.50\t6.700000000000001"
+  )
+  writeLines(lines, input)
+  write_filtered_bed(input, output, c("g1", "g3"), c("s1", "s2"), chunk_size = 2L)
+  testthat::expect_identical(readLines(gzfile(output)), lines[c(1L, 2L, 4L)])
+})
+
+testthat::test_that("filter metrics preserve unavailable reference states and sample counts", {
+  testthat::expect_error(validate_residual_cutoff(0), "positive")
+  testthat::expect_error(validate_residual_cutoff(Inf), "positive")
+  testthat::expect_null(validate_residual_cutoff(NULL))
+  metric <- make_filter_metric(
+    tibble::tibble(n_genes = 0L, pearson_r = NA_real_, spearman_rho = NA_real_,
+      r_squared = NA_real_, intercept = NA_real_, slope = NA_real_),
+    cell_type = "B cells", slug = "b_cells",
+    comparison_status = "reference_cell_type_unavailable",
+    n_original = 4L, n_negative_excluded = 1L, n_reference_excluded = 0L,
+    n_residual_excluded = 0L, n_retained = 3L,
+    deconvolution_n_samples = 10L, reference_n_samples = NA_integer_,
+    metric_set = "baseline"
+  )
+  testthat::expect_equal(metric$comparison_status, "reference_cell_type_unavailable")
+  testthat::expect_equal(metric$deconvolution_n_samples, 10L)
+  testthat::expect_true(is.na(metric$reference_n_samples))
+  other_lineage <- tibble::tibble(gene_id = "g1", cell_type = "CD4 T cells",
+    n_samples = 4L, mean_log2_cpm1 = 1, median_log2_cpm1 = 1)
+  testthat::expect_identical(reference_comparison_status(other_lineage, "B cells"),
+                             "reference_cell_type_unavailable")
 })

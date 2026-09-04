@@ -40,7 +40,7 @@ apply_reference_rules <- function(bed_summary, cell_type, reference_summary,
     result$comparison_status <- "no_reference_cell_type"
     return(result)
   }
-  ref <- dplyr::filter(reference_summary, .data$cell_type == cell_type)
+  ref <- dplyr::filter(reference_summary, .data$cell_type == .env$cell_type)
   if (nrow(ref) == 0L) {
     result$comparison_status <- "reference_cell_type_unavailable"
     return(result)

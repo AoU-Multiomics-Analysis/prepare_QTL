@@ -20,7 +20,8 @@ save_negative_plots <- function(negative_summary, plot_dir) {
   heat <- ggplot2::ggplot(heat_data, ggplot2::aes(x = .data$cell_type, y = .data$gene_id,
                                                   fill = .data$negative_percentage)) +
     ggplot2::geom_tile() + ggplot2::scale_fill_viridis_c(name = "Negative (%)") +
-    ggplot2::labs(x = NULL, y = "Gene ID") + ggplot2::theme_minimal()
+    ggplot2::labs(x = NULL, y = "Gene ID") + ggplot2::theme_minimal() +
+    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
   ggplot2::ggsave(file.path(plot_dir, "negative_fraction_heatmap.pdf"), heat,
                   width = 7, height = max(4, min(14, nrow(ranked) * 0.13)), units = "in", limitsize = FALSE)
 }
