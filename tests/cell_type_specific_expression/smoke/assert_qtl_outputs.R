@@ -18,6 +18,7 @@ fixture_directory <- if (length(arguments) == 3L) {
 workflow_name <- "PrepareCellTypeEqtlWorkflow"
 outputs <- jsonlite::read_json(outputs_path, simplifyVector = TRUE)
 inputs <- jsonlite::read_json(inputs_path, simplifyVector = TRUE)
+source("tests/cell_type_specific_expression/smoke/reference_filter_metrics.R", local = TRUE)
 
 require_true <- function(condition, message) {
   if (!isTRUE(condition)) {
@@ -290,6 +291,17 @@ purrr::walk(c("negative_expression_summary", "reference_gene_comparison", "refer
     require_true(file.exists(path) && file.info(path)$size > 0,
       sprintf("The %s filtering report is missing or empty", name))
   })
+filter_metrics <- read_reference_filter_metrics(output_value("reference_filter_metrics"))
+mapped_reference_cell_types <- c(
+  "B cells", "CD4 T cells", "CD8 T cells", "NK cells", "Monocyte/myeloid",
+  "Neutrophils", "Eosinophils", "Dendritic cells"
+)
+validate_reference_filter_metrics(
+  filter_metrics,
+  expected_groups,
+  mapped_reference_cell_types,
+  !is.null(inputs[[paste0(workflow_name, ".haemopedia_counts")]])
+)
 plots <- output_value("reference_filter_plots")
 require_true(length(plots) > 0 && all(file.exists(plots)) && all(file.info(plots)$size > 0),
   "The filtering plots must be present")
