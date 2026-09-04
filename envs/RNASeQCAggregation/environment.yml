@@ -1,0 +1,12 @@
+name: rnaseqc2-aggregation
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11.16
+  - gsutil=5.36
+  - crcmod=1.7
+  - bash=5.2.37
+  - coreutils=9.11
+  - findutils=4.10.0
+  - gawk=5.4.1
