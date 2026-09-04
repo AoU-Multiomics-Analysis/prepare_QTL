@@ -116,7 +116,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     call eqtl.eQTLPrepareData as PrepareCellTypeEqtl {
       input:
         OutputPrefix = PrepareScatterInputs.output_prefixes[index],
-        Log2CpmBed = PrepareScatterInputs.expression_beds[index],
+        CpmBed = PrepareScatterInputs.expression_beds[index],
         SampleList = SampleList,
         AdditionalCovariates = AdditionalCovariates,
         ResidualizeNormalizedInputs = false,

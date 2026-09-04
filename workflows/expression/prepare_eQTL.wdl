@@ -10,6 +10,7 @@ task eqtl_prepare_expression {
     input {
         File? CountGCT
         File? AnnotationGTF
+        File? CpmBed
         File? Log2CpmBed
         File SampleList
         String OutputPrefix
@@ -31,6 +32,7 @@ task eqtl_prepare_expression {
         Rscript /tmp/PrepareExpression.R \
             ~{if defined(CountGCT) then "--CountGCT \"" + select_first([CountGCT]) + "\"" else ""} \
             ~{if defined(AnnotationGTF) then "--AnnotationGTF \"" + select_first([AnnotationGTF]) + "\"" else ""} \
+            ~{if defined(CpmBed) then "--CpmBed '" + sub(select_first([CpmBed]), "'", "'\"'\"'") + "'" else ""} \
             ~{if defined(Log2CpmBed) then "--Log2CpmBed \"" + select_first([Log2CpmBed]) + "\"" else ""} \
             --SampleList "~{SampleList}" \
             --OutputPrefix "~{OutputPrefix}"
@@ -62,6 +64,7 @@ workflow eQTLPrepareData {
         String OutputPrefix
         File? CountGCT
         File? AnnotationGTF
+        File? CpmBed
         File? Log2CpmBed
         File SampleList
         File? AdditionalCovariates
@@ -86,6 +89,7 @@ workflow eQTLPrepareData {
             max_retries = max_retries,
             CountGCT  = CountGCT,
             AnnotationGTF = AnnotationGTF,
+            CpmBed = CpmBed,
             Log2CpmBed = Log2CpmBed,
             SampleList = SampleList
     }

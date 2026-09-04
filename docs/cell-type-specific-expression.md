@@ -230,10 +230,27 @@ HSPE task files. The export task rebuilds the
 linear TCA view from `filtered_expression` and removes the same constant genes
 before tensor extraction.
 
-For compatibility, the integrated workflow sends each linear-scale TCA BED to
-the `Log2CpmBed` input of `prepare_eQTL.wdl`. That input skips count
-normalization and transformation. The QTL step applies INT to one branch and
-direct centering and scaling to the other branch.
+The integrated workflow sends each linear-scale TCA BED to the `CpmBed` input
+of `prepare_eQTL.wdl`. This input skips count filtering, TMM normalization,
+CPM calculation, and GTF mapping. The QTL step rank-normalizes the supplied
+values for INT. For the scaled output, it applies `log2(CPM + 1)` before
+centering and scaling. Connectivity-outlier checks, phenotype PCs, and merged
+covariates remain separate for the two branches. TCA fitting, exported TCA
+BED files, and gene summaries remain in linear CPM space.
+
+The `Log2CpmBed` input remains available for files that are already in log2
+space and never applies another log transform. Supply exactly one of
+`CountGCT`, `CpmBed`, or `Log2CpmBed` to the reusable eQTL workflow.
+`CpmBed` rejects negative or non-finite estimates before writing expression
+outputs. It does not clamp negative TCA estimates to zero. If an exported TCA
+BED contains negative values, eQTL preparation stops and reports example
+gene IDs; the original TCA output remains unchanged.
+
+Deploy the updated standard QTL image together with the updated WDL: older
+images do not implement the `CpmBed` input. This change does not require a
+different image for TCA. GitHub Actions checks the numerical transformation
+from exported TCA BEDs to scaled QTL BEDs. The complete workflow with this
+CPM-input change has not been tested on Terra; no Terra job was submitted.
 
 ## Proportion modes
 
