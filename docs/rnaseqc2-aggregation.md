@@ -15,6 +15,9 @@ This workflow merges RNA-SeQC files in two stages. Each scatter shard merges at 
 
 The workflow uses one tab-separated sample manifest. Do not quote fields or add empty lines. Use one of these exact headers. In the examples below, `\t` means a tab character; the example TSV file contains actual tabs.
 
+Supply an uncompressed `.tsv` manifest. Gzip-compressed manifests are not yet
+supported. The RNA-SeQC data files listed inside it can be gzip-compressed.
+
 Without insert-size files:
 
 ```text
@@ -43,6 +46,10 @@ The path columns are:
 
 Each path must be a `gs://` URI. Repeated source basenames are allowed. The workflow stages every file with its manifest row number, sample ID, and file type. For example, it can stage two files named `shared.gct.gz` as `000001.GTEX-001.gene_tpm.gct.gz` and `000002.GTEX-002.gene_tpm.gct.gz`.
 
+Keep the `exon_count_gct` column and its URI values in the manifest, even when
+exon merging is off. The manifest format and URI checks remain unchanged.
+With `merge_exons: false`, the workflow does not download or read those exon files.
+
 Each URI must include a bucket and object path. Keep the referenced objects immutable during a run. Terra fingerprints the manifest file for call caching, but it does not fingerprint objects that are listed as text inside the manifest.
 
 Sample IDs must be unique. They can contain letters, numbers, periods, underscores, and hyphens. The workflow uses these IDs in all aggregate output tables, even when the individual RNA-SeQC files contain a different internal sample name.
@@ -56,7 +63,25 @@ The image includes `merge_rnaseqc.py`; do not upload a separate script.
 When upgrading from the previous workflow, remove the `merge_script` input from
 the Terra configuration or input JSON.
 
-Import `rnaseqc2_aggregate_batched.wdl` into Terra. Set `batch_disk_space_gb` for the largest input batch, its temporary files, and its four or five batch outputs. Set `merge_disk_space_gb` from the total compressed size of all batch outputs and the expected final outputs. Include extra space for localization and temporary output files.
+Import `rnaseqc2_aggregate_batched.wdl` into Terra. Set `batch_disk_space_gb` for the largest selected input batch, its temporary files, and its outputs. Set `merge_disk_space_gb` from the total compressed size of all batch outputs and the expected final outputs. Include extra space for localization and temporary output files.
+
+Set the required Boolean input `merge_exons` explicitly; it has no default:
+
+- `false`: skip exon downloads, the batch exon merges, and the final exon merge.
+- `true`: merge exons and require matching exon rows in the same order.
+
+TPM, gene-read counts, and QC metrics are always merged. Optional insert-size
+histograms still follow the manifest column and do not depend on `merge_exons`.
+To skip the exon step that failed, add this setting to the Terra input JSON:
+
+```json
+"rnaseqc2_aggregate_batched_workflow.merge_exons": false
+```
+
+The `exon_count_gct` output is now an `Array[File]`: `[]` when exons are off,
+or one file when they are on. This follows the existing insert-size output
+pattern and creates no placeholder file. Update any output mapping or downstream
+workflow that previously expected a single required exon file.
 
 The output `prefix` must start with a letter or number. It can also contain periods, underscores, and hyphens.
 
@@ -82,7 +107,7 @@ existing RNA-SeQC outputs; it does not generate per-sample QC files.
 
 The image contains no cloud credentials. `/etc/boto.cfg` tells standalone
 `gsutil` to obtain credentials from the service account attached to the Terra
-task VM. The account needs read access to all objects in the
+task VM. The account needs read access to the selected objects in the
 manifest. This has not been tested with a live Terra submission.
 
 The insert-size output is an `Array[File]` with zero or one file. WDL 1.0 uses this form so that the output can be absent without creating an invalid empty gzip file.
@@ -123,10 +148,16 @@ the repository. They also check compiled checksum support and local file
 copying with `gsutil`. A credential-selection check replaces only the metadata
 server call and verifies that `gsutil` creates VM service-account credentials.
 Real WDL validation and final-merge tasks run with
-synthetic files, with and without insert-size tables. The final-merge test uses
+synthetic files for all four combinations of exon and insert-size settings.
+The final-merge test uses
 the prefix file returned by validation. A whole-workflow check supplies an unsafe
 prefix. It must fail in the validation task without executing the prefix as shell
 code. These checks do not access private buckets or submit jobs to Terra.
+
+The local tests also run the rendered batch command with only cloud transfers
+replaced by fixture copies. They check that mismatched exons stop the batch when
+enabled, and that disabling exons avoids their downloads while preserving TPM,
+gene counts, and QC metrics.
 
 Only a trusted branch push publishes the tested image to GHCR, with a
 `sha-<full-commit>` tag. A push to `main` also updates the `main` tag.

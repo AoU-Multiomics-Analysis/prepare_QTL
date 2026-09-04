@@ -1,5 +1,6 @@
 {
-    "rnaseqc2_aggregate_batched_workflow.sample_manifest": "gs://YOUR_BUCKET/manifests/rnaseqc_samples.tsv",
+  "rnaseqc2_aggregate_batched_workflow.sample_manifest": "gs://YOUR_BUCKET/manifests/rnaseqc_samples.tsv",
   "rnaseqc2_aggregate_batched_workflow.prefix": "cohort",
+  "rnaseqc2_aggregate_batched_workflow.merge_exons": false,
   "rnaseqc2_aggregate_batched_workflow.merge_disk_space_gb": 1000
 }

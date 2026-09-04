@@ -288,6 +288,41 @@ class MergeRnaseqcTest(unittest.TestCase):
                 transfer_rows,
             )
 
+    def test_prepare_batch_can_skip_exon_transfers_and_keep_qc(self) -> None:
+        for inserts in (False, True):
+            with (self.subTest(inserts=inserts),
+                  tempfile.TemporaryDirectory() as temp_dir):
+                temp = Path(temp_dir)
+                manifest = temp / "samples.tsv"
+                header = "sample_id\ttpm_gct\tcount_gct\texon_count_gct\tmetrics_tsv"
+                row = (
+                    "sample_1\tgs://test/tpm.gct\tgs://test/count.gct\t"
+                    "gs://test/unused-exon.gct\tgs://test/metrics.tsv"
+                )
+                if inserts:
+                    header += "\tinsert_size_hist"
+                    row += "\tgs://test/insert.txt"
+                manifest.write_text(header + "\n" + row + "\n")
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "prepare-batch", "--input",
+                     str(manifest), "--batch-index", "0", "--batch-size", "100",
+                     "--staging-directory", "individual_outputs", "--skip-exons"],
+                    cwd=temp, capture_output=True, text=True, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                transfers = (temp / "transfers.tsv").read_text().splitlines()
+                sources = [line.split("\t")[0] for line in transfers]
+                expected = ["gs://test/tpm.gct", "gs://test/count.gct",
+                            "gs://test/metrics.tsv"]
+                if inserts:
+                    expected.append("gs://test/insert.txt")
+                self.assertEqual(sources, expected)
+                self.assertFalse((temp / "local_exon.list").exists())
+                self.assertEqual(
+                    (temp / "local_metrics.list").read_text(),
+                    "individual_outputs/000001.sample_1.metrics.tsv\n",
+                )
+
     def test_prepare_later_batch_preserves_order_and_insert_size_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
