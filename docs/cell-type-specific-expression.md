@@ -18,6 +18,7 @@ Use this checklist for the integrated human whole-blood pipeline,
 | `AdditionalCovariates` | Yes | Sample-by-covariate TSV with `sample_id`; numeric covariate columns. | Merges supplied covariates with phenotype PCs for each cell type and output branch. |
 | `precomputed_proportions` | No | Sample-by-cell-type TSV; `sample_id` first, followed by all 22 LM22 columns. Fractions, not percentages. | Skips HSPE estimation. Grouping and TCA still run. |
 | `deconvolution_covariates` | No | Sample-by-covariate TSV; `sample_id` first, followed by finite numeric columns. | Supplies covariates to the TCA model. It is not a substitute for `AdditionalCovariates`. |
+| `haemopedia_counts` | No | Human Haemopedia **raw counts**, gene ID in the first column and sorted reference samples in the remaining columns; TSV or TSV.gz. | Adds reference expression filtering and comparison after TCA export. Do not supply CPM, TPM, or log values here. |
 
 Also supply `OutputPrefix`, a safe filename prefix such as `whole_blood`.
 The other integrated inputs have defaults. See the
@@ -53,7 +54,7 @@ Gene-ID BED: linear CPM
       ├─ HSPE: gene symbols → log2(CPM + p) → LM22 marker batches → proportions
       └─ TCA: linear CPM + grouped proportions → fit → model cleanup → cell-type BEDs: linear CPM
                                                   ├─ CPM gene summaries
-                                                  └─ CpmBed → eQTL preparation
+                                                  └─ per-cell negative/reference filter → CpmBed → eQTL preparation
                                                        ├─ ranks → INT BED
                                                        └─ log2(CPM + 1) → center/scale → scaled BED
 ```
@@ -69,6 +70,7 @@ The HSPE branch is skipped when `precomputed_proportions` is supplied.
 | HSPE estimates or supplied proportions | Fractions | Combines LM22 subtypes, filters major groups, floors exact zeros in retained groups, and normalizes each sample's weights to sum to one. | Fractions |
 | TCA fitting and export | Linear CPM and grouped fractions | Removes constant input genes, fits the cohort model, and excludes numerically singular genes before extraction. Does not apply the HSPE log transform. | Estimated cell-type expression on the linear-CPM model scale |
 | Gene summary | Exported TCA CPM | Computes mean, median, SD, standard error of the mean, quartiles, and IQR. | CPM units, except identifiers and sample counts |
+| Reference comparison | Haemopedia raw counts and exported TCA CPM | TMM-normalizes the full reference matrix, calculates linear CPM, then compares sample means of `log2(CPM + 1)`. | Mean log2(CPM + 1) for comparisons; filtered BEDs retain linear CPM |
 | eQTL INT branch | Supplied expression values | Applies rank-based inverse normal transformation per gene across selected samples. | Dimensionless INT values |
 | eQTL scaled branch from `CpmBed` | Linear CPM | Applies `log2(CPM + 1)`, then centers and scales each gene across selected samples. | Dimensionless standardized values |
 
@@ -115,7 +117,7 @@ output preserves supplied values for BED inputs; it contains TMM-normalized
 CPM for count inputs. Thus, a file named `.raw.bed.gz` is not necessarily a
 raw-count matrix. Its scale depends on the input mode.
 
-The integrated pipeline automatically passes TCA BEDs through `CpmBed`.
+The integrated pipeline automatically passes filtered TCA BEDs through `CpmBed`.
 You do not set `CpmBed` or `Log2CpmBed` at its top level. Its public
 `expression` input must still be linear CPM. In the reusable single-matrix
 workflow, `SampleList`, `OutputPrefix`, `memory`, `disk_space`, and
@@ -339,6 +341,9 @@ a value.
 | `lm22` | `File` | Required | LM22 reference matrix. The workflow requires it in both proportion modes. |
 | `precomputed_proportions` | `File?` | `None` | Optional sample-by-LM22 proportion matrix. If provided, the workflow skips hspe. |
 | `covariates` | `File?` | `None` | Optional TCA covariates with `sample_id` first. Samples must match the expression order. Values must be finite numeric values, with no intercept or constant column. |
+| `haemopedia_counts` | `File?` | `None` | Raw human Haemopedia counts; absence means negative-only post-export filtering. |
+| `reference_min_mean_log2_cpm1` | `Float` | `0.01` | Strict mean-log expression threshold in both datasets. |
+| `reference_residual_cutoff` | `Float?` | `None` | Optional positive absolute standardized-residual cutoff; one pass, off by default. Requires the reference. |
 | `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for all deconvolution tasks. |
 | `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for all tasks. |
 | `max_retries` | `Int` | `2` | Global retry value for all tasks. |
@@ -367,7 +372,7 @@ a value.
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
 | `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
-| `gene_summary_memory` | `String` | `"8 GB"` | Memory for the gene summary task. It uses one CPU and `export_disk_gb` for disk space. |
+| `gene_summary_memory` | `String` | `"8 GB"` | Memory for the gene summary, reference preparation, and BED filter tasks. Each uses one CPU and `export_disk_gb` for disk space. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
 | `manifest_disk_gb` | `Int` | `100` | Local disk in GB for the deconvolution manifest. |
@@ -381,6 +386,9 @@ a value.
 | `lm22` | `File` | Required | LM22 reference matrix. The workflow requires it in both proportion modes. |
 | `precomputed_proportions` | `File?` | `None` | Optional sample-by-LM22 proportion matrix. If provided, the workflow skips hspe. |
 | `deconvolution_covariates` | `File?` | `None` | Optional TCA covariates. This is the integrated alias of standalone `covariates`. |
+| `haemopedia_counts` | `File?` | `None` | Raw human Haemopedia counts; absence means negative-only post-export filtering. |
+| `reference_min_mean_log2_cpm1` | `Float` | `0.01` | Strict mean-log expression threshold in both datasets. |
+| `reference_residual_cutoff` | `Float?` | `None` | Optional positive absolute standardized-residual cutoff; one pass, off by default. Requires the reference. |
 | `SampleList` | `File` | Required | Headerless sample list passed to every scattered expression-QTL call. Does not subset HSPE or TCA. |
 | `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
 | `OutputPrefix` | `String` | Required | Basename-safe token. It must start with an ASCII letter or number. It can contain only letters, numbers, dots, underscores, and hyphens. Each scatter call adds the cell-type slug. |
@@ -413,7 +421,7 @@ a value.
 | `export_cpu` | `Int` | `8` | CPU count for TCA BED export. |
 | `export_memory` | `String` | `"256 GB"` | Memory for TCA BED export. |
 | `export_disk_gb` | `Int` | `500` | Local disk in GB for TCA BED export. |
-| `gene_summary_memory` | `String` | `"8 GB"` | Memory for the gene summary task. It uses one CPU and `export_disk_gb` for disk space. |
+| `gene_summary_memory` | `String` | `"8 GB"` | Memory for the gene summary, reference preparation, and BED filter tasks. Each uses one CPU and `export_disk_gb` for disk space. |
 | `manifest_cpu` | `Int` | `4` | CPU count for the deconvolution manifest. |
 | `manifest_memory` | `String` | `"32 GB"` | Memory for the deconvolution manifest. |
 | `manifest_disk_gb` | `Int` | `100` | Local disk in GB for the deconvolution manifest. |
@@ -690,6 +698,8 @@ Before a Terra submission, check:
 | `tca_model_unfiltered` | Original fitted TCA model RDS, before numerical cleanup. | Audit the fit or repeat cleanup without fitting again. Do not substitute it for the final model. |
 | `tca_numerical_excluded_genes` | Gene IDs, reasons, variance ranges, reciprocal condition numbers, and threshold. | Audit numerical exclusions after fitting. This is separate from the pre-fit constant-gene report, `tca_excluded_genes`. |
 | `cell_type_beds` | One gene-by-sample BED per retained cell type; estimated linear CPM. | Compare cell-type expression profiles. Keep the matching gene IDs, sample IDs, and inventory. |
+| `filtered_cell_type_beds` | Separate nonnegative, per-cell-type filtered BEDs; unchanged linear CPM values for retained rows. | These are the inputs to the integrated eQTL scatter. |
+| `negative_expression_summary`, `reference_gene_comparison`, `reference_filter_metrics` | Negative-value counts, gene-level comparisons/exclusions, and per-cell filter/comparison statistics. | Audit the retained gene universe. See the reference filtering section below. |
 | `cell_type_gene_summary` | Per-cell-type, per-gene CPM summaries across all exported samples. | Compare mean or median expression profiles; inspect variability. See the standard-error limitations below. |
 | `estimated_proportions` | HSPE's sample-by-22-cell-type fractions; absent when precomputed proportions are used. | Inspect the proportion estimates before grouping. |
 | `proportions_lm22`, `proportions_combined`, `tca_weights` | Original 22-type fractions, summed major groups, and filtered/renormalized model weights. | Inspect the changes made before TCA. These are not expression matrices. |
@@ -698,7 +708,7 @@ Before a Terra submission, check:
 | `int_phenotype_pcs`, `scaled_phenotype_pcs` | Selected phenotype PC scores for the corresponding branch. | Inspect PCs and use the matching merged covariates. The `_all` outputs contain the full PC sets. |
 | `int_merged_covariates`, `scaled_merged_covariates` | Supplied QTL covariates plus selected phenotype PCs; covariates in rows. | Adjust QTL association models. Align samples by ID. |
 | `int_connectivity_outliers`, `scaled_connectivity_outliers` | Removed `SampleID` values and connectivity `Z_score`. | Check why sample sets differ across cell types or branches. |
-| `cell_type_qtl_manifest` | One row per cell type, with a Terra entity ID and full paths for the ten QTL output categories. | Import the TSV into a Terra data table or use the paths directly. |
+| `cell_type_qtl_manifest` | One row per cell type, with a Terra entity ID, ten QTL output categories, source/filtered CPM BEDs and filter reports. | Import the TSV into a Terra data table or use the paths directly. |
 
 Do not interpret INT values, scaled values, PCs, or proportions as CPM or
 TPM. For external expression comparisons, start with `cell_type_beds` or
@@ -714,9 +724,10 @@ that file has already been subset to its `SampleList`.
 
 For troubleshooting, retain `gene_type_filter_report`, `cell_group_filter_report`,
 `tca_excluded_genes`, HSPE overlap/marker diagnostics, reconstruction results,
-QC plots, and task logs. TCA can export negative estimates; the summary keeps
-them, but `CpmBed` rejects them before QTL preparation. A successful TCA export
-does not therefore guarantee that every downstream cell-type QTL call passes.
+QC plots, and task logs. TCA can export negative estimates; the original BEDs
+and original summary keep them. The post-export filter removes a gene from the
+affected cell type before its BED reaches `CpmBed`. Other eQTL input checks still
+apply, so successful filtering does not guarantee every downstream call passes.
 
 ## Post-fit numerical cleanup
 
@@ -828,9 +839,109 @@ samples need a separate dependence-aware analysis. These are CPM summaries,
 not TPM summaries. Before comparing external datasets, check expression
 units, gene identifiers, cell-type definitions, and processing differences.
 
-The summary is a separate workflow output. The existing BED inventory and
-QTL manifest keep their current schemas. GitHub Actions checks the summary
+The summary is a separate workflow output. The original BED inventory keeps
+its schema; the QTL manifest adds the filtering paths described below.
+GitHub Actions checks the original summary
 against the exported BEDs in both end-to-end smoke runs.
+
+## Per-cell-type reference filtering
+
+After export, every cell type is filtered independently. If any sample has a
+CPM estimate below zero, remove that entire gene row from that cell type's
+filtered BED. There is no tolerance for tiny negative values and no clipping.
+The same gene can remain in other cell types. The negative summary records
+counts, percentages, minimum CPM, and mean negative CPM before any removal.
+Sample membership is unchanged; the check uses all exported samples, not only
+the later eQTL `SampleList`.
+
+Without `haemopedia_counts`, this is the only new filter. With the reference,
+the workflow follows the supplied edgeR procedure on the full count matrix:
+
+```r
+y <- edgeR::DGEList(counts)
+y <- edgeR::calcNormFactors(y)
+reference_cpm <- edgeR::cpm(y, log = FALSE)
+```
+
+Only then are genes matched with the deconvolution output. Do not pre-normalize
+the reference or restrict its gene universe before passing it as raw counts.
+Join by gene ID; numeric version suffixes on Ensembl IDs can be removed for
+matching, but original BED identifiers stay unchanged. Ambiguous duplicate
+matching keys are errors. Missing reference genes are not measured zeros.
+
+The workflow removes terminal replicate suffixes such as `.1`, then maps:
+
+| Pipeline cell type | Reference populations |
+| --- | --- |
+| B cells | `NveB`, `MemB` |
+| CD4 T cells | `CD4T` |
+| CD8 T cells | `CD8T` |
+| NK cells | `NK` |
+| Monocyte/myeloid | `Mono`, `MonoNonClassical` |
+| Neutrophils | `Neut` |
+| Eosinophils | `Eo` |
+| Dendritic cells | `myDC`, `myDC123`, `pDC` |
+
+Each reference sample has equal weight, not each subtype. For example, five
+naive-B samples contribute more than three memory-B samples. All expected
+subpopulations must be present for a compared lineage. Mast and gamma-delta
+T cells have no matching reference here: only their negative filter applies.
+When a reference is supplied, it must contain every mapped lineage used by the
+BED inventory. A missing required lineage is an input error; the workflow does
+not silently switch that lineage to negative-only filtering. A reference can
+contain only a subset of mapped lineages when the BED inventory uses only that
+same subset. This requirement does not apply when the complete reference input
+is omitted, or to mast and gamma-delta T cells.
+
+For each eligible gene, compute **the mean of sample-level `log2(CPM + 1)`**
+in each dataset. This differs from `log2(mean(CPM) + 1)` and from the existing
+CPM-scale summary. Retain genes with mean log expression strictly greater than
+`reference_min_mean_log2_cpm1` (default `0.01`) in both datasets. This is a
+permissive expression threshold. Unmatched genes are excluded only in mapped
+reference cell types. The filtered BEDs themselves remain linear CPM.
+
+Compare deconvolution mean log expression (y) against reference mean log
+expression (x) across genes. Reports include Pearson r, Spearman rho, OLS
+R-squared, slope, intercept, gene counts, residuals and standardized residuals.
+Plots include negative prevalence, a heatmap of up to 100 genes with the largest
+negative fractions, and per-cell scatter and residual plots. Full gene results
+are retained in the tables even when the heatmap shows only a subset.
+
+`reference_residual_cutoff` is optional and **off by default**. If supplied,
+remove genes whose absolute internally standardized OLS residual exceeds it.
+The residual is `e / (s * sqrt(1 - h))`, where `s` is the residual standard error
+and `h` is leverage. This is one pass using the baseline fit, not iterative
+outlier removal. Baseline metrics stay separate from metrics on retained genes.
+No cutoff is recommended as a universal biological threshold.
+
+An insufficient or constant comparison gives an explicit unavailable status.
+Requested residual removal fails when the residuals cannot be calculated.
+A cell type with no remaining genes fails before eQTL preparation.
+
+The B-cell model group includes plasma cells, absent from this reference. The
+myeloid model group includes macrophage components, unlike the reference
+monocyte populations. The dendritic group combines distinct subtypes. A large
+residual can reflect these differences or real biology, not just estimation
+error. Correlation across genes is descriptive, not donor-level validation.
+R-squared here equals squared Pearson r and does not measure identity-line
+agreement. Better correlation after residual filtering is selection-dependent.
+
+Example additional Terra inputs:
+
+```json
+{
+  "PrepareCellTypeEqtlWorkflow.haemopedia_counts": "gs://YOUR_BUCKET/GSE115736_Haemopedia-Human-RNASeq_raw.txt.gz",
+  "PrepareCellTypeEqtlWorkflow.reference_min_mean_log2_cpm1": 0.01
+}
+```
+
+The workflow publishes `filtered_cell_type_bed_inventory`,
+`negative_expression_summary`, `reference_gene_comparison`,
+`reference_filter_metrics`, `reference_filter_plots`, and `reference_filter_log`.
+When a reference is supplied, `haemopedia_reference_summary`,
+`haemopedia_reference_samples`, and `haemopedia_reference_metadata` document its
+processing. Original BEDs, the TCA model, raw summaries and reconstruction QC
+are preserved. The reference filter does not change TCA or HSPE calculations.
 
 ## Independent filtering and outputs
 
@@ -861,7 +972,7 @@ host paths in local smoke tests. The manifest task receives these paths as
 task validates the path format and array alignment; it does not read the file
 contents. No files are copied or moved. No destination path input is needed.
 
-The manifest does not contain raw or residualized BED files. The integrated
+The manifest includes original and filtered CPM BEDs, but not residualized BED files. The integrated
 workflow exposes the deconvolution proportions, TCA model, weights, filter
 report, BED inventory, reconstruction results, QC results, parameters, logs,
 and provenance outputs separately.
@@ -938,8 +1049,14 @@ retained cell type and these exact columns:
 | `scaled_merged_covariates` | Additional covariates merged with selected scaled PCs. |
 | `int_connectivity_outliers` | Connectivity-outlier report for the INT branch. |
 | `scaled_connectivity_outliers` | Connectivity-outlier report for the scaled branch. |
+| `source_cpm_bed` | Original TCA BED for this cell type, before post-export filtering. |
+| `filtered_cpm_bed` | Linear CPM BED supplied to eQTL preparation after per-cell filtering. |
+| `negative_expression_summary` | Shared per-gene, per-cell-type negative-value report. |
+| `reference_gene_comparison` | Shared comparison and gene-exclusion report. |
+| `reference_filter_metrics` | Shared filter counts and comparison metrics. |
 
-All ten file columns contain full paths, not basenames. Import this TSV with
+All file columns contain full paths, not basenames. Shared report paths repeat
+across cell-type rows. Import this TSV with
 Terra's **Import Data** action to create or update the `cell_type` table.
 The pipeline does not import it automatically. See the
 [Terra table format guide](https://support.terra.bio/hc/en-us/articles/6197368140955-How-to-make-a-data-table-from-scratch-or-a-template).

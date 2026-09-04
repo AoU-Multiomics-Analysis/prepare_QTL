@@ -6,6 +6,7 @@ import "tasks/proportions.wdl" as proportion_tasks
 import "tasks/tca.wdl" as tca_tasks
 import "tasks/qc.wdl" as qc_tasks
 import "tasks/gene_summary.wdl" as summary_tasks
+import "tasks/reference_filter.wdl" as reference_filter_tasks
 
 workflow CellTypeDeconvolution {
   input {
@@ -30,6 +31,9 @@ workflow CellTypeDeconvolution {
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
     Array[String] gene_type = ["protein_coding", "lncRNA"]
+    File? haemopedia_counts
+    Float reference_min_mean_log2_cpm1 = 0.01
+    Float? reference_residual_cutoff
 
     Int hspe_cpu = 4
     String hspe_memory = "32 GB"
@@ -188,6 +192,32 @@ workflow CellTypeDeconvolution {
       max_retries = max_retries
   }
 
+  if (defined(haemopedia_counts)) {
+    call reference_filter_tasks.PrepareHaemopedia {
+      input:
+        counts = select_first([haemopedia_counts]),
+        docker_image = deconvolution_docker_image,
+        memory = gene_summary_memory,
+        disk_gb = export_disk_gb,
+        preemptible_attempts = preemptible_attempts,
+        max_retries = max_retries
+    }
+  }
+
+  call reference_filter_tasks.FilterCellTypeBeds {
+    input:
+      cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
+      cell_type_beds = ExportTcaBeds.cell_type_beds,
+      reference_summary = PrepareHaemopedia.summary,
+      min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
+      residual_cutoff = reference_residual_cutoff,
+      docker_image = deconvolution_docker_image,
+      memory = gene_summary_memory,
+      disk_gb = export_disk_gb,
+      preemptible_attempts = preemptible_attempts,
+      max_retries = max_retries
+  }
+
   call qc_tasks.BuildManifest {
     input:
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
@@ -256,6 +286,16 @@ workflow CellTypeDeconvolution {
     File cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory
     File cell_type_gene_summary = SummarizeCellTypeBeds.summary
     File gene_summary_log = SummarizeCellTypeBeds.log
+    Array[File] filtered_cell_type_beds = FilterCellTypeBeds.filtered_beds
+    File filtered_cell_type_bed_inventory = FilterCellTypeBeds.filtered_inventory
+    File negative_expression_summary = FilterCellTypeBeds.negative_summary
+    File reference_gene_comparison = FilterCellTypeBeds.gene_comparison
+    File reference_filter_metrics = FilterCellTypeBeds.filter_metrics
+    Array[File] reference_filter_plots = FilterCellTypeBeds.plots
+    File reference_filter_log = FilterCellTypeBeds.log
+    File? haemopedia_reference_summary = PrepareHaemopedia.summary
+    File? haemopedia_reference_samples = PrepareHaemopedia.samples
+    File? haemopedia_reference_metadata = PrepareHaemopedia.metadata
     File reconstruction_by_sample = ExportTcaBeds.reconstruction_by_sample
     File qc_summary = BuildManifest.qc_summary
     File qc_plots = ExportTcaBeds.qc_plots

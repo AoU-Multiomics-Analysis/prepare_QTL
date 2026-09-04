@@ -33,6 +33,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
     Array[String] gene_type = ["protein_coding", "lncRNA"]
+    File? haemopedia_counts
+    Float reference_min_mean_log2_cpm1 = 0.01
+    Float? reference_residual_cutoff
 
     Int hspe_cpu = 4
     String hspe_memory = "32 GB"
@@ -81,6 +84,9 @@ workflow PrepareCellTypeEqtlWorkflow {
       random_seed = random_seed,
       log2_pseudocount = log2_pseudocount,
       gene_type = gene_type,
+      haemopedia_counts = haemopedia_counts,
+      reference_min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
+      reference_residual_cutoff = reference_residual_cutoff,
       hspe_cpu = hspe_cpu,
       hspe_memory = hspe_memory,
       hspe_disk_gb = hspe_disk_gb,
@@ -101,8 +107,8 @@ workflow PrepareCellTypeEqtlWorkflow {
 
   call integration.PrepareScatterInputs as PrepareScatterInputs {
     input:
-      cell_type_bed_inventory = CellTypeDeconvolution.cell_type_bed_inventory,
-      cell_type_beds = CellTypeDeconvolution.cell_type_beds,
+      cell_type_bed_inventory = CellTypeDeconvolution.filtered_cell_type_bed_inventory,
+      cell_type_beds = CellTypeDeconvolution.filtered_cell_type_beds,
       output_prefix = OutputPrefix,
       docker_image = deconvolution_docker_image,
       cpu = scatter_cpu,
@@ -148,6 +154,13 @@ workflow PrepareCellTypeEqtlWorkflow {
       scaled_merged_covariates = scaled_merged_covariate,
       int_connectivity_outliers = PrepareCellTypeEqtl.IntConnectivityOutliers,
       scaled_connectivity_outliers = PrepareCellTypeEqtl.ScaledConnectivityOutliers,
+      source_beds = CellTypeDeconvolution.cell_type_beds,
+      source_bed_inventory = CellTypeDeconvolution.cell_type_bed_inventory,
+      filtered_beds = CellTypeDeconvolution.filtered_cell_type_beds,
+      filtered_bed_inventory = CellTypeDeconvolution.filtered_cell_type_bed_inventory,
+      negative_summary = CellTypeDeconvolution.negative_expression_summary,
+      gene_comparison = CellTypeDeconvolution.reference_gene_comparison,
+      filter_metrics = CellTypeDeconvolution.reference_filter_metrics,
       docker_image = deconvolution_docker_image,
       cpu = scatter_cpu,
       memory = scatter_memory,
@@ -189,6 +202,16 @@ workflow PrepareCellTypeEqtlWorkflow {
     File cell_type_bed_inventory = CellTypeDeconvolution.cell_type_bed_inventory
     File cell_type_gene_summary = CellTypeDeconvolution.cell_type_gene_summary
     File gene_summary_log = CellTypeDeconvolution.gene_summary_log
+    Array[File] filtered_cell_type_beds = CellTypeDeconvolution.filtered_cell_type_beds
+    File filtered_cell_type_bed_inventory = CellTypeDeconvolution.filtered_cell_type_bed_inventory
+    File negative_expression_summary = CellTypeDeconvolution.negative_expression_summary
+    File reference_gene_comparison = CellTypeDeconvolution.reference_gene_comparison
+    File reference_filter_metrics = CellTypeDeconvolution.reference_filter_metrics
+    Array[File] reference_filter_plots = CellTypeDeconvolution.reference_filter_plots
+    File reference_filter_log = CellTypeDeconvolution.reference_filter_log
+    File? haemopedia_reference_summary = CellTypeDeconvolution.haemopedia_reference_summary
+    File? haemopedia_reference_samples = CellTypeDeconvolution.haemopedia_reference_samples
+    File? haemopedia_reference_metadata = CellTypeDeconvolution.haemopedia_reference_metadata
     File reconstruction_by_sample = CellTypeDeconvolution.reconstruction_by_sample
     File qc_summary = CellTypeDeconvolution.qc_summary
     File qc_plots = CellTypeDeconvolution.qc_plots

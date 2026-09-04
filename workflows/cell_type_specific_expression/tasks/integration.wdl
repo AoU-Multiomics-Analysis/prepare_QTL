@@ -73,6 +73,15 @@ task BuildQtlManifest {
     Array[String] scaled_merged_covariates
     Array[String] int_connectivity_outliers
     Array[String] scaled_connectivity_outliers
+    # Inventories are localized for slug alignment. BED and report values stay
+    # String metadata so that Cromwell preserves their upstream cloud URLs.
+    Array[String] source_beds
+    File source_bed_inventory
+    Array[String] filtered_beds
+    File filtered_bed_inventory
+    String negative_summary
+    String gene_comparison
+    String filter_metrics
     String docker_image
     Int cpu = 1
     String memory = "4 GB"
@@ -80,6 +89,9 @@ task BuildQtlManifest {
     Int preemptible_attempts = 0
     Int max_retries = 1
   }
+
+  File source_inventory_path_file = write_lines([source_bed_inventory])
+  File filtered_inventory_path_file = write_lines([filtered_bed_inventory])
 
   command <<<
     set -euo pipefail
@@ -89,6 +101,8 @@ task BuildQtlManifest {
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs
+    IFS= read -r source_inventory_path < '~{source_inventory_path_file}'
+    IFS= read -r filtered_inventory_path < '~{filtered_inventory_path_file}'
     # Task-scoped serialization preserves quoting and keeps file creation off
     # the Terra workflow engine. These strings are upstream output URLs.
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/build_qtl_manifest.R \
@@ -104,6 +118,13 @@ task BuildQtlManifest {
       --scaled-covariates '~{write_json(scaled_merged_covariates)}' \
       --int-outliers '~{write_json(int_connectivity_outliers)}' \
       --scaled-outliers '~{write_json(scaled_connectivity_outliers)}' \
+      --source-beds '~{write_json(source_beds)}' \
+      --source-inventory "$source_inventory_path" \
+      --filtered-beds '~{write_json(filtered_beds)}' \
+      --filtered-inventory "$filtered_inventory_path" \
+      --negative-summary '~{write_json(negative_summary)}' \
+      --gene-comparison '~{write_json(gene_comparison)}' \
+      --filter-metrics '~{write_json(filter_metrics)}' \
       --output outputs/cell_type_qtl_manifest.tsv 2>&1 | tee -a "$log"
     validated_cell_count="$(awk 'END { print NR - 1 }' outputs/cell_type_qtl_manifest.tsv)"
     printf 'stage=%s dimensions=validated_cell_count:%s outputs=%s manifest_path=%s completion_time=%s\n' \

@@ -258,6 +258,7 @@ precomputed_inputs <- append(
   list(
     "PrepareCellTypeEqtlWorkflow.expression" =
       file.path(fixture_root, "synthetic_expression_with_zero.bed"),
+    "PrepareCellTypeEqtlWorkflow.haemopedia_counts" = "ci-runs/reference-counts.tsv.gz",
     "PrepareCellTypeEqtlWorkflow.lm22" =
       file.path(fixture_root, "synthetic_signature.tsv"),
     "PrepareCellTypeEqtlWorkflow.precomputed_proportions" =

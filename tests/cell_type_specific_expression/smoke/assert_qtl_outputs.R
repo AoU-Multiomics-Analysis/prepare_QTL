@@ -18,6 +18,7 @@ fixture_directory <- if (length(arguments) == 3L) {
 workflow_name <- "PrepareCellTypeEqtlWorkflow"
 outputs <- jsonlite::read_json(outputs_path, simplifyVector = TRUE)
 inputs <- jsonlite::read_json(inputs_path, simplifyVector = TRUE)
+source("tests/cell_type_specific_expression/smoke/reference_filter_metrics.R", local = TRUE)
 
 require_true <- function(condition, message) {
   if (!isTRUE(condition)) {
@@ -56,7 +57,9 @@ manifest_columns <- c(
   "int_phenotype_pcs", "int_phenotype_pcs_all",
   "scaled_phenotype_pcs", "scaled_phenotype_pcs_all",
   "int_merged_covariates", "scaled_merged_covariates",
-  "int_connectivity_outliers", "scaled_connectivity_outliers"
+  "int_connectivity_outliers", "scaled_connectivity_outliers",
+  "source_cpm_bed", "filtered_cpm_bed", "negative_expression_summary",
+  "reference_gene_comparison", "reference_filter_metrics"
 )
 manifest <- readr::read_tsv(
   output_value("cell_type_qtl_manifest"),
@@ -67,7 +70,7 @@ manifest <- readr::read_tsv(
 )
 require_true(
   identical(names(manifest), manifest_columns),
-  "The QTL manifest must have the exact 13-column schema"
+  "The QTL manifest must preserve QTL columns and include filtering output paths"
 )
 require_true(
   identical(manifest$cell_type, expected_groups),
@@ -236,14 +239,28 @@ purrr::walk2(int_bed_tables, scaled_bed_tables, function(int_bed, scaled_bed) {
   )
 })
 
-# Compare the final QTL values with the exported linear-CPM matrices. Compute
+# Compare the final QTL values with the filtered linear-CPM matrices. Compute
 # scaling on all selected samples first, then select the non-outlier samples.
 # This catches a pipeline that passes CPM through Log2CpmBed and skips the log.
-tca_paths <- output_value("cell_type_beds")
+tca_paths <- output_value("filtered_cell_type_beds")
+source_paths <- output_value("cell_type_beds")
 purrr::walk(seq_len(nrow(manifest)), function(index) {
-  tca_path <- tca_paths[basename(tca_paths) == paste0(manifest$cell_type_slug[[index]], ".bed.gz")]
-  require_true(length(tca_path) == 1L, "Each QTL cell type must match one exported TCA BED")
+  slug <- manifest$cell_type_slug[[index]]
+  tca_path <- tca_paths[basename(tca_paths) == paste0(slug, ".filtered.bed.gz")]
+  source_path <- source_paths[basename(source_paths) == paste0(slug, ".bed.gz")]
+  require_true(length(tca_path) == 1L && length(source_path) == 1L,
+    "Each QTL cell type must match one source and one filtered TCA BED")
+  require_true(identical(normalizePath(tca_path), normalizePath(manifest$filtered_cpm_bed[[index]])),
+    "Filtered CPM cloud-path metadata must identify the correct cell type")
+  require_true(identical(normalizePath(source_path), normalizePath(manifest$source_cpm_bed[[index]])),
+    "Source CPM cloud-path metadata must identify the correct cell type")
   tca_bed <- read_qtl_bed(tca_path, "TCA CPM")
+  source_bed <- read_qtl_bed(source_path, "source TCA CPM")
+  matched_rows <- match(tca_bed$gene_id, source_bed$gene_id)
+  require_true(!anyNA(matched_rows) && !is.unsorted(matched_rows),
+    "Filtered rows must preserve their original gene order")
+  require_true(isTRUE(all.equal(tca_bed, source_bed[matched_rows, ], tolerance = 0)),
+    "Filtering must preserve original coordinates, sample order, and CPM values")
   scaled_bed <- scaled_bed_tables[[index]]
   require_true(identical(tca_bed$gene_id, scaled_bed$gene_id),
                "The QTL scaled BED changed the TCA gene order")
@@ -265,6 +282,35 @@ purrr::walk(seq_len(nrow(manifest)), function(index) {
     "The QTL scaled BED must use log2(CPM + 1) before centering and scaling"
   )
 })
+
+purrr::walk(c("negative_expression_summary", "reference_gene_comparison", "reference_filter_metrics"),
+  function(name) {
+    path <- output_value(name)
+    require_true(all(normalizePath(manifest[[name]]) == normalizePath(path)),
+      sprintf("Shared %s path must match the workflow output", name))
+    require_true(file.exists(path) && file.info(path)$size > 0,
+      sprintf("The %s filtering report is missing or empty", name))
+  })
+filter_metrics <- read_reference_filter_metrics(output_value("reference_filter_metrics"))
+mapped_reference_cell_types <- c(
+  "B cells", "CD4 T cells", "CD8 T cells", "NK cells", "Monocyte/myeloid",
+  "Neutrophils", "Eosinophils", "Dendritic cells"
+)
+validate_reference_filter_metrics(
+  filter_metrics,
+  expected_groups,
+  mapped_reference_cell_types,
+  !is.null(inputs[[paste0(workflow_name, ".haemopedia_counts")]])
+)
+plots <- output_value("reference_filter_plots")
+require_true(length(plots) > 0 && all(file.exists(plots)) && all(file.info(plots)$size > 0),
+  "The filtering plots must be present")
+if (!is.null(inputs[[paste0(workflow_name, ".haemopedia_counts")]])) {
+  reference <- readr::read_tsv(output_value("haemopedia_reference_summary"), show_col_types = FALSE)
+  require_true(all(c("gene_id", "cell_type", "mean_log2_cpm1") %in% names(reference)) &&
+    nrow(reference) > 0 && all(is.finite(reference$mean_log2_cpm1)),
+    "The reference-enabled smoke run must produce finite mean log expression")
+}
 
 read_pc_table <- function(path, expected_bed, label) {
   table <- readr::read_tsv(

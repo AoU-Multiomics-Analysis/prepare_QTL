@@ -187,7 +187,8 @@ testthat::test_that("end-to-end WDL exposes aligned QTL-ready file arrays", {
   all_array_names <- array_matches[!is.na(array_matches[, 1L]), 2L]
   testthat::expect_identical(
     all_array_names,
-    c("cell_type_beds", expected_qtl_array_names)
+    c("cell_type_beds", "filtered_cell_type_beds", "reference_filter_plots",
+      expected_qtl_array_names)
   )
 
   public_output_names <- stringr::str_match(
@@ -224,7 +225,12 @@ testthat::test_that("end-to-end WDL builds the manifest from authoritative array
     "int_merged_covariates = int_merged_covariate",
     "scaled_merged_covariates = scaled_merged_covariate",
     "int_connectivity_outliers = PrepareCellTypeEqtl.IntConnectivityOutliers",
-    "scaled_connectivity_outliers = PrepareCellTypeEqtl.ScaledConnectivityOutliers"
+    "scaled_connectivity_outliers = PrepareCellTypeEqtl.ScaledConnectivityOutliers",
+    "source_beds = CellTypeDeconvolution.cell_type_beds",
+    "filtered_beds = CellTypeDeconvolution.filtered_cell_type_beds",
+    "negative_summary = CellTypeDeconvolution.negative_expression_summary",
+    "gene_comparison = CellTypeDeconvolution.reference_gene_comparison",
+    "filter_metrics = CellTypeDeconvolution.reference_filter_metrics"
   )
   purrr::walk(
     expected_assignments,
