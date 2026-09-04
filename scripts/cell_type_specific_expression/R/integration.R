@@ -146,26 +146,40 @@ build_cell_type_qtl_manifest <- function(
       anyDuplicated(cell_type_slugs) > 0L) {
     stop("Cell types and slugs must be nonempty and unique", call. = FALSE)
   }
-  if (!all(vapply(file_lists, is.character, logical(1))) ||
-      any(!file.exists(unlist(file_lists, use.names = FALSE)))) {
-    stop("Every cell-type manifest file must exist", call. = FALSE)
+  if (any(grepl("[[:cntrl:]]", c(cell_types, cell_type_slugs)))) {
+    stop("Cell identities must not contain control characters", call. = FALSE)
   }
-  duplicate_basenames <- vapply(
+  if (any(!grepl("^[a-z0-9]+(_[a-z0-9]+)*$", cell_type_slugs))) {
+    stop("Cell-type IDs must use safe lowercase slugs", call. = FALSE)
+  }
+  paths <- unlist(file_lists, use.names = FALSE)
+  if (!all(vapply(file_lists, is.character, logical(1))) ||
+      anyNA(paths) || any(!nzchar(paths)) || any(grepl("[[:cntrl:]]", paths))) {
+    stop("Manifest paths must be nonempty strings without control characters", call. = FALSE)
+  }
+  # Paths are metadata supplied by completed upstream calls. Do not open them:
+  # cloud objects and local runner host paths are not localized into this task.
+  cloud_paths <- grepl("^gs://[^/[:space:]]+/[^[:cntrl:]]+$", paths) &
+    !endsWith(paths, "/")
+  local_paths <- startsWith(paths, "/")
+  if (any(!cloud_paths & !local_paths)) {
+    stop("Manifest paths must be full gs:// object URLs or absolute local paths", call. = FALSE)
+  }
+  duplicate_paths <- vapply(
     file_lists,
-    function(paths) anyDuplicated(basename(paths)) > 0L,
+    function(paths) anyDuplicated(paths) > 0L,
     logical(1)
   )
-  if (any(duplicate_basenames)) {
+  if (any(duplicate_paths)) {
     stop(
-      "Manifest file basenames must be unique within each output category",
+      "Manifest paths must be unique within each output category",
       call. = FALSE
     )
   }
 
-  file_columns <- file_lists |>
-    purrr::map(basename) |>
-    tibble::as_tibble()
+  file_columns <- tibble::as_tibble(file_lists)
   tibble::tibble(
+    `entity:cell_type_id` = cell_type_slugs,
     cell_type = cell_types,
     cell_type_slug = cell_type_slugs
   ) |>

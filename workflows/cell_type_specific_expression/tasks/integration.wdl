@@ -59,18 +59,20 @@ CELL_TYPE_BED_PATHS
 
 task BuildQtlManifest {
   input {
+    # Path-only metadata: File -> String coercion at this call boundary keeps
+    # the original Cromwell output URLs instead of task-localized paths.
     Array[String] cell_types
     Array[String] cell_type_slugs
-    Array[File] int_beds
-    Array[File] scaled_beds
-    Array[File] int_phenotype_pcs
-    Array[File] int_phenotype_pcs_all
-    Array[File] scaled_phenotype_pcs
-    Array[File] scaled_phenotype_pcs_all
-    Array[File] int_merged_covariates
-    Array[File] scaled_merged_covariates
-    Array[File] int_connectivity_outliers
-    Array[File] scaled_connectivity_outliers
+    Array[String] int_beds
+    Array[String] scaled_beds
+    Array[String] int_phenotype_pcs
+    Array[String] int_phenotype_pcs_all
+    Array[String] scaled_phenotype_pcs
+    Array[String] scaled_phenotype_pcs_all
+    Array[String] int_merged_covariates
+    Array[String] scaled_merged_covariates
+    Array[String] int_connectivity_outliers
+    Array[String] scaled_connectivity_outliers
     String docker_image
     Int cpu = 1
     String memory = "4 GB"
@@ -86,56 +88,22 @@ task BuildQtlManifest {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    mkdir -p inputs outputs
-    cat > inputs/cell_types.txt <<'CELL_TYPES'
-~{sep='\n' cell_types}
-CELL_TYPES
-    cat > inputs/cell_type_slugs.txt <<'CELL_TYPE_SLUGS'
-~{sep='\n' cell_type_slugs}
-CELL_TYPE_SLUGS
-    cat > inputs/int_beds.txt <<'INT_BEDS'
-~{sep='\n' int_beds}
-INT_BEDS
-    cat > inputs/scaled_beds.txt <<'SCALED_BEDS'
-~{sep='\n' scaled_beds}
-SCALED_BEDS
-    cat > inputs/int_phenotype_pcs.txt <<'INT_PHENOTYPE_PCS'
-~{sep='\n' int_phenotype_pcs}
-INT_PHENOTYPE_PCS
-    cat > inputs/int_phenotype_pcs_all.txt <<'INT_PHENOTYPE_PCS_ALL'
-~{sep='\n' int_phenotype_pcs_all}
-INT_PHENOTYPE_PCS_ALL
-    cat > inputs/scaled_phenotype_pcs.txt <<'SCALED_PHENOTYPE_PCS'
-~{sep='\n' scaled_phenotype_pcs}
-SCALED_PHENOTYPE_PCS
-    cat > inputs/scaled_phenotype_pcs_all.txt <<'SCALED_PHENOTYPE_PCS_ALL'
-~{sep='\n' scaled_phenotype_pcs_all}
-SCALED_PHENOTYPE_PCS_ALL
-    cat > inputs/int_merged_covariates.txt <<'INT_MERGED_COVARIATES'
-~{sep='\n' int_merged_covariates}
-INT_MERGED_COVARIATES
-    cat > inputs/scaled_merged_covariates.txt <<'SCALED_MERGED_COVARIATES'
-~{sep='\n' scaled_merged_covariates}
-SCALED_MERGED_COVARIATES
-    cat > inputs/int_connectivity_outliers.txt <<'INT_CONNECTIVITY_OUTLIERS'
-~{sep='\n' int_connectivity_outliers}
-INT_CONNECTIVITY_OUTLIERS
-    cat > inputs/scaled_connectivity_outliers.txt <<'SCALED_CONNECTIVITY_OUTLIERS'
-~{sep='\n' scaled_connectivity_outliers}
-SCALED_CONNECTIVITY_OUTLIERS
+    mkdir -p outputs
+    # Task-scoped serialization preserves quoting and keeps file creation off
+    # the Terra workflow engine. These strings are upstream output URLs.
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/build_qtl_manifest.R \
-      --cell-types inputs/cell_types.txt \
-      --cell-type-slugs inputs/cell_type_slugs.txt \
-      --int-beds inputs/int_beds.txt \
-      --scaled-beds inputs/scaled_beds.txt \
-      --int-pcs inputs/int_phenotype_pcs.txt \
-      --int-pcs-all inputs/int_phenotype_pcs_all.txt \
-      --scaled-pcs inputs/scaled_phenotype_pcs.txt \
-      --scaled-pcs-all inputs/scaled_phenotype_pcs_all.txt \
-      --int-covariates inputs/int_merged_covariates.txt \
-      --scaled-covariates inputs/scaled_merged_covariates.txt \
-      --int-outliers inputs/int_connectivity_outliers.txt \
-      --scaled-outliers inputs/scaled_connectivity_outliers.txt \
+      --cell-types '~{write_json(cell_types)}' \
+      --cell-type-slugs '~{write_json(cell_type_slugs)}' \
+      --int-beds '~{write_json(int_beds)}' \
+      --scaled-beds '~{write_json(scaled_beds)}' \
+      --int-pcs '~{write_json(int_phenotype_pcs)}' \
+      --int-pcs-all '~{write_json(int_phenotype_pcs_all)}' \
+      --scaled-pcs '~{write_json(scaled_phenotype_pcs)}' \
+      --scaled-pcs-all '~{write_json(scaled_phenotype_pcs_all)}' \
+      --int-covariates '~{write_json(int_merged_covariates)}' \
+      --scaled-covariates '~{write_json(scaled_merged_covariates)}' \
+      --int-outliers '~{write_json(int_connectivity_outliers)}' \
+      --scaled-outliers '~{write_json(scaled_connectivity_outliers)}' \
       --output outputs/cell_type_qtl_manifest.tsv 2>&1 | tee -a "$log"
     validated_cell_count="$(awk 'END { print NR - 1 }' outputs/cell_type_qtl_manifest.tsv)"
     printf 'stage=%s dimensions=validated_cell_count:%s outputs=%s manifest_path=%s completion_time=%s\n' \

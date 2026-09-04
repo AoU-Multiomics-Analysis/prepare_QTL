@@ -698,7 +698,7 @@ Before a Terra submission, check:
 | `int_phenotype_pcs`, `scaled_phenotype_pcs` | Selected phenotype PC scores for the corresponding branch. | Inspect PCs and use the matching merged covariates. The `_all` outputs contain the full PC sets. |
 | `int_merged_covariates`, `scaled_merged_covariates` | Supplied QTL covariates plus selected phenotype PCs; covariates in rows. | Adjust QTL association models. Align samples by ID. |
 | `int_connectivity_outliers`, `scaled_connectivity_outliers` | Removed `SampleID` values and connectivity `Z_score`. | Check why sample sets differ across cell types or branches. |
-| `cell_type_qtl_manifest` | One row per cell type, with filenames for the ten QTL output categories. | Find each cell type's matched outputs. Use the public file arrays for cloud paths. |
+| `cell_type_qtl_manifest` | One row per cell type, with a Terra entity ID and full paths for the ten QTL output categories. | Import the TSV into a Terra data table or use the paths directly. |
 
 Do not interpret INT values, scaled values, PCs, or proportions as CPM or
 TPM. For external expression comparisons, start with `cell_type_beds` or
@@ -854,9 +854,12 @@ The integrated workflow publishes ten ordered file arrays:
 - `scaled_connectivity_outliers`
 
 These `Array[File]` outputs are authoritative. Their order matches `cell_types`,
-`cell_type_slugs`, and the manifest rows. The manifest stores stable basenames
-because a WDL task cannot know the final Terra or Cromwell output URI. Use the
-arrays to get the localized or cloud file paths.
+`cell_type_slugs`, and the manifest rows. The final QTL manifest preserves the
+completed upstream calls' full output paths: `gs://` URLs on Terra and absolute
+host paths in local smoke tests. The manifest task receives these paths as
+`Array[String]` metadata, so Cromwell does not localize the files again. The
+task validates the path format and array alignment; it does not read the file
+contents. No files are copied or moved. No destination path input is needed.
 
 The manifest does not contain raw or residualized BED files. The integrated
 workflow exposes the deconvolution proportions, TCA model, weights, filter
@@ -922,6 +925,7 @@ retained cell type and these exact columns:
 
 | Column | Meaning |
 | --- | --- |
+| `entity:cell_type_id` | First column; Terra row ID, equal to the cell-type slug (for example, `cd4_t_cells`). |
 | `cell_type` | Cell-type display name. |
 | `cell_type_slug` | Stable identifier used in filenames. |
 | `int_bed` | Rank-based inverse-normal-transformed expression BED. |
@@ -934,3 +938,15 @@ retained cell type and these exact columns:
 | `scaled_merged_covariates` | Additional covariates merged with selected scaled PCs. |
 | `int_connectivity_outliers` | Connectivity-outlier report for the INT branch. |
 | `scaled_connectivity_outliers` | Connectivity-outlier report for the scaled branch. |
+
+All ten file columns contain full paths, not basenames. Import this TSV with
+Terra's **Import Data** action to create or update the `cell_type` table.
+The pipeline does not import it automatically. See the
+[Terra table format guide](https://support.terra.bio/hc/en-us/articles/6197368140955-How-to-make-a-data-table-from-scratch-or-a-template).
+
+IDs are stable across runs. Importing another run with the same IDs into the
+same table updates those rows. Use a separate table or change the IDs before
+import if you need to keep multiple cohorts or runs in one workspace.
+Keep the referenced submission files: the TSV contains links, not copies.
+Call-cached outputs can link to an earlier run. The separate deconvolution
+`output_manifest` is unchanged. No provenance file is added.
