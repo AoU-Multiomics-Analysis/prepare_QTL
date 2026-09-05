@@ -27,6 +27,25 @@ INLINE_EXTERNAL_TASK_CONTRACTS = {
 _PLACEHOLDER = '__UNRESOLVED_WDL_PLACEHOLDER__'
 _INTERPRETERS = {'Rscript', 'python', 'python3'}
 _IDENTIFIER = re.compile(r'^[A-Za-z_][A-Za-z_0-9]*$')
+# Existing xargs transfer programs contain no repository script invocation.
+# Ignore line indentation only; changed programs need a reviewed contract.
+_FIXED_TRANSFER_SHELL_PROGRAMS = {
+    '2': 'gsutil cp "$1" "$2"',
+    '3': '\n'.join((
+        'sample_id="$1"',
+        'source_path="$2"',
+        'local_path="$3"',
+        'if [[ "$source_path" == gs://* ]]; then',
+        'gsutil -q cp "$source_path" "$local_path"',
+        'else',
+        'if [ ! -f "$source_path" ]; then',
+        'echo "Input BED file for ${sample_id} is not accessible inside the task: ${source_path}" >&2',
+        'exit 1',
+        'fi',
+        'cp "$source_path" "$local_path"',
+        'fi',
+    )),
+}
 
 
 def _without_literal_data(command):
@@ -106,12 +125,27 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
     consumers = []
     matched_contract = False
     command_start = True
+    command_index = 0
     for index, token in enumerate(tokens):
         executable = Path(token).name
         if token in {'\n', ';', '&&', '||', '|', '(', 'then', 'do', 'else', 'if', 'elif'}:
             command_start = True
             continue
         if not command_start:
+            if executable in {'bash', 'sh'}:
+                program = tokens[index + 2] if index + 2 < len(tokens) else ''
+                program = '\n'.join(line.strip() for line in program.strip().splitlines())
+                prefix = tokens[command_index:index]
+                if (len(prefix) == 6 and prefix[:3] == ['xargs', '-0', '-n']
+                        and prefix[3] in _FIXED_TRANSFER_SHELL_PROGRAMS
+                        and prefix[4] == '-P'
+                        and re.fullmatch(rf'(?:[0-9]+|{_PLACEHOLDER}[0-9]+__)', prefix[5])
+                        and token == 'bash'
+                        and tokens[index + 1:index + 2] == ['-c']
+                        and program == _FIXED_TRANSFER_SHELL_PROGRAMS[prefix[3]]):
+                    continue
+                raise ValueError(f'{label}: unsupported indirect command {display(token)!r}; '
+                                 'add a reviewed contract')
             if executable in _INTERPRETERS:
                 raise ValueError(f'{label}: interpreter {token!r} is not a direct command; '
                                  'add a reviewed contract')
@@ -119,6 +153,7 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
         if re.match(r'^[A-Za-z_][A-Za-z_0-9]*=', token):
             continue
         command_start = False
+        command_index = index
         if executable in {'bash', 'sh', 'eval', 'source', '.', 'exec', 'env'} or (
                 any(mark in token for mark in (_PLACEHOLDER, '$', '`'))
                 and '=' not in token):

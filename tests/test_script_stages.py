@@ -95,13 +95,29 @@ class ScriptStagesTest(unittest.TestCase):
         errors = self.module.validate_script_roots(config)
         self.assertTrue(any('build' in error.lower() for error in errors), errors)
 
-    def test_validation_rejects_unsafe_roots_and_alias_targets(self):
+    def test_validation_rejects_unsafe_script_root(self):
         config = copy.deepcopy(self.config)
         config['stages']['proteomics']['script_roots'].append('scripts//unsafe')
+        errors = self.module.validate_script_roots(config)
+        self.assertTrue(any('Stage proteomics: Script root' in error
+                            and 'normalized' in error and 'scripts//unsafe' in error
+                            for error in errors), errors)
+
+    def test_validation_rejects_unsafe_legacy_runtime_root(self):
+        config = copy.deepcopy(self.config)
         config['legacy_runtime_roots'].append('../outside')
+        errors = self.module.validate_script_roots(config)
+        self.assertTrue(any('Legacy runtime root' in error
+                            and 'normalized' in error and '../outside' in error
+                            for error in errors), errors)
+
+    def test_validation_rejects_unsafe_runtime_alias_target(self):
+        config = copy.deepcopy(self.config)
         config['runtime_aliases'] = {'/tmp/Ambiguous.R': '../outside/Ambiguous.R'}
         errors = self.module.validate_script_roots(config)
-        self.assertGreaterEqual(len(errors), 3, errors)
+        self.assertTrue(any('Runtime alias target' in error and 'normalized' in error
+                            and '../outside/Ambiguous.R' in error
+                            for error in errors), errors)
 
     def test_canonical_runtime_prefix_resolves_repository_source(self):
         self.assertEqual(

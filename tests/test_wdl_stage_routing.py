@@ -12,6 +12,24 @@ from wdl_stage_routing import task_stages, validate_routing
 
 
 class WdlStageRoutingTest(unittest.TestCase):
+    TRANSFER_PROGRAMS = (
+        'gsutil cp "$1" "$2"',
+        '''
+        sample_id="$1"
+        source_path="$2"
+        local_path="$3"
+        if [[ "$source_path" == gs://* ]]; then
+            gsutil -q cp "$source_path" "$local_path"
+        else
+            if [ ! -f "$source_path" ]; then
+                echo "Input BED file for ${sample_id} is not accessible inside the task: ${source_path}" >&2
+                exit 1
+            fi
+            cp "$source_path" "$local_path"
+        fi
+        ''',
+    )
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -163,6 +181,55 @@ class WdlStageRoutingTest(unittest.TestCase):
     def test_literal_cat_heredoc_is_data(self):
         self.workflow(command="cat > paths.txt <<'PATHS'\n~{script}\nPATHS\n" + self.command)
         self.assertEqual(self.errors(), [])
+
+    def test_valid_script_does_not_hide_timeout_shell_with_dynamic_target(self):
+        self.workflow(command=self.command + '\n' +
+                      "timeout 10 bash -c 'python3 \"$SCRIPT\"'")
+        task = WDL.load(str(self.root / 'workflows/main.wdl')).tasks[0]
+        with self.assertRaisesRegex(
+                ValueError, r"workflows/main.wdl task NeverRegistered: .*bash.*contract"):
+            task_stages(task, self.config, self.root)
+
+    def test_valid_script_does_not_hide_timeout_shell_with_other_stage(self):
+        self.script('fit_tca.R')
+        self.config['stages']['cell_fit']['sources'] = [
+            'scripts/cell_type_specific_expression/fit_tca.R']
+        self.workflow(command=self.command + '\n' +
+                      "timeout 10 bash -c 'Rscript /opt/prepare_qtl/scripts/"
+                      "cell_type_specific_expression/fit_tca.R'")
+        task = WDL.load(str(self.root / 'workflows/main.wdl')).tasks[0]
+        with self.assertRaisesRegex(
+                ValueError, r"workflows/main.wdl task NeverRegistered: .*bash.*contract"):
+            task_stages(task, self.config, self.root)
+
+    def test_fixed_xargs_transfer_programs_remain_supported(self):
+        for count, program in enumerate(self.TRANSFER_PROGRAMS, start=2):
+            with self.subTest(count=count):
+                self.workflow(command=self.command + '\n' +
+                              f"xargs -0 -n {count} -P 2 bash -c '{program}' _")
+                self.assertEqual(self.errors(), [])
+
+    def test_modified_xargs_transfer_program_requires_review(self):
+        for count, program in enumerate(self.TRANSFER_PROGRAMS, start=2):
+            for extra in ('; python3 "$SCRIPT"', '; touch unreviewed'):
+                with self.subTest(count=count, extra=extra):
+                    self.workflow(command=self.command + '\n' +
+                                  f"xargs -0 -n {count} -P 2 bash -c '" +
+                                  program.rstrip() + extra + "' _")
+                    errors = self.errors()
+                    self.assertTrue(any('bash' in error and 'contract' in error
+                                        for error in errors), errors)
+
+    def test_ordinary_read_variable_named_source_remains_supported(self):
+        self.workflow(command='read -r source destination\n' + self.command)
+        self.assertEqual(self.errors(), [])
+
+    def test_xargs_replacement_cannot_change_a_fixed_transfer_program(self):
+        self.workflow(command=self.command + '\n' +
+                      "xargs -I gsutil bash -c 'gsutil cp \"$1\" \"$2\"' _")
+        errors = self.errors()
+        self.assertTrue(any('bash' in error and 'contract' in error
+                            for error in errors), errors)
 
     def test_nested_interpreter_substitutions_require_review(self):
         for nested in ('python3 "~{script}"',
