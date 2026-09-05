@@ -1,13 +1,5 @@
 version 1.0
 
-struct ReferenceFilterConfig {
-  File inventory
-  Array[File] bed_paths
-  File? reference_summary
-  Float min_mean_log2_cpm1
-  Float? residual_cutoff
-}
-
 task PrepareHaemopedia {
   input {
     File counts
@@ -69,15 +61,6 @@ task FilterCellTypeBeds {
     Int max_retries = 2
   }
 
-  # Preserve File values so Cromwell can localize them before serialization.
-  ReferenceFilterConfig filter_config = object {
-    inventory: cell_type_bed_inventory,
-    bed_paths: cell_type_beds,
-    reference_summary: reference_summary,
-    min_mean_log2_cpm1: min_mean_log2_cpm1,
-    residual_cutoff: residual_cutoff
-  }
-
   command <<<
     set -euo pipefail
     stage="filter_cell_type_beds"
@@ -87,10 +70,25 @@ task FilterCellTypeBeds {
     trap 'status=$?; printf "stage=%s status=failed error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs
     export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-    # Serialize only while rendering the command, when File inputs are localized.
-    # Writing JSON in a declaration would store cloud URIs without rewriting them.
+    # Create the list at command rendering, after input File localization.
+    # Keep the generated File typed until Cromwell maps its own path too.
+    cp '~{write_lines(cell_type_beds)}' bed_paths.txt
+    inventory_path='~{sub(cell_type_bed_inventory, "'", "'\"'\"'")}'
+    reference_path='~{if defined(reference_summary) then sub(select_first([reference_summary]), "'", "'\"'\"'") else ""}'
+    optional_arguments=()
+    if [[ -n "$reference_path" ]]; then
+      optional_arguments+=(--reference-summary "$reference_path")
+    fi
+    residual_value='~{default="" residual_cutoff}'
+    if [[ -n "$residual_value" ]]; then
+      optional_arguments+=(--residual-cutoff "$residual_value")
+    fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/filter_cell_type_beds.R \
-      '~{write_json(filter_config)}' outputs 2>&1 | tee -a "$log"
+      --inventory "$inventory_path" \
+      --bed-list bed_paths.txt \
+      --min-mean-log2-cpm1 '~{min_mean_log2_cpm1}' \
+      "${optional_arguments[@]}" \
+      --output-dir outputs 2>&1 | tee -a "$log"
     retained_count="$(awk 'END { print NR - 1 }' outputs/filtered_inventory.tsv)"
     printf 'stage=%s dimensions=cell_types:%s outputs=%s completion_time=%s\n' "$stage" \
       "$retained_count" 'filtered_beds,filtered_inventory,negative_summary,gene_comparison,filter_metrics,plots' \

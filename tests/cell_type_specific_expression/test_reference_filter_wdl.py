@@ -1,9 +1,7 @@
 """Typed contracts for reference preparation and post-export BED filtering."""
 import gzip
 import hashlib
-import json
 import os
-import shlex
 import shutil
 import subprocess
 import tempfile
@@ -19,6 +17,18 @@ ROOT = Path(__file__).resolve().parents[2]
 class TaskStdLib(WDL.StdLib.Base):
     def _virtualize_filename(self, filename):
         return filename
+
+
+class CloudGeneratedFileStdLib(TaskStdLib):
+    """Model write_lines returning a cloud File, not an already-local filename."""
+    def __init__(self, directory):
+        super().__init__("1.0", write_dir=directory)
+        self.generated_paths = {}
+
+    def _virtualize_filename(self, filename):
+        uri = "gs://test-bucket/call-FilterCellTypeBeds/" + Path(filename).name
+        self.generated_paths[uri] = filename
+        return uri
 
 
 def render_after_localization(task, local_inputs, directory):
@@ -109,7 +119,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         self.assertEqual(str(scatter.inputs["cell_type_bed_inventory"]),
                          "CellTypeDeconvolution.filtered_cell_type_bed_inventory")
 
-    def test_filter_task_serializes_config_only_inside_task(self):
+    def test_filter_task_has_typed_inputs_and_logging(self):
         task_path = ROOT / "workflows/cell_type_specific_expression/tasks/reference_filter.wdl"
         self.assertTrue(task_path.exists())
         document = WDL.load(str(task_path))
@@ -144,7 +154,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             self.assertEqual(result.stdout.splitlines()[-1], str(counts))
             self.assertFalse((Path(directory) / "unexpected_side_effect").exists())
 
-    def test_filter_command_serializes_localized_files_and_optional_values(self):
+    def test_filter_command_passes_localized_arguments_and_optional_values(self):
         document = WDL.load(str(
             ROOT / "workflows/cell_type_specific_expression/tasks/reference_filter.wdl"
         ))
@@ -161,18 +171,39 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                     "cell_type_beds", WDL.Value.Array(WDL.Type.File(), [WDL.Value.File(p) for p in beds])
                 ).bind(
                     "reference_summary", WDL.Value.File(reference) if reference else WDL.Value.Null()
-                ).bind("min_mean_log2_cpm1", WDL.Value.Float(0.0123456789)).bind(
+                ).bind("min_mean_log2_cpm1", WDL.Value.Float(0.01)).bind(
                     "residual_cutoff", WDL.Value.Float(3.5) if use_reference else WDL.Value.Null()
                 )
                 command = render_after_localization(task, env, directory)
-                tokens = shlex.split(command.replace("\\\n", ""))
-                config_path = tokens[tokens.index("Rscript") + 2]
-                config = json.loads(Path(config_path).read_text())
-                self.assertEqual(config, {
-                    "inventory": inventory, "bed_paths": beds, "reference_summary": reference,
-                    "min_mean_log2_cpm1": 0.0123456789,
-                    "residual_cutoff": 3.5 if use_reference else None,
-                })
+                stub = """Rscript() {
+                  printf '%s\\0' "$@" > captured_args
+                  printf 'cell_group\\n' > outputs/filtered_inventory.tsv
+                }
+                """
+                result = subprocess.run(["bash", "-c", stub + command], cwd=directory,
+                                        text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                tokens = (Path(directory) / "captured_args").read_bytes().decode().split(chr(0))[:-1]
+                self.assertIn("--inventory", tokens)
+                self.assertEqual(tokens[tokens.index("--inventory") + 1], inventory)
+                self.assertEqual(float(tokens[tokens.index("--min-mean-log2-cpm1") + 1]), 0.01)
+                bed_list = Path(directory) / tokens[tokens.index("--bed-list") + 1]
+                self.assertEqual(bed_list.read_text().splitlines(), beds)
+                if use_reference:
+                    self.assertEqual(tokens[tokens.index("--reference-summary") + 1], reference)
+                    self.assertEqual(float(tokens[tokens.index("--residual-cutoff") + 1]), 3.5)
+                else:
+                    self.assertNotIn("--reference-summary", tokens)
+                    self.assertNotIn("--residual-cutoff", tokens)
+                cloud_stdlib = CloudGeneratedFileStdLib(directory)
+                argument = next(part for part in task.command.parts
+                    if isinstance(part, WDL.Expr.Placeholder) and "write_lines" in str(part.expr))
+                generated = argument.expr.eval(env, cloud_stdlib)
+                self.assertIsInstance(generated, WDL.Value.File,
+                    "Generated BED list must remain File-typed for Cromwell localization")
+                localized = WDL.Value.rewrite_paths(generated,
+                    lambda value: cloud_stdlib.generated_paths[value.value])
+                self.assertEqual(Path(localized.value).read_text().splitlines(), beds)
 
     @unittest.skipUnless(shutil.which("Rscript"), "Rscript is required")
     def test_rendered_tasks_use_localized_paths_and_return_filter_outputs(self):
