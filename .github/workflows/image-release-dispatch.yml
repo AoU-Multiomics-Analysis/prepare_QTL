@@ -1,0 +1,35 @@
+name: Dispatch Stage Release
+
+# Metadata-only: never check out, import, or execute candidate code here.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, ready_for_review]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    if: >-
+      vars.RELEASE_ENABLED == 'true' && vars.RELEASE_AUTO_TRIGGER == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.base.ref == 'main' &&
+      contains(github.event.pull_request.labels.*.name, 'release-ready')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          COMMIT_PINS: ${{ vars.RELEASE_AUTO_COMMIT }}
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'image-release.yml',
+              ref: 'main',
+              inputs: {
+                pr: String(context.payload.pull_request.number),
+                commit_pins: process.env.COMMIT_PINS === 'true' ? 'true' : 'false'
+              }
+            });

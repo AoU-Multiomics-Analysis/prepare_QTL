@@ -10,6 +10,7 @@ task BuildMethylationCohortSamples {
     input {
         Array[File] SampleQCFiles
         String OutputPrefix
+        String docker_image
     }
 
     command <<<
@@ -21,7 +22,7 @@ task BuildMethylationCohortSamples {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "4G"
         disks: "local-disk 20 HDD"
         cpu: 1
@@ -51,6 +52,7 @@ task MergeMethylationChromosome {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
+        String docker_image
     }
 
     command <<<
@@ -78,7 +80,7 @@ task MergeMethylationChromosome {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: "~{NumThreads}"
@@ -98,6 +100,7 @@ task BuildMethylationCorrelationCovariates {
         File PhenotypePCs
         File? AdditionalCovariates
         String OutputPrefix
+        String docker_image
     }
 
     command <<<
@@ -109,7 +112,7 @@ task BuildMethylationCorrelationCovariates {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "16G"
         disks: "local-disk 50 HDD"
         cpu: 1
@@ -129,6 +132,7 @@ task AnalyzeMethylationCpGCorrelation {
         Float MinAbsCorrelation
         Int MemoryGB
         Int DiskGB
+        String docker_image
     }
 
     command <<<
@@ -141,7 +145,7 @@ task AnalyzeMethylationCpGCorrelation {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: 1
@@ -171,6 +175,7 @@ task AggregateMethylationChromosomes {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
+        String docker_image
     }
 
     command <<<
@@ -241,7 +246,7 @@ task AggregateMethylationChromosomes {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: "~{NumThreads}"
@@ -271,6 +276,7 @@ task FinalizeMethylationConnectivity {
         Float ConnectivityZThreshold
         Int MemoryGB
         Int DiskGB
+        String docker_image
     }
 
     command <<<
@@ -290,7 +296,7 @@ task FinalizeMethylationConnectivity {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: 1
@@ -317,6 +323,7 @@ task AnnotateMethylationSites {
         Int PromoterWindow
         Int MemoryGB
         Int DiskGB
+        String docker_image
     }
 
     command <<<
@@ -330,7 +337,7 @@ task AnnotateMethylationSites {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: 1
@@ -393,12 +400,14 @@ workflow AggregateMethylationCohort {
         Int CorrelationDiskGB = 250
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
+        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
     }
 
     call BuildMethylationCohortSamples {
         input:
             SampleQCFiles = SampleQCFiles,
-            OutputPrefix = OutputPrefix
+            OutputPrefix = OutputPrefix,
+            docker_image = methylation_docker_image
     }
 
     Array[String] AutosomeNames = [
@@ -443,7 +452,8 @@ workflow AggregateMethylationCohort {
                 ComputeCoverageMethylationCorrelation = ComputeCoverageMethylationCorrelation,
                 MemoryGB = MergeMemoryGB,
                 DiskGB = MergeDiskGB,
-                NumThreads = NumThreads
+                NumThreads = NumThreads,
+                docker_image = methylation_docker_image
         }
     }
 
@@ -459,7 +469,8 @@ workflow AggregateMethylationCohort {
             OutputPrefix = OutputPrefix,
             MemoryGB = AggregateMemoryGB,
             DiskGB = AggregateDiskGB,
-            NumThreads = NumThreads
+            NumThreads = NumThreads,
+            docker_image = methylation_docker_image
     }
 
     call ComputePCs.PhenotypePCs as PreliminaryIntPhenotypePCs {
@@ -469,14 +480,16 @@ workflow AggregateMethylationCohort {
             OutputSuffix = ".INT",
             memory = MergeMemoryGB,
             disk_space = MergeDiskGB,
-            num_threads = NumThreads
+            num_threads = NumThreads,
+            DockerImage = methylation_docker_image
     }
 
     call BuildMethylationCorrelationCovariates {
         input:
             PhenotypePCs = PreliminaryIntPhenotypePCs.OutPhenotypePCs,
             AdditionalCovariates = AdditionalCovariates,
-            OutputPrefix = OutputPrefix
+            OutputPrefix = OutputPrefix,
+            docker_image = methylation_docker_image
     }
 
     scatter (autosome_index in range(length(AutosomeNames))) {
@@ -488,7 +501,8 @@ workflow AggregateMethylationCohort {
                 WindowBP = CorrelationWindowBP,
                 MinAbsCorrelation = CorrelationMinAbsCorrelation,
                 MemoryGB = CorrelationMemoryGB,
-                DiskGB = CorrelationDiskGB
+                DiskGB = CorrelationDiskGB,
+                docker_image = methylation_docker_image
         }
     }
 
@@ -502,7 +516,8 @@ workflow AggregateMethylationCohort {
             OutputPrefix = OutputPrefix,
             ConnectivityZThreshold = ConnectivityZThreshold,
             MemoryGB = AggregateMemoryGB,
-            DiskGB = AggregateDiskGB
+            DiskGB = AggregateDiskGB,
+            docker_image = methylation_docker_image
     }
 
     if (AnnotateSites) {
@@ -515,7 +530,8 @@ workflow AggregateMethylationCohort {
                 OutputPrefix = OutputPrefix,
                 PromoterWindow = PromoterWindow,
                 MemoryGB = AnnotationMemoryGB,
-                DiskGB = AnnotationDiskGB
+                DiskGB = AnnotationDiskGB,
+                docker_image = methylation_docker_image
         }
     }
 
@@ -526,7 +542,8 @@ workflow AggregateMethylationCohort {
             OutputSuffix = ".INT",
             memory = MergeMemoryGB,
             disk_space = MergeDiskGB,
-            num_threads = NumThreads
+            num_threads = NumThreads,
+            DockerImage = methylation_docker_image
     }
 
     if (defined(AdditionalCovariates)) {
@@ -535,7 +552,8 @@ workflow AggregateMethylationCohort {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".methylation",
-                OutputSuffix = ".INT"
+                OutputSuffix = ".INT",
+                DockerImage = methylation_docker_image
         }
     }
 

@@ -13,6 +13,7 @@ task PrepareMethylationData {
         Int memory
         Int disk_space
         Int num_threads
+        String docker_image
     }
 
     command <<<
@@ -28,7 +29,7 @@ task PrepareMethylationData {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{memory}GB"
         disks: "local-disk ~{disk_space} HDD"
         cpu: "~{num_threads}"
@@ -54,6 +55,7 @@ workflow mQTLPrepareData {
         Int memory
         Int disk_space
         Int num_threads
+        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
     }
 
     call PrepareMethylationData {
@@ -64,7 +66,8 @@ workflow mQTLPrepareData {
             MissingnessThreshold = MissingnessThreshold,
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads
+            num_threads = num_threads,
+            docker_image = methylation_docker_image
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
@@ -74,7 +77,8 @@ workflow mQTLPrepareData {
             OutputSuffix = ".INT",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads
+            num_threads = num_threads,
+            DockerImage = methylation_docker_image
     }
 
     call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
@@ -84,7 +88,8 @@ workflow mQTLPrepareData {
             OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads
+            num_threads = num_threads,
+            DockerImage = methylation_docker_image
     }
 
     if (defined(AdditionalCovariates)) {
@@ -93,7 +98,8 @@ workflow mQTLPrepareData {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".methylation",
-                OutputSuffix = ".INT"
+                OutputSuffix = ".INT",
+                DockerImage = methylation_docker_image
         }
 
         call CovariateMerge.MergeCovariates as MergeScaledAdditionalCovariates {
@@ -101,7 +107,8 @@ workflow mQTLPrepareData {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".methylation",
-                OutputSuffix = ".scaled"
+                OutputSuffix = ".scaled",
+                DockerImage = methylation_docker_image
         }
     }
 

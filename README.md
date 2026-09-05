@@ -29,6 +29,7 @@ prepare_QTL/
 - [PacBio 5mC QTL workflow](docs/methylation-qtl.md): pb-CpG-tools inputs, QC, sharding, site metadata, and TensorQTL phenotype output.
 - [Genotype workflows](docs/genotype-workflows.md): VCF, PLINK, genotype PC, allele frequency, and dosage WDLs.
 - [Docker environment](docs/docker.md): Docker image location and included R package dependencies.
+- [Stage image releases](docs/image-release.md): Keep WDLs on `main` while testing and updating only the affected image digests; includes administrator setup and rollout limits.
 
 ## Main Workflows
 

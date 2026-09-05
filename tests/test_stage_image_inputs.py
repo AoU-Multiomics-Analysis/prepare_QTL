@@ -1,9 +1,10 @@
 """Catch image cross-wiring and mutable defaults at actual WDL call boundaries."""
 from pathlib import Path
+import os
 import unittest
 import WDL
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get('RELEASE_SOURCE_ROOT', Path(__file__).resolve().parents[1])).resolve()
 BASE = ROOT / 'workflows/cell_type_specific_expression'
 STAGES = ('estimation', 'fit', 'export', 'downstream')
 

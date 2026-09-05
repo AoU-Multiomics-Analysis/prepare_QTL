@@ -158,9 +158,12 @@ def check_workflow_rejects_unsafe_prefix(
 
 
 def main() -> None:
+    global WDL
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", required=True)
+    parser.add_argument("--source-root", type=Path, default=ROOT)
     args = parser.parse_args()
+    WDL = args.source_root.resolve() / "workflows/expression/rnaseqc2_aggregate_batched.wdl"
     # Mount only tests. The production script must come from the image.
     # Bypass the entrypoint, as a WDL backend can do, to test the runtime PATH.
     subprocess.run(

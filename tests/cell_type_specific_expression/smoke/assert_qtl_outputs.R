@@ -259,7 +259,11 @@ purrr::walk(seq_len(nrow(manifest)), function(index) {
   matched_rows <- match(tca_bed$gene_id, source_bed$gene_id)
   require_true(!anyNA(matched_rows) && !is.unsorted(matched_rows),
     "Filtered rows must preserve their original gene order")
-  require_true(isTRUE(all.equal(tca_bed, source_bed[matched_rows, ], tolerance = 0)),
+  require_true(isTRUE(all.equal(
+    as.data.frame(tca_bed),
+    as.data.frame(source_bed[matched_rows, ]),
+    tolerance = 0
+  )),
     "Filtering must preserve original coordinates, sample order, and CPM values")
   scaled_bed <- scaled_bed_tables[[index]]
   require_true(identical(tca_bed$gene_id, scaled_bed$gene_id),

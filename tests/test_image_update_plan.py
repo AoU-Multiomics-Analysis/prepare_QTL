@@ -34,7 +34,7 @@ class ImagePlanTest(unittest.TestCase):
 
     def test_environment_changes_update_all_consumers(self):
         plan = self.module.plan_changes(self.config, ['envs/PhenotypePCs/Dockerfile'])
-        self.assertEqual(plan['stages'], ['expression', 'methylation', 'proteomics', 'splicing'])
+        self.assertEqual(plan['stages'], ['common', 'expression', 'methylation', 'proteomics', 'splicing'])
 
     def test_wdl_and_tests_do_not_request_builds_or_pins(self):
         paths = ['workflows/genotype/prepare_VCF.wdl', 'tests/example_test.py']

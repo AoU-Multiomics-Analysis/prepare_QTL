@@ -8,6 +8,7 @@ task BuildMethylationCorrelationCovariates {
         File PhenotypePCs
         File? AdditionalCovariates
         String OutputPrefix
+        String docker_image
     }
 
     command <<<
@@ -19,7 +20,7 @@ task BuildMethylationCorrelationCovariates {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "16G"
         disks: "local-disk 50 HDD"
         cpu: 1
@@ -39,6 +40,7 @@ task AnalyzeMethylationCpGCorrelation {
         Float MinAbsCorrelation
         Int MemoryGB
         Int DiskGB
+        String docker_image
     }
 
     command <<<
@@ -51,7 +53,7 @@ task AnalyzeMethylationCpGCorrelation {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: 1
@@ -80,6 +82,7 @@ task FinalizeMethylationConnectivity {
         Float ConnectivityZThreshold
         Int MemoryGB
         Int DiskGB
+        String docker_image
     }
 
     command <<<
@@ -99,7 +102,7 @@ task FinalizeMethylationConnectivity {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: 1
@@ -137,6 +140,7 @@ workflow RefineMethylationConnectivity {
         Float ConnectivityZThreshold = -3.0
         Int ConnectivityMemoryGB = 64
         Int ConnectivityDiskGB = 1000
+        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
     }
 
     call ComputePCs.PhenotypePCs as PreliminaryIntPhenotypePCs {
@@ -146,14 +150,16 @@ workflow RefineMethylationConnectivity {
             OutputSuffix = ".INT",
             memory = PcMemoryGB,
             disk_space = PcDiskGB,
-            num_threads = NumThreads
+            num_threads = NumThreads,
+            DockerImage = methylation_docker_image
     }
 
     call BuildMethylationCorrelationCovariates {
         input:
             PhenotypePCs = PreliminaryIntPhenotypePCs.OutPhenotypePCs,
             AdditionalCovariates = AdditionalCovariates,
-            OutputPrefix = OutputPrefix
+            OutputPrefix = OutputPrefix,
+            docker_image = methylation_docker_image
     }
 
     scatter (chromosome_index in range(length(IntMethylationBedsByChromosome))) {
@@ -165,7 +171,8 @@ workflow RefineMethylationConnectivity {
                 WindowBP = CorrelationWindowBP,
                 MinAbsCorrelation = CorrelationMinAbsCorrelation,
                 MemoryGB = CorrelationMemoryGB,
-                DiskGB = CorrelationDiskGB
+                DiskGB = CorrelationDiskGB,
+                docker_image = methylation_docker_image
         }
     }
 
@@ -179,7 +186,8 @@ workflow RefineMethylationConnectivity {
             OutputPrefix = OutputPrefix,
             ConnectivityZThreshold = ConnectivityZThreshold,
             MemoryGB = ConnectivityMemoryGB,
-            DiskGB = ConnectivityDiskGB
+            DiskGB = ConnectivityDiskGB,
+            docker_image = methylation_docker_image
     }
 
     output {

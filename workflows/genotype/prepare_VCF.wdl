@@ -1,7 +1,7 @@
 version 1.0
 
 
-import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/MTtoVCF/refs/heads/develop/main.wdl" as ProcessMT
+import "https://raw.githubusercontent.com/AoU-Multiomics-Analysis/MTtoVCF/73964bf2e7f579b903cb88bbbd2c326e7c85116d/main.wdl" as ProcessMT
 
 workflow PrepareGenotypes{
     input {
@@ -117,5 +117,4 @@ task ComputeGenotypePCs {
             File output_tsv = "~{output_prefix}_genetic_PCs.tsv"
         }
 }
-
 

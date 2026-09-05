@@ -9,7 +9,7 @@ task ResidualizePhenotypes {
         Int memory
         Int disk_space
         Int num_threads
-        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
         Int preemptible_attempts = 2
         Int max_retries = 2
     }

@@ -1,19 +1,23 @@
-# Report-only release groups. These do not yet change WDL image defaults.
+# Shared dependency policy for reports and the opt-in trusted release workflow.
 version: 1
 images:
   cell_type:
+    dockerfile: envs/CellTypeSpecificExpression/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression
     build_paths: ["scripts/cell_type_specific_expression/**", "envs/CellTypeSpecificExpression/**", ".dockerignore"]
     environment_paths: ["envs/CellTypeSpecificExpression/**", ".dockerignore"]
   standard:
+    dockerfile: envs/PhenotypePCs/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl
     build_paths: ["scripts/**", "envs/PhenotypePCs/**", ".dockerignore"]
     environment_paths: ["envs/PhenotypePCs/**", ".dockerignore"]
   methylation_rust:
+    dockerfile: envs/MethylationRust/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust
     build_paths: ["rust/methylation_filter/**", "rust/methylation_merge/**", "envs/MethylationRust/**", ".dockerignore"]
     environment_paths: ["envs/MethylationRust/**", ".dockerignore"]
   rnaseqc:
+    dockerfile: envs/RNASeQCAggregation/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation
     build_paths: ["scripts/expression/merge_rnaseqc.py", "envs/RNASeQCAggregation/**", ".dockerignore"]
     environment_paths: ["envs/RNASeQCAggregation/**", ".dockerignore"]
@@ -68,6 +72,9 @@ stages:
   expression:
     image: standard
     sources: ["scripts/expression/PrepareExpression.R", "scripts/common/**"]
+  common:
+    image: standard
+    sources: ["scripts/common/**"]
   proteomics:
     image: standard
     sources: ["scripts/proteomics/**", "scripts/common/**"]
@@ -110,7 +117,7 @@ workflow_groups:
   - paths: ["workflows/expression/rnaseqc2_aggregate_batched.wdl"]
     stages: [rnaseqc]
   - paths: ["workflows/common/**"]
-    stages: [expression, proteomics, splicing, methylation]
+    stages: [common, expression, proteomics, splicing, methylation]
   - paths: ["workflows/proteomics/**"]
     stages: [proteomics]
   - paths: ["workflows/splicing/**"]
