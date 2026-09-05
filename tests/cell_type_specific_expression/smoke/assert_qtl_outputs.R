@@ -187,19 +187,16 @@ purrr::iwalk(expected_manifest_files, function(expected_files, column_name) {
 })
 
 read_qtl_bed <- function(path, label) {
-  bed <- readr::read_tsv(
+  # Match PrepareExpression's parser. A one-bit numeric difference can be
+  # amplified by scaling nearly constant TCA estimates.
+  bed <- data.table::fread(
     path,
-    col_types = readr::cols(
-      `#chr` = readr::col_character(),
-      start = readr::col_integer(),
-      end = readr::col_integer(),
-      gene_id = readr::col_character(),
-      .default = readr::col_double()
-    ),
-    name_repair = "minimal",
-    show_col_types = FALSE,
-    progress = FALSE
-  )
+    header = TRUE,
+    check.names = FALSE,
+    colClasses = list(character = c("#chr", "gene_id")),
+    showProgress = FALSE
+  ) |>
+    tibble::as_tibble(.name_repair = "minimal")
   metadata_columns <- c("#chr", "start", "end", "gene_id")
   require_true(
     identical(names(bed)[seq_along(metadata_columns)], metadata_columns),
@@ -280,11 +277,12 @@ purrr::walk(seq_len(nrow(manifest)), function(index) {
   observed <- scaled_bed |>
     dplyr::select(dplyr::all_of(kept_samples)) |>
     as.matrix()
-  require_true(
-    isTRUE(all.equal(unname(observed), unname(expected[, kept_samples, drop = FALSE]),
-                     tolerance = 1e-7)),
-    "The QTL scaled BED must use log2(CPM + 1) before centering and scaling"
-  )
+  comparison <- all.equal(unname(observed), unname(expected[, kept_samples, drop = FALSE]),
+                          tolerance = 1e-7)
+  require_true(isTRUE(comparison), paste0(
+    "The QTL scaled BED must use log2(CPM + 1) before centering and scaling; ",
+    "cell_type=", slug, "; comparison=", paste(comparison, collapse = "; ")
+  ))
 })
 
 purrr::walk(c("negative_expression_summary", "reference_gene_comparison", "reference_filter_metrics"),
