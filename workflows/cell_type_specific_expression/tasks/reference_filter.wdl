@@ -90,7 +90,7 @@ task FilterCellTypeBeds {
     # Serialize only while rendering the command, when File inputs are localized.
     # Writing JSON in a declaration would store cloud URIs without rewriting them.
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/filter_cell_type_beds.R \
-      '~{sub(write_json(filter_config), "'", "'\"'\"'")}' outputs 2>&1 | tee -a "$log"
+      '~{write_json(filter_config)}' outputs 2>&1 | tee -a "$log"
     retained_count="$(awk 'END { print NR - 1 }' outputs/filtered_inventory.tsv)"
     printf 'stage=%s dimensions=cell_types:%s outputs=%s completion_time=%s\n' "$stage" \
       "$retained_count" 'filtered_beds,filtered_inventory,negative_summary,gene_comparison,filter_metrics,plots' \
