@@ -16,7 +16,10 @@ workflow CellTypeDeconvolution {
     File? precomputed_tca_model
     File? precomputed_proportions
     File? covariates
-    String deconvolution_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"
+    String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
+    String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
+    String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
+    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
     Int preemptible_attempts = 2
     Int max_retries = 2
     Float min_lm22_overlap = 0.80
@@ -63,7 +66,7 @@ workflow CellTypeDeconvolution {
         gtf = gtf,
         gene_type = gene_type,
         log2_pseudocount = log2_pseudocount,
-        docker_image = deconvolution_docker_image,
+        docker_image = estimation_docker_image,
         cpu = hspe_cpu,
         memory = hspe_memory,
         disk_gb = hspe_disk_gb,
@@ -74,7 +77,7 @@ workflow CellTypeDeconvolution {
     call proportion_tasks.ValidateProportionMode {
       input:
         precomputed_proportions = precomputed_proportions,
-        docker_image = deconvolution_docker_image,
+        docker_image = estimation_docker_image,
         preemptible_attempts = preemptible_attempts,
         max_retries = max_retries
     }
@@ -97,7 +100,7 @@ workflow CellTypeDeconvolution {
         batch_size = hspe_batch_size,
         quantile_normalize = hspe_quantile_normalize,
         random_seed = random_seed,
-        docker_image = deconvolution_docker_image,
+        docker_image = estimation_docker_image,
         cpu = hspe_cpu,
         memory = hspe_memory,
         disk_gb = hspe_disk_gb,
@@ -109,7 +112,7 @@ workflow CellTypeDeconvolution {
         input:
           prepared = PrepareHspeBatches.prepared,
           batch = batch,
-          docker_image = deconvolution_docker_image,
+          docker_image = estimation_docker_image,
           memory = hspe_batch_memory,
           disk_gb = hspe_batch_disk_gb,
           preemptible_attempts = preemptible_attempts,
@@ -122,7 +125,7 @@ workflow CellTypeDeconvolution {
         batch_results = RunHspeBatch.result,
         preparation_log = PrepareHspeBatches.log,
         batch_logs = RunHspeBatch.log,
-        docker_image = deconvolution_docker_image,
+        docker_image = estimation_docker_image,
         cpu = proportions_cpu,
         memory = proportions_memory,
         disk_gb = proportions_disk_gb,
@@ -141,7 +144,7 @@ workflow CellTypeDeconvolution {
         proportions = proportions_for_processing,
         mean_threshold = group_mean_threshold,
         zero_floor = zero_floor,
-        docker_image = deconvolution_docker_image,
+        docker_image = estimation_docker_image,
         cpu = proportions_cpu,
         memory = proportions_memory,
         disk_gb = proportions_disk_gb,
@@ -157,7 +160,7 @@ workflow CellTypeDeconvolution {
         max_iters = tca_max_iters,
         random_seed = random_seed,
         parallel = tca_parallel,
-        docker_image = deconvolution_docker_image,
+        docker_image = fit_docker_image,
         cpu = fit_cpu,
         memory = fit_memory,
         disk_gb = fit_disk_gb,
@@ -174,7 +177,7 @@ workflow CellTypeDeconvolution {
     input:
       unfiltered_model = select_first([precomputed_tca_model, FitTca.model]),
       reuse_model = defined(precomputed_tca_model),
-      docker_image = deconvolution_docker_image,
+      docker_image = fit_docker_image,
       preemptible_attempts = preemptible_attempts,
       max_retries = max_retries
   }
@@ -187,7 +190,7 @@ workflow CellTypeDeconvolution {
       covariates = fit_covariates,
       reuse_model = defined(precomputed_tca_model),
       parallel = tca_parallel,
-      docker_image = deconvolution_docker_image,
+      docker_image = export_docker_image,
       cpu = export_cpu,
       memory = export_memory,
       disk_gb = export_disk_gb,
@@ -199,7 +202,7 @@ workflow CellTypeDeconvolution {
     input:
       cell_type_beds = ExportTcaBeds.cell_type_beds,
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
-      docker_image = deconvolution_docker_image,
+      docker_image = downstream_docker_image,
       memory = gene_summary_memory,
       disk_gb = export_disk_gb,
       preemptible_attempts = preemptible_attempts,
@@ -210,7 +213,7 @@ workflow CellTypeDeconvolution {
     call reference_filter_tasks.PrepareHaemopedia {
       input:
         counts = select_first([haemopedia_counts]),
-        docker_image = deconvolution_docker_image,
+        docker_image = downstream_docker_image,
         memory = gene_summary_memory,
         disk_gb = export_disk_gb,
         preemptible_attempts = preemptible_attempts,
@@ -225,7 +228,7 @@ workflow CellTypeDeconvolution {
       reference_summary = PrepareHaemopedia.summary,
       min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
       residual_cutoff = reference_residual_cutoff,
-      docker_image = deconvolution_docker_image,
+      docker_image = downstream_docker_image,
       memory = gene_summary_memory,
       disk_gb = export_disk_gb,
       preemptible_attempts = preemptible_attempts,
@@ -258,8 +261,8 @@ workflow CellTypeDeconvolution {
       random_seed = random_seed,
       scale = "cpm",
       tca_version = tca_version,
-      container_image = deconvolution_docker_image,
-      docker_image = deconvolution_docker_image,
+      container_image = downstream_docker_image,
+      docker_image = downstream_docker_image,
       cpu = manifest_cpu,
       memory = manifest_memory,
       disk_gb = manifest_disk_gb,
@@ -268,6 +271,12 @@ workflow CellTypeDeconvolution {
   }
 
   output {
+    Map[String, String] stage_images = {
+      "estimation": estimation_docker_image,
+      "fit": fit_docker_image,
+      "export": export_docker_image,
+      "downstream": downstream_docker_image
+    }
     File filtered_expression = export_expression
     File? gene_type_filter_report = FilterExpressionGenes.report
     File? gene_type_filter_log = FilterExpressionGenes.log

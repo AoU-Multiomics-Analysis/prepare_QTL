@@ -509,8 +509,8 @@ require_true(
   "The deconvolution manifest parameters are incorrect"
 )
 require_true(
-  identical(manifest$container_image, "cell-type-specific-expression:test"),
-  "The manifest did not record the dedicated test image"
+  identical(manifest$container_image, input_value("downstream_docker_image")),
+  "The manifest did not record its downstream image"
 )
 require_true(
   length(manifest$outputs) == nrow(inventory),

@@ -352,7 +352,10 @@ a value.
 | `haemopedia_counts` | `File?` | `None` | Raw human Haemopedia counts; absence means negative-only post-export filtering. |
 | `reference_min_mean_log2_cpm1` | `Float` | `0.01` | Strict mean-log expression threshold in both datasets. |
 | `reference_residual_cutoff` | `Float?` | `None` | Optional positive absolute standardized-residual cutoff; one pass, off by default. Requires the reference. |
-| `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for all deconvolution tasks. |
+| `estimation_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | Gene filtering, HSPE, and proportion processing. |
+| `fit_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | TCA fitting and model cleanup. |
+| `export_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | BED export and export QC. |
+| `downstream_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | Summaries, reference filtering, and manifests. |
 | `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for all tasks. |
 | `max_retries` | `Int` | `2` | Global retry value for all tasks. |
 | `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
@@ -400,8 +403,11 @@ a value.
 | `SampleList` | `File` | Required | Sample list with an optional `research_id`, `sample_id`, or `ID` header; passed to every scattered expression-QTL call. Does not subset HSPE or TCA. |
 | `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
 | `OutputPrefix` | `String` | Required | Basename-safe token. It must start with an ASCII letter or number. It can contain only letters, numbers, dots, underscores, and hyphens. Each scatter call adds the cell-type slug. |
-| `deconvolution_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"` | Container for deconvolution and integration tasks. |
-| `qtl_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl:main"` | Container for scattered expression-QTL tasks. |
+| `estimation_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | Gene filtering, HSPE, and proportion processing. |
+| `fit_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | TCA fitting and model cleanup. |
+| `export_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | BED export and export QC. |
+| `downstream_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | Summaries, reference filtering, and manifests. |
+| `qtl_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"` | Container for scattered expression-QTL tasks. |
 | `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for deconvolution and QTL tasks. |
 | `max_retries` | `Int` | `2` | Global retry value for deconvolution and QTL tasks. |
 | `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
@@ -679,9 +685,14 @@ single-matrix workflow. The integrated workflow requires it.
 Use the WDL and images from a matching release. The integrated workflow's
 `qtl_docker_image` must contain the `CpmBed` implementation added in
 [PR #34](https://github.com/AoU-Multiomics-Analysis/prepare_QTL/pull/34).
-It uses `deconvolution_docker_image` for HSPE/TCA and `qtl_docker_image` for
-eQTL preparation. A mutable `:main` tag can change; record the resolved
-image digest and workflow revision for each run.
+The cell-type entry points now use separate estimation, fit, export, and
+downstream image inputs; the integrated workflow also uses `qtl_docker_image`.
+Defaults are immutable digest references. The shared `deconvolution_docker_image`
+input has been removed: replace saved overrides with the stage inputs you need.
+The `stage_images` workflow output records the selected images. The older
+deconvolution manifest's `container_image` field identifies only the downstream
+manifest task image, not all stages. Record the workflow revision as well.
+See [initial pin verification and rollout limits](stage-image-defaults.md).
 
 Memory input types differ. For example, `fit_memory` and `export_memory`
 are strings such as `"256 GB"`. `eqtl_memory` is an integer such as `64`;

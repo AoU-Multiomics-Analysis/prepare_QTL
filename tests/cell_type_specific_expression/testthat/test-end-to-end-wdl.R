@@ -81,12 +81,12 @@ testthat::test_that("end-to-end WDL imports and calls the reusable workflows", {
   )
   testthat::expect_match(
     text,
-    "deconvolution_docker_image = deconvolution_docker_image",
+    "estimation_docker_image = estimation_docker_image",
     fixed = TRUE
   )
   testthat::expect_match(
     text,
-    "docker_image = deconvolution_docker_image",
+    "docker_image = downstream_docker_image",
     fixed = TRUE
   )
 })
