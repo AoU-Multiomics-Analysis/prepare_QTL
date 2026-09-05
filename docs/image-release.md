@@ -26,22 +26,122 @@ remove those overrides if you want to use the maintained defaults.
 
 ## Administrator setup
 
-The new release workflow is disabled until `RELEASE_ENABLED` is `true`.
-This PR does not create secrets, enable settings, or start a release.
+Use `ci/setup_release.py` from a local checkout to configure missing release
+settings. The default command reads settings and prints a plan. Only `--apply`
+permits changes. The command does not enable releases or start workflows.
 
-Before you enable it:
+Install Python 3.11 or later and the [GitHub CLI](https://cli.github.com/).
+Authenticate `gh` to GitHub.com with repository administrator access. Merge the
+release infrastructure into `main` before setup. The command checks both release
+workflows at one `main` revision. It supports GitHub.com only.
 
-1. Merge the release infrastructure into `main`.
-2. Create GitHub environments named `release-publish` and `release-commit`.
-   Configure required reviewers and restrict deployments to `main`. GitHub
-   does not add protection rules merely because a workflow names an environment.
-3. Allow this repository's build job to publish the four registered GHCR
-   packages. The registry reader currently requires **public GHCR packages**.
-4. For automatic pin commits, install a GitHub App on this repository only.
-   Give it **Contents: read and write** and **Pull requests: read** permissions.
-   It does not need workflow-write or administrator permissions.
-5. Set repository variable `RELEASE_APP_ID` to the App ID. Store the private
-   key as secret `RELEASE_APP_PRIVATE_KEY` in the `release-commit` environment.
+```bash
+python -m venv .venv-release-setup
+. .venv-release-setup/bin/activate
+python -m pip install -r ci/release-setup-requirements.txt
+gh auth login --hostname github.com
+
+# Read-only plan. No key file read, browser, local server, or GitHub write.
+python ci/setup_release.py --repo OWNER/REPO --reviewer GITHUB_LOGIN
+
+# Create missing settings and guide new App registration and installation.
+python ci/setup_release.py --repo OWNER/REPO --reviewer GITHUB_LOGIN \
+  --create-app --apply
+
+# Use an existing App. The only private-key input is a file path.
+chmod 600 /absolute/path/app.pem
+python ci/setup_release.py --repo OWNER/REPO --reviewer GITHUB_LOGIN \
+  --app-id APP_ID --private-key-file /absolute/path/app.pem --apply
+```
+
+Choose each reviewer explicitly. Repeat `--reviewer LOGIN` for up to six
+different GitHub users with repository read access. Teams are not supported.
+The tool creates `release-publish` and `release-commit` with those reviewers
+and a deployment rule for the `main` branch. A tag rule does not meet this
+requirement. Existing reviewer sets must match. Existing wait timers, custom
+rules, self-review controls, and bypass settings are preserved. If the existing
+protection is incompatible, setup stops before changes. Resolve that conflict
+with a repository administrator. The tool does not remove protection when a
+GitHub plan or organization policy restricts it.
+
+The tool creates the `release-ready` label and absent release variables. It
+preserves every existing variable value, including `true`. It is not a command
+to disable an existing release installation. It also preserves an existing
+`RELEASE_APP_ID` and `release-commit/RELEASE_APP_PRIVATE_KEY` secret. A different
+requested App ID is a conflict. Secret rotation is outside this command.
+
+New Apps request Contents write and Pull requests read, without event
+subscriptions or an active webhook. GitHub hosts the registration approval.
+The tool shows the public App ID and installation link. Select the target
+repository only. Obtain organization approval when required. After installation,
+type `continue` in the terminal. The tool then verifies App identity, owner,
+permissions, and target repository access. It rejects a new App with broader
+write permissions or all-repository access. For an existing App, it reports
+broader access and does not change it. Selected-repository mode confirms target
+access; it does not prove that no other repositories are selected.
+
+`--create-app` cannot be combined with supplied credentials. It also stops if
+the repository already has either App credential setting. Use the existing-App
+command for a repeat run. Apply without a credential mode stops before changes
+because installation verification needs a key. A dry run needs no credentials.
+Even when a dry run includes `--private-key-file`, the file is not read.
+
+The tool checks that a supplied key is a regular file. On POSIX systems, it
+rejects group or world permissions and symbolic links. It does not change file
+permissions. A generated App key stays in memory and goes to `gh secret set`
+through standard input. It is not printed, saved, or placed in process arguments.
+The local registration callback binds only to `127.0.0.1` and expires after
+ten minutes. It validates the callback path and a random state token.
+
+Only one operator must run setup at a time. The tool rechecks protection, App ID,
+and secret names before upload. It stops if another operator changes the
+settings. However, GitHub secret PUT has no atomic create-only option. Another
+write between the last read and the upload can still be replaced. These checks
+do not remove that race.
+
+The tool cannot read GitHub's stored secret or compare it with a supplied key.
+When a secret already exists, verification covers the supplied key only. The
+stored secret remains unverified. A successful protected workflow trial is
+required to test the stored credential.
+
+Allow this repository's build job to publish the registered GHCR packages.
+The registry reader requires public GHCR packages. Setup reports an unreadable
+public manifest as a separate requirement. That read does not prove package
+write access. The tool does not change repository or package visibility.
+
+### Partial setup recovery
+
+Setup is not a transaction. On failure, the tool lists completed operation
+names without secret values. It preserves those resources. Exit code 0 means
+a conflict-free dry-run plan or verified configuration. Exit code 1 means a
+configuration or transport failure; invalid command arguments use exit code 2.
+An unavailable installation check cannot produce a completion report.
+
+If environment creation is incomplete, inspect its reviewers and branch rules
+in GitHub. Repair the protection explicitly before rerunning setup. Do not
+remove protection to make setup pass. Compatible completed resources are reused.
+
+If registration succeeds but installation or key upload fails, keep the App.
+Complete its installation and obtain any organization approval. Check the secret
+names because an upload error can have an uncertain result. If the secret is
+absent, generate a replacement private key in the GitHub App settings. Save the
+file privately and use the existing-App command with the displayed public App ID.
+Do not rerun new App creation to recover that key. The in-memory key is not saved.
+
+If key upload succeeds but App ID creation fails, the tool prints the public
+App ID. Confirm the App identity, then manually create the missing
+`RELEASE_APP_ID` repository variable with that value. Preserve the stored secret.
+Setup deliberately stops when a secret exists without App ID metadata. Once the
+metadata is repaired, a repeat run with existing-App credentials can verify
+the supplied key and reuse the stored secret. A protected workflow trial is
+still required. No App, environment, variable, or secret is deleted on failure.
+
+Live setup and GitHub App registration have not been tested for this change.
+The CI tests use fake GitHub responses and test-only keys. They do not create
+an App, start a real browser, or change GitHub settings. The setup command runs
+locally; no Actions job receives administrator credentials.
+
+### Manual trial and activation
 
 Use these repository variables:
 

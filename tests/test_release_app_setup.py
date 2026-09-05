@@ -4,9 +4,11 @@ import contextlib
 import io
 import http.client
 import json
+import os
 import socket
 import sys
 import threading
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -22,6 +24,44 @@ from release_setup import SetupError
 import release_app_setup as app
 
 SECRET = 'FAKE-SECRET-MUST-NOT-ESCAPE'
+
+
+class CLIKeyFileTests(unittest.TestCase):
+    def test_private_regular_file_is_read_and_unsafe_inputs_are_redacted(self):
+        from setup_release import _read_private_key
+        with tempfile.TemporaryDirectory() as directory:
+            key_path = Path(directory) / 'test.pem'
+            key_path.write_bytes(SECRET.encode())
+            key_path.chmod(0o600)
+            self.assertEqual(_read_private_key(str(key_path)), SECRET.encode())
+            for path in (directory, str(key_path) + '.missing'):
+                with self.subTest(path=path), self.assertRaises(SetupError) as caught:
+                    _read_private_key(path)
+                self.assertNotIn(SECRET, str(caught.exception))
+            if os.name == 'posix':
+                key_path.chmod(0o640)
+                with self.assertRaises(SetupError) as caught:
+                    _read_private_key(str(key_path))
+                self.assertIn('chmod 600', str(caught.exception))
+                self.assertEqual(key_path.stat().st_mode & 0o777, 0o640)
+                key_path.chmod(0o604)
+                with self.assertRaises(SetupError):
+                    _read_private_key(str(key_path))
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX special files')
+    def test_symlink_and_fifo_are_rejected_without_blocking(self):
+        from setup_release import _read_private_key
+        with tempfile.TemporaryDirectory() as directory:
+            key_path = Path(directory) / 'test.pem'
+            key_path.write_bytes(SECRET.encode())
+            key_path.chmod(0o600)
+            link = Path(directory) / 'link.pem'
+            link.symlink_to(key_path)
+            fifo = Path(directory) / 'fifo.pem'
+            os.mkfifo(fifo, 0o600)
+            for path in (link, fifo):
+                with self.subTest(path=path), self.assertRaises(SetupError):
+                    _read_private_key(str(path))
 
 
 def public_app():

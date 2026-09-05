@@ -1,6 +1,8 @@
 """Tests for the read-only release settings planner and GitHub transport."""
 import base64
 import copy
+import contextlib
+import io
 import json
 import os
 import sys
@@ -12,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'ci'))
 
 from release_setup import (GitHubCLI, SetupError, apply_settings,
                            inspect_settings, plan_settings)
+from setup_release import main
 
 
 def empty_settings():
@@ -667,6 +670,341 @@ class SettingsApplyTests(unittest.TestCase):
                 self.assertEqual(len(gh.writes), 1)
                 self.assertEqual(completed, ['environment:release-publish'])
                 self.assertIn('manual repair', str(caught.exception).lower())
+
+
+class CLIGitHub(StatefulGitHub):
+    """Persist fake API changes so repeated CLI runs use actual prior results."""
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.secret_present = False
+        self.events = []
+        self.upload_error = False
+        self.app_id_error = False
+        self.after_upload = None
+
+    def pages(self, route, key):
+        if route == '/repositories/42/environments/release-commit/secrets':
+            return [{'name': 'RELEASE_APP_PRIVATE_KEY',
+                     'created_at': '2026-09-05T00:00:00Z',
+                     'updated_at': '2026-09-05T00:00:00Z'}] if self.secret_present else []
+        return super().pages(route, key)
+
+    def write(self, method, route, body):
+        if body.get('name') == 'RELEASE_APP_ID' and self.app_id_error:
+            raise SetupError('GitHub API write failed; no response details were retained.')
+        result = super().write(method, route, body)
+        self.events.append(('write', route, body.get('name')))
+        return result
+
+    def upload_key(self, repository, pem):
+        if repository != 'owner/repo' or pem != b'FAKE-SECRET-MUST-NOT-ESCAPE':
+            raise AssertionError('Wrong credential upload arguments')
+        self.events.append(('upload',))
+        if self.upload_error:
+            raise SetupError('GitHub secret upload failed; the private key was not retained.')
+        self.secret_present = True
+        if self.after_upload:
+            self.after_upload()
+
+
+class CLIApp:
+    def __init__(self, gh):
+        self.gh = gh
+        self.on_verify = None
+        self.notices = ['Target repository access is verified; other selected repositories were not checked.']
+
+    def register_app(self, repository, owner_type):
+        if (repository, owner_type) != ('owner/repo', 'Organization'):
+            raise AssertionError('Wrong registration owner')
+        self.gh.events.append(('register',))
+        return {'id': 123, 'slug': 'release-helper', 'pem': b'FAKE-SECRET-MUST-NOT-ESCAPE'}
+
+    def verify_installation(self, repository, app_id, pem, *, newly_created=False):
+        if (repository, app_id, pem) != ('owner/repo', 123, b'FAKE-SECRET-MUST-NOT-ESCAPE'):
+            raise AssertionError('Wrong App verification arguments')
+        self.gh.events.append(('verify', newly_created))
+        if self.on_verify:
+            self.on_verify()
+        return {'id': 123, 'slug': 'release-helper', 'repository': repository,
+                'permissions': {'contents': 'write', 'pull_requests': 'read', 'metadata': 'read'},
+                'notices': self.notices}
+
+
+class ReleaseSetupCLITests(unittest.TestCase):
+    args = ['--repo', 'owner/repo', '--reviewer', 'reviewer']
+
+    def invoke(self, args, gh, app_service=None):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+            code = main(args, gh=gh, app_service=app_service)
+        return code, output.getvalue()
+
+    def test_dry_run_cannot_read_key_register_app_or_write(self):
+        gh = StatefulGitHub()
+        gh.write = mock.Mock(side_effect=AssertionError('GitHub write'))
+        gh.upload_key = mock.Mock(side_effect=AssertionError('secret write'))
+        forbidden = mock.Mock()
+        forbidden.register_app.side_effect = AssertionError('registration')
+        forbidden.verify_installation.side_effect = AssertionError('verification')
+        with mock.patch('setup_release._read_private_key',
+                        side_effect=AssertionError('key read')):
+            for extra in ([], ['--create-app'],
+                          ['--app-id', '123', '--private-key-file', '/not/read/in/dry-run']):
+                with self.subTest(extra=extra):
+                    code, output = self.invoke(self.args + extra, gh, forbidden)
+                    self.assertEqual(code, 0)
+                    self.assertIn('stage=plan status=complete', output)
+        self.assertEqual(gh.writes, [])
+
+    def test_invalid_arguments_fail_before_any_external_operation(self):
+        invalid = [
+            ['--repo', 'owner/repo'],
+            ['--repo', 'owner/repo/extra', '--reviewer', 'reviewer'],
+            ['--repo', 'owner/..', '--reviewer', 'reviewer'],
+            ['--repo', 'owner/repo?x=1', '--reviewer', 'reviewer'],
+            self.args + ['--reviewer', 'REVIEWER'],
+            self.args + sum((['--reviewer', f'user-{i}'] for i in range(6)), []),
+            self.args + ['--app-id', '123'],
+            self.args + ['--private-key-file', '/unused'],
+            self.args + ['--app-id', '0', '--private-key-file', '/unused'],
+            self.args + ['--create-app', '--app-id', '123', '--private-key-file', '/unused'],
+            self.args + ['--private-key', 'FAKE-SECRET-MUST-NOT-ESCAPE'],
+        ]
+        forbidden = mock.Mock()
+        forbidden.get.side_effect = AssertionError('inspection')
+        with mock.patch('setup_release._read_private_key', side_effect=AssertionError('key read')):
+            for args in invalid:
+                with self.subTest(args=args):
+                    output = io.StringIO()
+                    with contextlib.redirect_stderr(output), self.assertRaises(SystemExit) as caught:
+                        main(args, gh=forbidden, app_service=forbidden)
+                    self.assertEqual(caught.exception.code, 2)
+                    self.assertNotIn('FAKE-SECRET-MUST-NOT-ESCAPE', output.getvalue())
+
+    def test_help_does_not_construct_transports(self):
+        with mock.patch('setup_release.GitHubCLI', side_effect=AssertionError('transport')):
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as caught:
+                main(['--help'])
+        self.assertEqual(caught.exception.code, 0)
+
+    def apply(self, gh, app=None, *, create=False):
+        credentials = (['--create-app'] if create else
+                       ['--app-id', '123', '--private-key-file', '/fake/test-only.pem'])
+        with mock.patch('setup_release._read_private_key', return_value=b'FAKE-SECRET-MUST-NOT-ESCAPE'):
+            return self.invoke(self.args + credentials + ['--apply'], gh, app or CLIApp(gh))
+
+    def test_apply_verifies_protections_and_app_before_secret_then_app_id(self):
+        gh = CLIGitHub()
+        code, output = self.apply(gh)
+        self.assertEqual(code, 0)
+        self.assertTrue(gh.secret_present)
+        self.assertEqual(gh.variables, {'RELEASE_ENABLED': 'false',
+                                      'RELEASE_AUTO_TRIGGER': 'false',
+                                      'RELEASE_AUTO_COMMIT': 'false', 'RELEASE_APP_ID': '123'})
+        self.assertEqual(gh.events[-3:], [('verify', False), ('upload',),
+                         ('write', '/repos/owner/repo/actions/variables', 'RELEASE_APP_ID')])
+        self.assertIn('stage=report status=complete', output)
+        self.assertNotIn('FAKE-SECRET-MUST-NOT-ESCAPE', output)
+        self.assertIn('protected workflow trial', output)
+
+    def test_repeat_run_preserves_stored_secret_and_enabled_variables(self):
+        gh = CLIGitHub()
+        self.assertEqual(self.apply(gh)[0], 0)
+        gh.variables['RELEASE_ENABLED'] = 'true'
+        gh.variables['RELEASE_AUTO_TRIGGER'] = 'true'
+        gh.variables['RELEASE_AUTO_COMMIT'] = 'true'
+        before = copy.deepcopy(gh.writes)
+        gh.events.clear()
+        code, output = self.apply(gh)
+        self.assertEqual(code, 0)
+        self.assertEqual(gh.writes, before)
+        self.assertEqual(gh.events, [('verify', False)])
+        self.assertIn('stored secret was not verified', output)
+        for name in ('RELEASE_ENABLED', 'RELEASE_AUTO_TRIGGER', 'RELEASE_AUTO_COMMIT'):
+            self.assertEqual(gh.variables[name], 'true')
+            self.assertIn(f'{name} is already true', output)
+
+    def test_create_waits_for_explicit_installation_continuation(self):
+        gh = CLIGitHub()
+        def continue_installation(prompt):
+            gh.events.append(('continue',))
+            return 'continue'
+        with mock.patch('builtins.input', side_effect=continue_installation):
+            code, output = self.apply(gh, create=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(gh.events[-5:], [('register',), ('continue',), ('verify', True),
+                                         ('upload',), ('write', '/repos/owner/repo/actions/variables', 'RELEASE_APP_ID')])
+        self.assertIn('App ID: 123', output)
+        self.assertIn('https://github.com/apps/release-helper/installations/new', output)
+        self.assertIn('owner/repo only', output)
+
+    def test_create_without_continuation_preserves_settings_without_credentials(self):
+        for response in ('', 'no', EOFError()):
+            gh = CLIGitHub()
+            options = {'side_effect': response} if isinstance(response, Exception) else {'return_value': response}
+            with self.subTest(response=response), mock.patch('builtins.input', **options):
+                code, output = self.apply(gh, create=True)
+            self.assertEqual(code, 1)
+            self.assertFalse(any(event[0] in ('verify', 'upload') for event in gh.events))
+            self.assertNotIn('RELEASE_APP_ID', gh.variables)
+            self.assertIn('App ID: 123', output)
+            self.assertNotIn('stage=report status=complete', output)
+
+    def test_apply_without_credentials_or_create_with_credentials_stops_before_writes(self):
+        for app_id, secret, create in ((None, False, False), ('123', False, True),
+                                      ('123', True, True), (None, True, True)):
+            gh = CLIGitHub()
+            if app_id:
+                gh.variables['RELEASE_APP_ID'] = app_id
+            gh.secret_present = secret
+            if secret:
+                gh.environments['release-commit'] = protected_environment()
+            args = self.args + ['--apply'] + (['--create-app'] if create else [])
+            with self.subTest(app_id=app_id, secret=secret, create=create):
+                code, output = self.invoke(args, gh, CLIApp(gh))
+                self.assertEqual(code, 1)
+                self.assertEqual(gh.writes, [])
+                self.assertEqual(gh.events, [])
+                self.assertNotIn('stage=report status=complete', output)
+
+    def test_mismatched_app_or_environment_stops_before_key_read(self):
+        for target in ('app', 'environment'):
+            gh = CLIGitHub()
+            if target == 'app':
+                gh.variables['RELEASE_APP_ID'] = '456'
+            else:
+                gh.environments['release-commit'] = protected_environment(
+                    reviewers=[{'type': 'User', 'id': 88}])
+            with self.subTest(target=target), mock.patch('setup_release._read_private_key',
+                                                        side_effect=AssertionError('key read')):
+                code, _ = self.invoke(self.args + ['--app-id', '123', '--private-key-file', '/never/read', '--apply'], gh, CLIApp(gh))
+            self.assertEqual(code, 1)
+            self.assertEqual(gh.writes, [])
+
+    def test_apply_rechecks_all_settings_before_first_write(self):
+        gh = CLIGitHub()
+        get = gh.get
+        reads = 0
+        def changed(route, **kwargs):
+            nonlocal reads
+            if route == '/repos/owner/repo':
+                reads += 1
+                if reads == 2:
+                    gh.variables['RELEASE_ENABLED'] = 'true'
+            return get(route, **kwargs)
+        gh.get = changed
+        code, _ = self.apply(gh)
+        self.assertEqual(code, 1)
+        self.assertEqual(gh.writes, [])
+
+    def test_stale_environment_app_id_or_new_secret_stops_before_upload(self):
+        for target in ('environment', 'app', 'secret'):
+            gh = CLIGitHub()
+            app = CLIApp(gh)
+            def change():
+                if target == 'environment':
+                    gh.environments['release-commit']['environment']['reviewers'] = []
+                elif target == 'app':
+                    gh.variables['RELEASE_APP_ID'] = '456'
+                else:
+                    gh.variables['RELEASE_APP_ID'] = '123'
+                    gh.secret_present = True
+            app.on_verify = change
+            with self.subTest(target=target):
+                code, _ = self.apply(gh, app)
+            self.assertEqual(code, 1)
+            self.assertNotIn(('upload',), gh.events)
+            self.assertFalse(any(body.get('name') == 'RELEASE_APP_ID' for _, _, body in gh.writes))
+
+    def test_upload_failure_reports_replacement_key_recovery_and_public_id(self):
+        gh = CLIGitHub()
+        gh.upload_error = True
+        code, output = self.apply(gh)
+        self.assertEqual(code, 1)
+        self.assertNotIn('RELEASE_APP_ID', gh.variables)
+        self.assertIn('App ID: 123', output)
+        self.assertIn('Generate a replacement private key', output)
+        self.assertIn('--app-id', output)
+        self.assertIn('environment:release-publish', output)
+        self.assertNotIn('FAKE-SECRET-MUST-NOT-ESCAPE', output)
+        gh.upload_error = False
+        writes = len(gh.writes)
+        self.assertEqual(self.apply(gh)[0], 0)
+        self.assertEqual(len(gh.writes), writes + 1)
+
+    def test_app_id_write_failure_requires_manual_metadata_repair(self):
+        gh = CLIGitHub()
+        gh.app_id_error = True
+        code, output = self.apply(gh)
+        self.assertEqual(code, 1)
+        self.assertTrue(gh.secret_present)
+        self.assertNotIn('RELEASE_APP_ID', gh.variables)
+        self.assertIn('App ID: 123', output)
+        self.assertIn('manual metadata repair', output)
+        self.assertNotIn('FAKE-SECRET-MUST-NOT-ESCAPE', output)
+        before = list(gh.events)
+        self.assertEqual(self.apply(gh)[0], 1)
+        self.assertEqual(gh.events, before)
+
+    def test_metadata_readback_failure_is_not_reported_as_complete(self):
+        gh = CLIGitHub()
+        gh.after_upload = lambda: setattr(gh, 'secret_present', False)
+        code, output = self.apply(gh)
+        self.assertEqual(code, 1)
+        self.assertNotIn('stage=report status=complete', output)
+
+    def test_app_id_changed_after_upload_is_never_replaced(self):
+        gh = CLIGitHub()
+        gh.after_upload = lambda: gh.variables.update(RELEASE_APP_ID='456')
+        code, _ = self.apply(gh)
+        self.assertEqual(code, 1)
+        self.assertEqual(gh.variables['RELEASE_APP_ID'], '456')
+        self.assertFalse(any(body.get('name') == 'RELEASE_APP_ID' for _, _, body in gh.writes))
+
+    def test_partial_environment_and_missing_installation_do_not_upload(self):
+        gh = CLIGitHub(corrupt_environment=True)
+        code, output = self.apply(gh)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(gh.writes), 1)
+        self.assertIn('manual repair', output)
+        self.assertIn('environment:release-publish', output)
+        gh = CLIGitHub()
+        app = CLIApp(gh)
+        def missing():
+            raise SetupError('GitHub App API access failed; no response details were retained.')
+        app.on_verify = missing
+        code, output = self.apply(gh, app)
+        self.assertEqual(code, 1)
+        self.assertNotIn(('upload',), gh.events)
+        self.assertNotIn('stage=report status=complete', output)
+
+    def test_package_and_broad_app_access_notices_are_reported(self):
+        gh = CLIGitHub()
+        gh.public_manifest = lambda repository: False
+        app = CLIApp(gh)
+        app.notices = ['The existing App installation can access all owner repositories.',
+                       'The existing App has additional write permissions; access was not changed.']
+        code, output = self.apply(gh, app)
+        self.assertEqual(code, 0)
+        self.assertIn('ghcr.io/owner/image', output)
+        self.assertIn('all owner repositories', output)
+        self.assertIn('additional write permissions', output)
+
+    def test_raw_os_error_is_redacted_and_interrupt_is_not_success(self):
+        for error in (OSError('FAKE-SECRET-MUST-NOT-ESCAPE'), KeyboardInterrupt()):
+            gh = CLIGitHub()
+            app = CLIApp(gh)
+            def fail():
+                raise error
+            app.on_verify = fail
+            with self.subTest(error=type(error).__name__):
+                if isinstance(error, KeyboardInterrupt):
+                    with self.assertRaises(KeyboardInterrupt):
+                        self.apply(gh, app)
+                else:
+                    code, output = self.apply(gh, app)
+                    self.assertEqual(code, 1)
+                    self.assertNotIn('FAKE-SECRET-MUST-NOT-ESCAPE', output)
 
 
 if __name__ == '__main__':
