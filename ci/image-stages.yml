@@ -1,0 +1,122 @@
+# Report-only release groups. These do not yet change WDL image defaults.
+version: 1
+images:
+  cell_type:
+    repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression
+    build_paths: ["scripts/cell_type_specific_expression/**", "envs/CellTypeSpecificExpression/**", ".dockerignore"]
+    environment_paths: ["envs/CellTypeSpecificExpression/**", ".dockerignore"]
+  standard:
+    repository: ghcr.io/aou-multiomics-analysis/prepare_qtl
+    build_paths: ["scripts/**", "envs/PhenotypePCs/**", ".dockerignore"]
+    environment_paths: ["envs/PhenotypePCs/**", ".dockerignore"]
+  methylation_rust:
+    repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust
+    build_paths: ["rust/methylation_filter/**", "rust/methylation_merge/**", "envs/MethylationRust/**", ".dockerignore"]
+    environment_paths: ["envs/MethylationRust/**", ".dockerignore"]
+  rnaseqc:
+    repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation
+    build_paths: ["scripts/expression/merge_rnaseqc.py", "envs/RNASeQCAggregation/**", ".dockerignore"]
+    environment_paths: ["envs/RNASeQCAggregation/**", ".dockerignore"]
+
+stages:
+  cell_estimation:
+    image: cell_type
+    sources:
+      - scripts/cell_type_specific_expression/filter_expression_genes.R
+      - scripts/cell_type_specific_expression/validate_proportion_mode.R
+      - scripts/cell_type_specific_expression/process_proportions.R
+      - scripts/cell_type_specific_expression/prepare_hspe_batches.R
+      - scripts/cell_type_specific_expression/run_hspe_batch.R
+      - scripts/cell_type_specific_expression/run_hspe.R
+      - scripts/cell_type_specific_expression/merge_hspe_batches.R
+      - scripts/cell_type_specific_expression/R/hspe*.R
+      - scripts/cell_type_specific_expression/R/proportions.R
+      - scripts/cell_type_specific_expression/R/workflow_validation.R
+  cell_fit:
+    image: cell_type
+    sources:
+      - scripts/cell_type_specific_expression/fit_tca.R
+      - scripts/cell_type_specific_expression/clean_tca_model.R
+      - scripts/cell_type_specific_expression/R/tca_stage.R
+      - scripts/cell_type_specific_expression/R/model_cleanup.R
+      - scripts/cell_type_specific_expression/R/model_restart.R
+  cell_export:
+    image: cell_type
+    sources:
+      - scripts/cell_type_specific_expression/export_tca_beds.R
+      - scripts/cell_type_specific_expression/R/bed_outputs.R
+      - scripts/cell_type_specific_expression/R/model_cleanup.R
+      - scripts/cell_type_specific_expression/R/model_restart.R
+      - scripts/cell_type_specific_expression/R/tca_stage.R
+      - scripts/cell_type_specific_expression/R/qc.R
+  cell_downstream:
+    image: cell_type
+    sources:
+      - scripts/cell_type_specific_expression/summarize_cell_type_beds.R
+      - scripts/cell_type_specific_expression/prepare_haemopedia.R
+      - scripts/cell_type_specific_expression/filter_cell_type_beds.R
+      - scripts/cell_type_specific_expression/build_deconvolution_manifest.R
+      - scripts/cell_type_specific_expression/build_qtl_manifest.R
+      - scripts/cell_type_specific_expression/prepare_scatter_inputs.R
+      - scripts/cell_type_specific_expression/R/reference*.R
+      - scripts/cell_type_specific_expression/R/gene_summary.R
+      - scripts/cell_type_specific_expression/R/integration.R
+      - scripts/cell_type_specific_expression/R/qc.R
+      - scripts/cell_type_specific_expression/R/model_restart.R
+      - scripts/cell_type_specific_expression/R/bed_outputs.R
+      - scripts/cell_type_specific_expression/R/tca_stage.R
+  expression:
+    image: standard
+    sources: ["scripts/expression/PrepareExpression.R", "scripts/common/**"]
+  proteomics:
+    image: standard
+    sources: ["scripts/proteomics/**", "scripts/common/**"]
+  splicing:
+    image: standard
+    sources: ["scripts/splicing/**", "scripts/common/**"]
+  methylation:
+    image: standard
+    sources: ["scripts/methylation/**", "scripts/common/**"]
+  methylation_rust:
+    image: methylation_rust
+    sources: ["rust/methylation_filter/**", "rust/methylation_merge/**"]
+  rnaseqc:
+    image: rnaseqc
+    sources: ["scripts/expression/merge_rnaseqc.py"]
+
+shared:
+  - sources:
+      - scripts/cell_type_specific_expression/bootstrap.R
+      - scripts/cell_type_specific_expression/R/io.R
+      - scripts/cell_type_specific_expression/R/constants.R
+      - scripts/cell_type_specific_expression/R/expression.R
+      - scripts/cell_type_specific_expression/R/expression_bed.R
+    stages: [cell_estimation, cell_fit, cell_export, cell_downstream]
+
+# Classify development tools explicitly; they are copied but not used by live tasks.
+ignored_sources:
+  - scripts/.lintr
+  - scripts/check_wdl_logging.py
+  - scripts/check_wdl_file_scope.py
+  - scripts/validate_dockstore.py
+  - scripts/cell_type_specific_expression/lint_r.R
+  - scripts/cell_type_specific_expression/generate_synthetic_fixture.R
+
+workflow_groups:
+  - paths: ["workflows/cell_type_specific_expression/**"]
+    stages: [cell_estimation, cell_fit, cell_export, cell_downstream, expression]
+  - paths: ["workflows/expression/prepare_eQTL.wdl"]
+    stages: [expression]
+  - paths: ["workflows/expression/rnaseqc2_aggregate_batched.wdl"]
+    stages: [rnaseqc]
+  - paths: ["workflows/common/**"]
+    stages: [expression, proteomics, splicing, methylation]
+  - paths: ["workflows/proteomics/**"]
+    stages: [proteomics]
+  - paths: ["workflows/splicing/**"]
+    stages: [splicing]
+  - paths: ["workflows/methylation/**"]
+    stages: [methylation, methylation_rust]
+  - paths: ["workflows/genotype/**"]
+    stages: []
+    policy: external_images_manual
