@@ -70,6 +70,33 @@ def _relative(node, root):
     return Path(node.pos.abspath).resolve().relative_to(root.resolve()).as_posix()
 
 
+def _protect_literal_transfer_programs(command):
+    """Keep proof of single quoting before shlex removes shell quote context.
+
+    Consume comments, escaped characters and double-quoted words without inspecting
+    their contents. Only complete single-quoted fixed programs get a marker;
+    concatenated variable expansions cannot match that marker after lexing.
+    """
+    prefix = '__LITERAL_TRANSFER__'
+    while prefix in command:
+        prefix += '_'
+    programs = {}
+
+    def protect(match):
+        literal = match.group(1)
+        if literal is not None:
+            program = '\n'.join(line.strip() for line in literal.strip().splitlines())
+            if program in _FIXED_TRANSFER_SHELL_PROGRAMS.values():
+                marker = f'{prefix}{len(programs)}__'
+                programs[marker] = program
+                return "'" + marker + "'"
+        return match.group(0)
+
+    quoted_word = r"#[^\n]*|\\.|\"(?:\\.|[^\"\\])*\"|'([^']*)'"
+    command = re.sub(quoted_word, protect, command)
+    return command, programs
+
+
 def _check_substitutions(command):
     """Permit existing scalar log/read forms; reject all other substitutions."""
     literal_path = r'[A-Za-z0-9_./-]+'
@@ -115,6 +142,7 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
         _check_substitutions(command)
     except ValueError as error:
         raise ValueError(f'{label}: {display(str(error))}') from error
+    command, literal_programs = _protect_literal_transfer_programs(command)
     lexer = shlex.shlex(command, posix=True, punctuation_chars=';&|()')
     lexer.whitespace = ' \t\r'
     lexer.wordchars += '$'
@@ -133,8 +161,8 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
             continue
         if not command_start:
             if executable in {'bash', 'sh'}:
-                program = tokens[index + 2] if index + 2 < len(tokens) else ''
-                program = '\n'.join(line.strip() for line in program.strip().splitlines())
+                program_token = tokens[index + 2] if index + 2 < len(tokens) else ''
+                program = literal_programs.get(program_token)
                 prefix = tokens[command_index:index]
                 if (len(prefix) == 6 and prefix[:3] == ['xargs', '-0', '-n']
                         and prefix[3] in _FIXED_TRANSFER_SHELL_PROGRAMS
