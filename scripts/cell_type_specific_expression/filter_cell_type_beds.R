@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 
+# BED inputs use linear CPM. Expression thresholds use mean log2(CPM + 1).
 file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 script_path <- gsub("~+~", " ", sub("^--file=", "", file_arg[[1L]]), fixed = TRUE)
 source(file.path(dirname(normalizePath(script_path)), "bootstrap.R"))
