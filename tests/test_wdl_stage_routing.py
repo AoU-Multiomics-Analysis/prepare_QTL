@@ -164,6 +164,20 @@ class WdlStageRoutingTest(unittest.TestCase):
         self.workflow(command="cat > paths.txt <<'PATHS'\n~{script}\nPATHS\n" + self.command)
         self.assertEqual(self.errors(), [])
 
+    def test_nested_interpreter_substitutions_require_review(self):
+        for nested in ('python3 "~{script}"',
+                       'Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/fit/fit.R'):
+            for substitution in ('$(' + nested + ')', '`' + nested + '`'):
+                with self.subTest(substitution=substitution):
+                    self.workflow(command=self.command + ' --arg "' + substitution + '"')
+                    self.assertTrue(any('substitution' in e and 'contract' in e
+                                        and 'NeverRegistered' in e for e in self.errors()))
+
+    def test_current_log_substitutions_remain_supported(self):
+        self.workflow(command='printf "%s\\n" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"\n'
+                      'count="$(wc -l < outputs/data.tsv)"\n' + self.command)
+        self.assertEqual(self.errors(), [])
+
     def test_source_symlink_cannot_escape_candidate_root(self):
         script = self.root / 'scripts/cell_type_specific_expression/export/new.R'
         script.unlink()

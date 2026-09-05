@@ -51,6 +51,28 @@ def _relative(node, root):
     return Path(node.pos.abspath).resolve().relative_to(root.resolve()).as_posix()
 
 
+def _check_substitutions(command):
+    """Permit existing scalar log/read forms; reject all other substitutions."""
+    literal_path = r'[A-Za-z0-9_./-]+'
+    file_argument = rf'(?:{literal_path}|"\$[A-Za-z_][A-Za-z_0-9]*")'
+    safe_forms = (
+        r"date -u (?:\+%Y-%m-%dT%H:%M:%SZ|'\+%Y-%m-%dT%H:%M:%SZ')",
+        r"date '\+%b %d %H:%M:%S'",
+        rf'wc -l < {literal_path}',
+        rf"awk 'END {{ print NR (?:- 1|\+ 0) }}' {file_argument}",
+        rf"zgrep -m 1 '\^' {file_argument}",
+        rf'<(?:{literal_path}|"{_PLACEHOLDER}[0-9]+__")',
+    )
+    # The current RNA-SeQC log uses this integer arithmetic expression.
+    remainder = re.sub(rf'\$\(\({_PLACEHOLDER}[0-9]+__ \+ 1\)\)', '', command)
+    for match in re.finditer(r'\$\(([^()]*)\)', remainder):
+        if not any(re.fullmatch(form, match[1]) for form in safe_forms):
+            raise ValueError(f'unsupported command substitution {match[0]!r}; add a reviewed contract')
+    remainder = re.sub(r'\$\([^()]*\)', '', remainder)
+    if '$(' in remainder or '`' in remainder:
+        raise ValueError('unsupported nested or backtick command substitution; add a reviewed contract')
+
+
 def task_stages(task, config: dict, source_root: Path) -> set[str]:
     """Return stages that can run every literal script in this task.
 
@@ -70,6 +92,10 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
     command = ''.join(part if isinstance(part, str) else f'{_PLACEHOLDER}{i}__'
                       for i, part in enumerate(task.command.parts)).replace('\\\n', '')
     command = _without_literal_data(command)
+    try:
+        _check_substitutions(command)
+    except ValueError as error:
+        raise ValueError(f'{label}: {display(str(error))}') from error
     lexer = shlex.shlex(command, posix=True, punctuation_chars=';&|()')
     lexer.whitespace = ' \t\r'
     lexer.wordchars += '$'
