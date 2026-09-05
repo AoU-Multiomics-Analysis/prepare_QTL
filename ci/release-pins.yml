@@ -1,0 +1,26 @@
+# Candidate pin targets only. No publishing or automatic commits are enabled.
+version: 1
+stages:
+  cell_estimation:
+    - path: workflows/cell_type_specific_expression/deconvolution.wdl
+      input: estimation_docker_image
+    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+      input: estimation_docker_image
+  cell_fit:
+    - path: workflows/cell_type_specific_expression/deconvolution.wdl
+      input: fit_docker_image
+    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+      input: fit_docker_image
+  cell_export:
+    - path: workflows/cell_type_specific_expression/deconvolution.wdl
+      input: export_docker_image
+    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+      input: export_docker_image
+  cell_downstream:
+    - path: workflows/cell_type_specific_expression/deconvolution.wdl
+      input: downstream_docker_image
+    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+      input: downstream_docker_image
+  expression:
+    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+      input: qtl_docker_image
