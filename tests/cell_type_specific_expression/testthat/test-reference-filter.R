@@ -99,13 +99,13 @@ testthat::test_that("filter CLI preserves retained BED rows across chunks and pa
     n_genes = 3L, n_samples = 3L, scale = "cpm", cell_group = "B cells", slug = "b_cells")
   inventory_path <- file.path(tmp, "inventory.tsv")
   readr::write_tsv(inventory, inventory_path)
-  config <- list(inventory = inventory_path, bed_paths = list(bed), reference_summary = NULL,
-                 min_mean_log2_cpm1 = 0.01, residual_cutoff = NULL, chunk_size = 2L)
-  config_path <- file.path(tmp, "config with spaces.json")
-  jsonlite::write_json(config, config_path, auto_unbox = TRUE, null = "null")
+  bed_list <- file.path(tmp, "bed paths with spaces.txt")
+  writeLines(bed, bed_list)
   output <- file.path(tmp, "output with spaces")
   status <- system2("Rscript", c(shQuote(file.path(script_root, "filter_cell_type_beds.R")),
-                                  shQuote(config_path), shQuote(output)))
+                                  "--inventory", shQuote(inventory_path),
+                                  "--bed-list", shQuote(bed_list), "--chunk-size", "2",
+                                  "--output-dir", shQuote(output)))
   testthat::expect_equal(status, 0L)
   filtered <- readr::read_tsv(file.path(output, "beds", "b_cells.filtered.bed.gz"), show_col_types = FALSE)
   testthat::expect_equal(filtered$gene_id, c("g1", "g3"))
