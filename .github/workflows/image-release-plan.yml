@@ -34,6 +34,8 @@ jobs:
         run: |
           python tests/test_stage_image_inputs.py
           python tests/test_pinned_smoke_inputs.py
+      - name: Test candidate pin patches and stale-result guards
+        run: python tests/test_release_pin_proposals.py
       - name: Report last commit impact
         if: github.event_name == 'workflow_dispatch'
         run: python ci/plan_image_updates.py --base HEAD^ --head HEAD >> "$GITHUB_STEP_SUMMARY"
