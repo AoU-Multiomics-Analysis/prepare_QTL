@@ -19,12 +19,13 @@ images:
   rnaseqc:
     dockerfile: envs/RNASeQCAggregation/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation
-    build_paths: ["scripts/expression/merge_rnaseqc.py", "envs/RNASeQCAggregation/**", ".dockerignore"]
+    build_paths: ["scripts/expression/merge_rnaseqc.py", "scripts/expression/rnaseqc/**", "envs/RNASeQCAggregation/**", ".dockerignore"]
     environment_paths: ["envs/RNASeQCAggregation/**", ".dockerignore"]
 
 stages:
   cell_estimation:
     image: cell_type
+    script_roots: ["scripts/cell_type_specific_expression/estimation"]
     sources:
       - scripts/cell_type_specific_expression/filter_expression_genes.R
       - scripts/cell_type_specific_expression/validate_proportion_mode.R
@@ -38,6 +39,7 @@ stages:
       - scripts/cell_type_specific_expression/R/workflow_validation.R
   cell_fit:
     image: cell_type
+    script_roots: ["scripts/cell_type_specific_expression/fit"]
     sources:
       - scripts/cell_type_specific_expression/fit_tca.R
       - scripts/cell_type_specific_expression/clean_tca_model.R
@@ -46,6 +48,7 @@ stages:
       - scripts/cell_type_specific_expression/R/model_restart.R
   cell_export:
     image: cell_type
+    script_roots: ["scripts/cell_type_specific_expression/export"]
     sources:
       - scripts/cell_type_specific_expression/export_tca_beds.R
       - scripts/cell_type_specific_expression/R/bed_outputs.R
@@ -55,6 +58,7 @@ stages:
       - scripts/cell_type_specific_expression/R/qc.R
   cell_downstream:
     image: cell_type
+    script_roots: ["scripts/cell_type_specific_expression/downstream"]
     sources:
       - scripts/cell_type_specific_expression/summarize_cell_type_beds.R
       - scripts/cell_type_specific_expression/prepare_haemopedia.R
@@ -71,24 +75,30 @@ stages:
       - scripts/cell_type_specific_expression/R/tca_stage.R
   expression:
     image: standard
+    script_roots: ["scripts/expression/prepare"]
     sources: ["scripts/expression/PrepareExpression.R", "scripts/common/**"]
   common:
     image: standard
     sources: ["scripts/common/**"]
   proteomics:
     image: standard
+    script_roots: ["scripts/proteomics"]
     sources: ["scripts/proteomics/**", "scripts/common/**"]
   splicing:
     image: standard
+    script_roots: ["scripts/splicing"]
     sources: ["scripts/splicing/**", "scripts/common/**"]
   methylation:
     image: standard
+    script_roots: ["scripts/methylation"]
     sources: ["scripts/methylation/**", "scripts/common/**"]
   methylation_rust:
     image: methylation_rust
+    script_roots: ["rust/methylation_filter", "rust/methylation_merge"]
     sources: ["rust/methylation_filter/**", "rust/methylation_merge/**"]
   rnaseqc:
     image: rnaseqc
+    script_roots: ["scripts/expression/rnaseqc"]
     sources: ["scripts/expression/merge_rnaseqc.py"]
 
 shared:
@@ -98,6 +108,7 @@ shared:
       - scripts/cell_type_specific_expression/R/constants.R
       - scripts/cell_type_specific_expression/R/expression.R
       - scripts/cell_type_specific_expression/R/expression_bed.R
+      - scripts/cell_type_specific_expression/shared/**
     stages: [cell_estimation, cell_fit, cell_export, cell_downstream]
 
 # Classify development tools explicitly; they are copied but not used by live tasks.
@@ -108,6 +119,15 @@ ignored_sources:
   - scripts/validate_dockstore.py
   - scripts/cell_type_specific_expression/lint_r.R
   - scripts/cell_type_specific_expression/generate_synthetic_fixture.R
+  - scripts/cell_type_specific_expression/tools/**
+
+# The standard image also copies direct R scripts from these directories to /tmp.
+legacy_runtime_roots:
+  - scripts/common
+  - scripts/expression
+  - scripts/methylation
+  - scripts/proteomics
+  - scripts/splicing
 
 workflow_groups:
   - paths: ["workflows/cell_type_specific_expression/**"]

@@ -8,6 +8,13 @@ import sys
 
 import yaml
 
+try:
+    from ci.script_stages import source_patterns, validate_script_roots
+except ModuleNotFoundError as error:
+    if error.name != 'ci':
+        raise
+    from script_stages import source_patterns, validate_script_roots
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -36,7 +43,7 @@ def plan_changes(config, changed_paths):
                 result['stages'].update(stage for stage, item in config['stages'].items()
                                         if item['image'] == image)
         for stage, info in config['stages'].items():
-            if matches(path, info['sources']):
+            if matches(path, source_patterns(info)):
                 classified = True
                 result['stages'].add(stage)
         for rule in config['shared']:
@@ -59,6 +66,7 @@ def validate_registry(config, root):
         for stage in group['stages']:
             if stage not in config['stages']:
                 errors.append(f'Unknown stage: {stage}')
+    errors.extend(validate_script_roots(config))
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
     errors.extend('Unmapped source/workflow: ' + path for path in
                   plan_changes(config, tracked)['unmapped'])

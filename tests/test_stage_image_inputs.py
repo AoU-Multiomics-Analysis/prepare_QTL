@@ -1,20 +1,16 @@
 """Catch image cross-wiring and mutable defaults at actual WDL call boundaries."""
 from pathlib import Path
 import os
+import sys
 import unittest
 import WDL
 
-ROOT = Path(os.environ.get('RELEASE_SOURCE_ROOT', Path(__file__).resolve().parents[1])).resolve()
+POLICY_ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get('RELEASE_SOURCE_ROOT', POLICY_ROOT)).resolve()
+sys.path.insert(0, str(POLICY_ROOT / 'ci'))
+from wdl_stage_routing import validate_routing
 BASE = ROOT / 'workflows/cell_type_specific_expression'
 STAGES = ('estimation', 'fit', 'export', 'downstream')
-
-
-def calls(nodes):
-    for node in nodes:
-        if isinstance(node, WDL.Tree.Call):
-            yield node
-        elif isinstance(node, (WDL.Tree.Scatter, WDL.Tree.Conditional)):
-            yield from calls(node.body)
 
 
 class StageImagesTest(unittest.TestCase):
@@ -42,35 +38,9 @@ class StageImagesTest(unittest.TestCase):
                 self.assertEqual(value, child[name].expr.eval(WDL.Env.Bindings(), WDL.StdLib.Base('1.0')).value)
 
     def test_each_call_receives_only_its_stage_image(self):
-        groups = {
-            'estimation': ['FilterExpressionGenes', 'ValidateProportionMode', 'PrepareHspeBatches',
-                           'RunHspeBatch', 'MergeHspeBatches', 'ProcessProportions'],
-            'fit': ['FitTca', 'CleanTcaModel'],
-            'export': ['ExportTcaBeds'],
-            'downstream': ['SummarizeCellTypeBeds', 'PrepareHaemopedia', 'FilterCellTypeBeds', 'BuildManifest'],
-        }
-        expected = {name: group for group, names in groups.items() for name in names}
-        actual_calls = list(calls(self.child.body))
-        self.assertEqual(set(expected), {c.name for c in actual_calls})
-        for downstream in ('downstream-image', 'replacement-image'):
-            for call in actual_calls:
-                group = expected[call.name]
-                want = downstream if group == 'downstream' else group + '-image'
-                self.assertEqual(call.inputs['docker_image'].eval(
-                    self.environment(downstream), WDL.StdLib.Base('1.0')).value, want, call.name)
-
-    def test_parent_routes_images_to_child_and_qtl(self):
-        for call in calls(self.parent.body):
-            if call.name == 'CellTypeDeconvolution':
-                for stage in STAGES:
-                    name = stage + '_docker_image'
-                    self.assertIn(name, call.inputs)
-                    self.assertEqual(call.inputs[name].eval(self.environment(), WDL.StdLib.Base('1.0')).value,
-                                     stage + '-image')
-            else:
-                key = 'DockerImage' if call.name == 'PrepareCellTypeEqtl' else 'docker_image'
-                want = 'qtl-image' if key == 'DockerImage' else 'downstream-image'
-                self.assertEqual(call.inputs[key].eval(self.environment(), WDL.StdLib.Base('1.0')).value, want)
+        # The validator follows every call, including future tasks, and derives
+        # stage identity from trusted pin inputs even when image digests match.
+        self.assertEqual(validate_routing(ROOT, POLICY_ROOT), [])
 
     def test_output_records_selected_stage_images(self):
         for workflow, groups in [(self.child, STAGES), (self.parent, (*STAGES, 'qtl'))]:

@@ -10,6 +10,7 @@ import sys
 import yaml
 from plan_image_updates import matches
 from propose_image_pins import literal_span, validate_image
+from wdl_stage_routing import validate_routing
 
 SUPPORTED_STAGES = {'cell_estimation', 'cell_fit', 'cell_export', 'cell_downstream',
                     'expression', 'common', 'proteomics', 'splicing', 'methylation',
@@ -33,6 +34,9 @@ def main():
     args = parser.parse_args()
     trusted = Path(__file__).resolve().parents[1]
     source = args.source.resolve()
+    routing_errors = validate_routing(source, trusted)
+    if routing_errors:
+        raise ValueError('Invalid stage routing:\n' + '\n'.join(routing_errors))
     config = yaml.safe_load((trusted / 'ci/image-stages.yml').read_text())
     targets = yaml.safe_load((trusted / 'ci/release-pins.yml').read_text())
     stages = set(config['stages']) if args.all_stages else selected_stages(json.loads(args.record.read_text()), config)

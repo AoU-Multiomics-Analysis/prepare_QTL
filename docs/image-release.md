@@ -193,6 +193,31 @@ The GitHub environments and App installation are part of the security boundary.
 Review changes to Dockerfiles before approving publication. Do not make the
 publish or commit jobs available to untrusted forks.
 
+## Add scripts and stages
+
+For an existing stage:
+
+1. Put the new script in one of the stage's owned `script_roots` directories in
+   `ci/image-stages.yml`.
+2. In WDL, pass the matching registered stage image through each call. Use that
+   input for the task's `runtime.docker` value.
+3. Add or extend a runtime test that runs the script with that stage image.
+
+A change to a shared script invalidates every declared consumer stage. Put a
+helper in a shared directory only when each declared consumer image can run it.
+
+A new stage also needs an entry in `ci/image-stages.yml`, registered immutable
+defaults in `ci/release-pins.yml`, and a runtime gate in
+`ci/test_release_images.py`. Add the stage to `SUPPORTED_STAGES` only after the
+runtime gate exists.
+
+The per-file `sources`, legacy runtime aliases, and legacy runtime roots are
+transitional. Use owned directories and canonical runtime paths for new code.
+This policy-only change does not split existing images, move source files, or
+build or publish new stage images. Do not move sources until the trusted policy
+and its tests are on `main`. Image splitting and publication need a separate
+build and migration plan.
+
 ## Build reuse and image retention
 
 `ci/image-stages.yml` maps build inputs and stage consumers.

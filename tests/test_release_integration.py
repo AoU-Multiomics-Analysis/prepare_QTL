@@ -2,6 +2,7 @@
 import sys
 from pathlib import Path
 import unittest
+from unittest import mock
 import tempfile
 import subprocess
 import yaml
@@ -118,6 +119,80 @@ class ReleaseTestSelection(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         config = yaml.safe_load((root / 'ci/image-stages.yml').read_text())
         self.assertEqual(set(config['stages']), SUPPORTED_STAGES)
+
+    def test_release_runner_rejects_candidate_policy_override(self):
+        import test_release_images as release_tests
+        from wdl_stage_routing import validate_routing
+
+        with tempfile.TemporaryDirectory() as directory:
+            candidate = Path(directory) / 'candidate'
+            trusted = Path(directory) / 'trusted'
+
+            def write(root, relative, text):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+
+            digest = 'ghcr.io/example/cell@sha256:' + 'a' * 64
+            trusted_config = {
+                'images': {'cell': {'repository': 'ghcr.io/example/cell'}},
+                'stages': {
+                    'cell_export': {
+                        'image': 'cell',
+                        'script_roots': ['scripts/cell_type_specific_expression/export'],
+                    },
+                    'cell_fit': {
+                        'image': 'cell',
+                        'script_roots': ['scripts/cell_type_specific_expression/fit'],
+                    },
+                },
+                'shared': [],
+            }
+            pins = {'stages': {
+                'cell_export': [{'path': 'workflows/main.wdl', 'input': 'export_docker_image'}],
+                'cell_fit': [{'path': 'workflows/main.wdl', 'input': 'fit_docker_image'}],
+            }}
+            wdl = f'''version 1.0
+
+task Export {{
+  input {{ String docker_image }}
+  command <<<
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/export/new.R
+  >>>
+  runtime {{ docker: docker_image }}
+}}
+
+workflow Main {{
+  input {{
+    String export_docker_image = "{digest}"
+    String fit_docker_image = "{digest}"
+  }}
+  call Export {{ input: docker_image = fit_docker_image }}
+}}
+'''
+            write(candidate, 'workflows/main.wdl', wdl)
+            write(candidate, 'scripts/cell_type_specific_expression/export/new.R', '# fixture\n')
+            write(trusted, 'ci/image-stages.yml', yaml.safe_dump(trusted_config))
+            write(trusted, 'ci/release-pins.yml', yaml.safe_dump(pins))
+
+            candidate_config = yaml.safe_load(yaml.safe_dump(trusted_config))
+            candidate_config['stages']['cell_export']['script_roots'], \
+                candidate_config['stages']['cell_fit']['script_roots'] = (
+                    candidate_config['stages']['cell_fit']['script_roots'],
+                    candidate_config['stages']['cell_export']['script_roots'],
+                )
+            write(candidate, 'ci/image-stages.yml', yaml.safe_dump(candidate_config))
+            write(candidate, 'ci/release-pins.yml', yaml.safe_dump(pins))
+
+            self.assertEqual(validate_routing(candidate, candidate), [])
+            self.assertTrue(validate_routing(candidate, trusted))
+            with mock.patch.object(release_tests, '__file__', str(trusted / 'ci/test_release_images.py')), \
+                    mock.patch.object(sys, 'argv', ['test_release_images.py', '--source',
+                                                   str(candidate), '--all-stages']), \
+                    mock.patch.object(release_tests.subprocess, 'run') as run:
+                with self.assertRaisesRegex(ValueError, 'stage routing'):
+                    release_tests.main()
+                run.assert_not_called()
 
 
 if __name__ == '__main__':
