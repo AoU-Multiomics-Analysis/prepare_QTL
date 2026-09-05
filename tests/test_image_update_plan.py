@@ -48,6 +48,45 @@ class ImagePlanTest(unittest.TestCase):
         plan = self.module.plan_changes(self.config, ['scripts/cell_type_specific_expression/new_method.R'])
         self.assertEqual(plan['unmapped'], ['scripts/cell_type_specific_expression/new_method.R'])
 
+    def test_new_script_under_stage_root_selects_its_stage(self):
+        cases = {
+            'scripts/cell_type_specific_expression/estimation/new_tool.R': 'cell_estimation',
+            'scripts/cell_type_specific_expression/fit/new_tool.R': 'cell_fit',
+            'scripts/cell_type_specific_expression/export/new_tool.R': 'cell_export',
+            'scripts/cell_type_specific_expression/downstream/new_tool.R': 'cell_downstream',
+            'scripts/expression/prepare/new_tool.R': 'expression',
+            'scripts/expression/rnaseqc/new_tool.py': 'rnaseqc',
+            'scripts/proteomics/new_tool.R': 'proteomics',
+            'scripts/splicing/new_tool.R': 'splicing',
+            'scripts/methylation/new_tool.R': 'methylation',
+            'rust/methylation_filter/src/new_module.rs': 'methylation_rust',
+            'rust/methylation_merge/src/new_module.rs': 'methylation_rust',
+        }
+        for source, stage in cases.items():
+            with self.subTest(source=source):
+                plan = self.module.plan_changes(self.config, [source])
+                self.assertEqual(plan['stages'], [stage])
+                self.assertEqual(plan['unmapped'], [])
+
+    def test_new_shared_cell_script_selects_all_consumers(self):
+        plan = self.module.plan_changes(
+            self.config,
+            ['scripts/cell_type_specific_expression/shared/new_helper.R'],
+        )
+        self.assertEqual(
+            plan['stages'],
+            ['cell_downstream', 'cell_estimation', 'cell_export', 'cell_fit'],
+        )
+        self.assertEqual(plan['unmapped'], [])
+
+    def test_new_cell_development_tool_is_ignored(self):
+        plan = self.module.plan_changes(
+            self.config,
+            ['scripts/cell_type_specific_expression/tools/new_tool.R'],
+        )
+        self.assertEqual(plan['stages'], [])
+        self.assertEqual(plan['unmapped'], [])
+
     def test_all_tracked_sources_and_workflows_are_classified(self):
         errors = self.module.validate_registry(self.config, ROOT)
         self.assertEqual(errors, [])
