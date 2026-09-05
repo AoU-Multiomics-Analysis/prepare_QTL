@@ -12,6 +12,7 @@ workflow PrepareMethylationQtlCovariates {
         Int PcMemoryGB
         Int PcDiskGB
         Int NumThreads
+        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
@@ -21,7 +22,8 @@ workflow PrepareMethylationQtlCovariates {
             OutputSuffix = ".INT",
             memory = PcMemoryGB,
             disk_space = PcDiskGB,
-            num_threads = NumThreads
+            num_threads = NumThreads,
+            DockerImage = methylation_docker_image
     }
 
     if (defined(AdditionalCovariates)) {
@@ -30,7 +32,8 @@ workflow PrepareMethylationQtlCovariates {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".methylation",
-                OutputSuffix = ".INT"
+                OutputSuffix = ".INT",
+                DockerImage = methylation_docker_image
         }
     }
 

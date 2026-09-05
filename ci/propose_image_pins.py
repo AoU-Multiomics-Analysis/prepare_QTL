@@ -22,11 +22,20 @@ def validate_image(value, repository):
         raise ValueError('Expected an immutable digest in repository ' + repository)
 
 
-def literal_span(text, input_name):
+def literal_span(text, input_name, scope='workflow', task=None):
     doc = WDL.parse_document(text)
-    if doc.wdl_version != '1.0' or doc.workflow is None:
-        raise ValueError('Pin targets must be WDL 1.0 workflows')
-    declarations = [d for d in doc.workflow.inputs if d.name == input_name]
+    if doc.wdl_version != '1.0':
+        raise ValueError('Pin targets must use WDL 1.0')
+    if scope == 'workflow' and task is None and doc.workflow is not None:
+        owner = doc.workflow
+    elif scope == 'task' and task:
+        owners = [item for item in doc.tasks if item.name == task]
+        if len(owners) != 1:
+            raise ValueError('Expected one named task: ' + task)
+        owner = owners[0]
+    else:
+        raise ValueError('Invalid or missing pin target scope')
+    declarations = [d for d in owner.inputs if d.name == input_name]
     if len(declarations) != 1:
         raise ValueError('Expected exactly one workflow input: ' + input_name)
     decl = declarations[0]
@@ -62,10 +71,12 @@ def propose(config, targets, plan, files, candidates):
             parts = PurePosixPath(path).parts
             if PurePosixPath(path).is_absolute() or '..' in parts or not path.endswith('.wdl'):
                 raise ValueError('Invalid WDL target path: ' + path)
-            if (path, name) in seen:
+            scope, task = location.get('scope', 'workflow'), location.get('task')
+            key = (path, scope, task, name)
+            if key in seen:
                 raise ValueError('Duplicate pin target: ' + path + ':' + name)
-            seen.add((path, name))
-            start, end, old = literal_span(files[path], name)
+            seen.add(key)
+            start, end, old = literal_span(files[path], name, scope, task)
             validate_image(old, repository)
             previous.add(old)
             if stage in plan['stages']:

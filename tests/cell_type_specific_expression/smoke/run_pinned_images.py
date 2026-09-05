@@ -4,10 +4,12 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import WDL
 
 PREFIX = 'PrepareCellTypeEqtlWorkflow.'
 WORKFLOW = 'workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl'
+RESTART_RUNNER = 'tests/cell_type_specific_expression/smoke/run_model_restart.py'
 
 
 def pinned_inputs(fixture, pins):
@@ -17,6 +19,17 @@ def pinned_inputs(fixture, pins):
 def read_outputs(path):
     # MiniWDL's outputs.json is flat; only its CLI stdout has an outputs wrapper.
     return json.loads(Path(path).read_text())
+
+
+def restart_command(baseline_outputs, baseline_inputs, restart_inputs, output_directory):
+    return [
+        sys.executable,
+        RESTART_RUNNER,
+        '--baseline-outputs', str(baseline_outputs),
+        '--baseline-inputs', str(baseline_inputs),
+        '--restart-inputs', str(restart_inputs),
+        '--output-directory', str(output_directory),
+    ]
 
 
 def main():
@@ -58,6 +71,13 @@ def main():
                               ('assert_qtl_outputs.R', pins['qtl_docker_image'])]:
             run_r(image, 'tests/cell_type_specific_expression/smoke/' + script,
                   output_path, str(input_path), 'tests/cell_type_specific_expression/fixtures')
+        if mode == 'precomputed':
+            subprocess.run(restart_command(
+                Path(output_path),
+                input_path,
+                Path('ci-runs/pinned-model-restart.inputs.json'),
+                Path('ci-runs/pinned-model-restart'),
+            ), check=True)
         print(f'stage=pinned_smoke mode={mode} status=passed', flush=True)
 
 

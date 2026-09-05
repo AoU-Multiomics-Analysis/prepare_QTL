@@ -15,6 +15,7 @@ task FilterMethylationSample {
         String AutosomePrefix
         Int MemoryGB
         Int DiskGB
+        String docker_image
     }
 
     command <<<
@@ -39,7 +40,7 @@ task FilterMethylationSample {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: 4
@@ -82,6 +83,7 @@ workflow ProcessMethylationSample {
         Float FenceK = 3.0
         Int MemoryGB = 64
         Int DiskGB = 250
+        String methylation_rust_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
     }
 
     call FilterMethylationSample {
@@ -94,7 +96,8 @@ workflow ProcessMethylationSample {
             FenceK = FenceK,
             AutosomePrefix = AutosomePrefix,
             MemoryGB = MemoryGB,
-            DiskGB = DiskGB
+            DiskGB = DiskGB,
+            docker_image = methylation_rust_docker_image
     }
 
     output {

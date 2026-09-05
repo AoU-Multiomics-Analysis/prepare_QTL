@@ -24,3 +24,61 @@ stages:
   expression:
     - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
       input: qtl_docker_image
+    - path: workflows/expression/prepare_eQTL.wdl
+      input: DockerImage
+    - path: workflows/expression/prepare_eQTL.wdl
+      scope: task
+      task: eqtl_prepare_expression
+      input: DockerImage
+  common:
+    - path: workflows/common/MergeCovariates.wdl
+      input: DockerImage
+    - path: workflows/common/MergeCovariates.wdl
+      scope: task
+      task: MergeCovariatesR
+      input: DockerImage
+    - path: workflows/common/ResidualizePhenotypes.wdl
+      scope: task
+      task: ResidualizePhenotypes
+      input: DockerImage
+    - path: workflows/common/calculate_phenotypePCs.wdl
+      input: DockerImage
+    - path: workflows/common/calculate_phenotypePCs.wdl
+      scope: task
+      task: ComputePCs
+      input: DockerImage
+  proteomics:
+    - path: workflows/proteomics/normalize_pQTL.wdl
+      input: proteomics_docker_image
+    - path: workflows/proteomics/prepare_pQTL.wdl
+      input: proteomics_docker_image
+  splicing:
+    - path: workflows/splicing/prepare_sQTL.wdl
+      input: splicing_docker_image
+  methylation:
+    - path: workflows/methylation/AggregateMethylationCohort.wdl
+      input: methylation_docker_image
+    - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      input: methylation_docker_image
+    - path: workflows/methylation/annotation.wdl
+      input: methylation_docker_image
+    - path: workflows/methylation/cohort_aggregation.wdl
+      input: methylation_docker_image
+    - path: workflows/methylation/connectivity.wdl
+      input: methylation_docker_image
+    - path: workflows/methylation/merge_methylation.wdl
+      input: methylation_docker_image
+    - path: workflows/methylation/prepare_mQTL.wdl
+      input: methylation_docker_image
+    - path: workflows/methylation/qtl_covariates.wdl
+      input: methylation_docker_image
+  methylation_rust:
+    - path: workflows/methylation/AggregateMethylationCohort.wdl
+      input: methylation_rust_docker_image
+    - path: workflows/methylation/ProcessMethylationSample.wdl
+      input: methylation_rust_docker_image
+    - path: workflows/methylation/cohort_aggregation.wdl
+      input: methylation_rust_docker_image
+  rnaseqc:
+    - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+      input: docker_image

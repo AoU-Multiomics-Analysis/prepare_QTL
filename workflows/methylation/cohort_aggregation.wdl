@@ -7,6 +7,7 @@ import "annotation.wdl" as Annotation
 task PrepareMethylationCohortManifest {
     input {
         File CohortManifest
+        String docker_image
     }
 
     command <<<
@@ -16,7 +17,7 @@ task PrepareMethylationCohortManifest {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "4G"
         disks: "local-disk 20 HDD"
         cpu: 1
@@ -52,6 +53,7 @@ task BuildMethylationCohortSamples {
     input {
         Array[File] SampleQCFiles
         String OutputPrefix
+        String docker_image
     }
 
     command <<<
@@ -63,7 +65,7 @@ task BuildMethylationCohortSamples {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "4G"
         disks: "local-disk 20 HDD"
         cpu: 1
@@ -93,6 +95,7 @@ task MergeMethylationChromosome {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
+        String docker_image
     }
 
     command <<<
@@ -118,7 +121,7 @@ task MergeMethylationChromosome {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: "~{NumThreads}"
@@ -147,6 +150,7 @@ task AggregateMethylationChromosomes {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
+        String docker_image
     }
 
     command <<<
@@ -248,7 +252,7 @@ task AggregateMethylationChromosomes {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: "~{NumThreads}"
@@ -292,11 +296,14 @@ workflow AggregateMethylationData {
         Int AnnotationMemoryGB
         Int AnnotationDiskGB
         Int NumThreads
+        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
+        String methylation_rust_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
     }
 
     call PrepareMethylationCohortManifest {
         input:
-            CohortManifest = CohortManifest
+            CohortManifest = CohortManifest,
+            docker_image = methylation_docker_image
     }
 
     Array[File] SampleQCFiles = read_lines(PrepareMethylationCohortManifest.SampleQCManifest)
@@ -317,7 +324,8 @@ workflow AggregateMethylationData {
     call BuildMethylationCohortSamples {
         input:
             SampleQCFiles = SampleQCFiles,
-            OutputPrefix = OutputPrefix
+            OutputPrefix = OutputPrefix,
+            docker_image = methylation_docker_image
     }
 
     Array[String] AutosomeNames = [
@@ -354,7 +362,8 @@ workflow AggregateMethylationData {
                 ComputeCoverageMethylationCorrelation = ComputeCoverageMethylationCorrelation,
                 MemoryGB = MergeMemoryGB,
                 DiskGB = MergeDiskGB,
-                NumThreads = NumThreads
+                NumThreads = NumThreads,
+                docker_image = methylation_rust_docker_image
         }
     }
 
@@ -370,7 +379,8 @@ workflow AggregateMethylationData {
             OutputPrefix = OutputPrefix,
             MemoryGB = AggregateMemoryGB,
             DiskGB = AggregateDiskGB,
-            NumThreads = NumThreads
+            NumThreads = NumThreads,
+            docker_image = methylation_docker_image
     }
 
     if (AnnotateSites) {
@@ -383,7 +393,8 @@ workflow AggregateMethylationData {
                 OutputPrefix = OutputPrefix,
                 PromoterWindow = PromoterWindow,
                 MemoryGB = AnnotationMemoryGB,
-                DiskGB = AnnotationDiskGB
+                DiskGB = AnnotationDiskGB,
+                methylation_docker_image = methylation_docker_image
         }
     }
 

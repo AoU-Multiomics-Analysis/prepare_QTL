@@ -2,6 +2,11 @@ name: Pinned Image Smoke (Manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      all_stages:
+        description: Test all registered image families (otherwise cell-type pipeline only)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -9,7 +14,7 @@ permissions:
 jobs:
   pinned_smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,11 +23,19 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install WDL runner
-        run: python -m pip install miniwdl==1.15.0
+        run: python -m pip install miniwdl==1.15.0 PyYAML==6.0.2
       - name: Check stage routing
         run: python tests/test_stage_image_inputs.py
       - name: Run with published digest defaults
-        run: python tests/cell_type_specific_expression/smoke/run_pinned_images.py
+        env:
+          ALL_STAGES: ${{ inputs.all_stages }}
+        run: |
+          docker swarm init --advertise-addr 127.0.0.1
+          if test "$ALL_STAGES" = true; then
+            python ci/test_release_images.py --source . --all-stages
+          else
+            python tests/cell_type_specific_expression/smoke/run_pinned_images.py
+          fi
       - name: Preserve run logs
         if: always()
         uses: actions/upload-artifact@v4

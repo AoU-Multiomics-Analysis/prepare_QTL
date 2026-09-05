@@ -8,6 +8,7 @@ task ShardMethylationManifest {
     input {
         File SampleManifest
         Int SamplesPerShard
+        String docker_image
     }
 
     command <<<
@@ -43,7 +44,7 @@ task ShardMethylationManifest {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "2G"
         disks: "local-disk 10 HDD"
         cpu: 1
@@ -65,6 +66,7 @@ task FilterMethylationShard {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
+        String docker_image
     }
 
     command <<<
@@ -113,7 +115,7 @@ task FilterMethylationShard {
     >>>
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "~{MemoryGB}G"
         disks: "local-disk ~{DiskGB} HDD"
         cpu: "~{NumThreads}"
@@ -191,12 +193,14 @@ workflow MergeMethylation {
         Int CorrelationDiskGB = 250
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
+        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
     }
 
     call ShardMethylationManifest {
         input:
             SampleManifest = SampleManifest,
-            SamplesPerShard = SamplesPerShard
+            SamplesPerShard = SamplesPerShard,
+            docker_image = methylation_docker_image
     }
 
     scatter (shard_index in range(length(ShardMethylationManifest.ShardManifests))) {
@@ -213,7 +217,8 @@ workflow MergeMethylation {
                 AutosomePrefix = AutosomePrefix,
                 MemoryGB = ShardMemoryGB,
                 DiskGB = ShardDiskGB,
-                NumThreads = ShardNumThreads
+                NumThreads = ShardNumThreads,
+                docker_image = methylation_docker_image
         }
     }
 
@@ -269,7 +274,8 @@ workflow MergeMethylation {
             CorrelationMemoryGB = CorrelationMemoryGB,
             CorrelationDiskGB = CorrelationDiskGB,
             ConnectivityZThreshold = ConnectivityZThreshold,
-            NumThreads = NumThreads
+            NumThreads = NumThreads,
+            methylation_docker_image = methylation_docker_image
     }
 
     output {

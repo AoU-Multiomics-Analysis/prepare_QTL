@@ -101,6 +101,15 @@ class ProposalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.propose()
 
+    def test_named_task_scope_updates_only_that_task(self):
+        text = 'version 1.0\ntask First { input { String image = "' + OLD + '" } command { echo ok } }\n'
+        text += 'task Second { input { String image = "' + OLD + '" } command { echo ok } }\n'
+        targets = {'version': 1, 'stages': {'export': [
+            {'path': 'workflows/tasks.wdl', 'scope': 'task', 'task': 'Second', 'input': 'image'}]}}
+        result = self.module.propose(self.config, targets, self.plan, {'workflows/tasks.wdl': text}, {'cell': NEW})
+        self.assertEqual(result['workflows/tasks.wdl'], text.replace('task Second { input { String image = "' + OLD,
+                                                                   'task Second { input { String image = "' + NEW))
+
     def test_real_repository_targets_update_only_downstream(self):
         config = yaml.safe_load((ROOT / 'ci/image-stages.yml').read_text())
         targets = yaml.safe_load((ROOT / 'ci/release-pins.yml').read_text())

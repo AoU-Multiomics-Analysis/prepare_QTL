@@ -12,6 +12,7 @@ task PrepareSpliceData {
         Int memory
         Int disk_space
         Int num_threads
+        String docker_image
     }
     command {
         Rscript /tmp/PrepareSpliceData.R \
@@ -21,7 +22,7 @@ task PrepareSpliceData {
         }
 
     runtime {
-        docker: "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+        docker: docker_image
         memory: "${memory}GB"
         disks: "local-disk ${disk_space} HDD"
         cpu: "${num_threads}"
@@ -48,6 +49,7 @@ workflow sQTLPrepareData  {
         Int memory
         Int disk_space
         Int num_threads
+        String splicing_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
     }
     call PrepareSpliceData {
         input:
@@ -56,7 +58,8 @@ workflow sQTLPrepareData  {
             num_threads = num_threads,
             SampleList = SampleList,
             SpliceData = SpliceData,
-            OutputPrefix = OutputPrefix
+            OutputPrefix = OutputPrefix,
+            docker_image = splicing_docker_image
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
@@ -66,7 +69,8 @@ workflow sQTLPrepareData  {
             OutputSuffix = ".INT",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads
+            num_threads = num_threads,
+            DockerImage = splicing_docker_image
     }
 
     call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
@@ -76,7 +80,8 @@ workflow sQTLPrepareData  {
             OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads
+            num_threads = num_threads,
+            DockerImage = splicing_docker_image
     }
     if (defined(AdditionalCovariates)) {
         call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
@@ -84,7 +89,8 @@ workflow sQTLPrepareData  {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".splicing",
-                OutputSuffix = ".INT"
+                OutputSuffix = ".INT",
+                DockerImage = splicing_docker_image
         }
 
         call CovariateMerge.MergeCovariates as MergeScaledAdditionalCovariates {
@@ -92,7 +98,8 @@ workflow sQTLPrepareData  {
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".splicing",
-                OutputSuffix = ".scaled"
+                OutputSuffix = ".scaled",
+                DockerImage = splicing_docker_image
         }
     }
 
@@ -104,7 +111,8 @@ workflow sQTLPrepareData  {
                 OutputFileName = OutputPrefix + ".splicing.INT.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
-                num_threads = num_threads
+                num_threads = num_threads,
+                DockerImage = splicing_docker_image
         }
 
         call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
@@ -114,7 +122,8 @@ workflow sQTLPrepareData  {
                 OutputFileName = OutputPrefix + ".splicing.scaled.residualized.bed.gz",
                 memory = memory,
                 disk_space = disk_space,
-                num_threads = num_threads
+                num_threads = num_threads,
+                DockerImage = splicing_docker_image
         }
     }
 
