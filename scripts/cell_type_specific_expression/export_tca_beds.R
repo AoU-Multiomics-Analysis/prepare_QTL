@@ -12,6 +12,8 @@ run_export_tca_beds <- function() {
       help = "Coordinate-preserving BED of non-negative linear CPM values."),
     optparse::make_option("--model", type = "character",
       help = "Cohort-wide fitted TCA model RDS."),
+    optparse::make_option("--reuse-model", dest = "reuse_model", action = "store_true", default = FALSE,
+      help = "Use the stored weights and covariates; align BED genes to the model."),
     optparse::make_option("--weights", type = "character",
       help = "Sample-by-group TCA weight TSV with sample_id first column."),
     optparse::make_option("--covariates", type = "character", default = NULL,
@@ -62,8 +64,9 @@ run_export_tca_beds <- function() {
   coordinates <- expression$coordinates
   weights <- read_numeric_matrix(options$weights, "sample_id")
   model <- readRDS(options$model)
-  X <- align_expression_to_tca_model(X, model)
-  C2 <- if (is.null(options$covariates) || !nzchar(options$covariates)) {
+  X <- if (isTRUE(options$reuse_model)) align_restart_expression(X, model) else align_expression_to_tca_model(X, model)
+  if (isTRUE(options$reuse_model)) weights <- model$W
+  C2 <- if (isTRUE(options$reuse_model) || is.null(options$covariates) || !nzchar(options$covariates)) {
     model$C2
   } else {
     read_numeric_matrix(options$covariates, "sample_id")

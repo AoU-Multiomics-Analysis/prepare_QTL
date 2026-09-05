@@ -9,6 +9,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     File expression
     File gtf
     File lm22
+    File? precomputed_tca_model
     File? precomputed_proportions
     File? deconvolution_covariates
     File SampleList
@@ -66,6 +67,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       expression = expression,
       gtf = gtf,
       lm22 = lm22,
+      precomputed_tca_model = precomputed_tca_model,
       precomputed_proportions = precomputed_proportions,
       covariates = deconvolution_covariates,
       deconvolution_docker_image = deconvolution_docker_image,
@@ -171,10 +173,10 @@ workflow PrepareCellTypeEqtlWorkflow {
 
   output {
     File filtered_expression = CellTypeDeconvolution.filtered_expression
-    File gene_type_filter_report = CellTypeDeconvolution.gene_type_filter_report
-    File gene_type_filter_log = CellTypeDeconvolution.gene_type_filter_log
+    File? gene_type_filter_report = CellTypeDeconvolution.gene_type_filter_report
+    File? gene_type_filter_log = CellTypeDeconvolution.gene_type_filter_log
 
-    File proportion_mode_validation_log = CellTypeDeconvolution.proportion_mode_validation_log
+    File? proportion_mode_validation_log = CellTypeDeconvolution.proportion_mode_validation_log
 
     File? estimated_proportions = CellTypeDeconvolution.estimated_proportions
     File? hspe_markers = CellTypeDeconvolution.hspe_markers
@@ -184,19 +186,19 @@ workflow PrepareCellTypeEqtlWorkflow {
     File? hspe_log = CellTypeDeconvolution.hspe_log
     File? hspe_sample_diagnostics = CellTypeDeconvolution.hspe_sample_diagnostics
 
-    File proportions_lm22 = CellTypeDeconvolution.proportions_lm22
-    File proportions_combined = CellTypeDeconvolution.proportions_combined
+    File? proportions_lm22 = CellTypeDeconvolution.proportions_lm22
+    File? proportions_combined = CellTypeDeconvolution.proportions_combined
     File tca_weights = CellTypeDeconvolution.tca_weights
-    File cell_group_filter_report = CellTypeDeconvolution.cell_group_filter_report
-    File proportions_log = CellTypeDeconvolution.proportions_log
+    File? cell_group_filter_report = CellTypeDeconvolution.cell_group_filter_report
+    File? proportions_log = CellTypeDeconvolution.proportions_log
 
     File tca_model = CellTypeDeconvolution.tca_model
-    File tca_model_unfiltered = CellTypeDeconvolution.tca_model_unfiltered
+    File? tca_model_unfiltered = CellTypeDeconvolution.tca_model_unfiltered
     File tca_numerical_excluded_genes = CellTypeDeconvolution.tca_numerical_excluded_genes
     File tca_cleanup_log = CellTypeDeconvolution.tca_cleanup_log
-    File tca_model_log = CellTypeDeconvolution.tca_model_log
-    File tca_excluded_genes = CellTypeDeconvolution.tca_excluded_genes
-    File fit_tca_log = CellTypeDeconvolution.fit_tca_log
+    File? tca_model_log = CellTypeDeconvolution.tca_model_log
+    File? tca_excluded_genes = CellTypeDeconvolution.tca_excluded_genes
+    File? fit_tca_log = CellTypeDeconvolution.fit_tca_log
 
     Array[File] cell_type_beds = CellTypeDeconvolution.cell_type_beds
     File cell_type_bed_inventory = CellTypeDeconvolution.cell_type_bed_inventory

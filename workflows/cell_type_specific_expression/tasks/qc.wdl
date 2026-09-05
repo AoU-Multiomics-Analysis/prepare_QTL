@@ -6,11 +6,11 @@ task BuildManifest {
     File export_qc_summary
     File export_qc_plots
     File model
-    File model_log
-    File original_proportions
-    File combined_proportions
+    File? model_log
+    File? original_proportions
+    File? combined_proportions
     File tca_weights
-    File filter_report
+    File? filter_report
     File? hspe_metadata
     String proportion_mode
     Float log2_pseudocount
@@ -59,20 +59,20 @@ task BuildManifest {
       '~{export_qc_summary}' \
       '~{export_qc_plots}' \
       '~{model}' \
-      '~{model_log}' \
-      '~{original_proportions}' \
-      '~{combined_proportions}' \
+      '~{default="" model_log}' \
+      '~{default="" original_proportions}' \
+      '~{default="" combined_proportions}' \
       '~{tca_weights}' \
-      '~{filter_report}' > supporting_inputs.txt
+      '~{default="" filter_report}' > supporting_inputs.txt
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/build_deconvolution_manifest.R \
       --outputs "$public_inventory" \
       --export-qc-summary '~{export_qc_summary}' \
-      --original-proportions '~{original_proportions}' \
-      --combined-proportions '~{combined_proportions}' \
+      --original-proportions '~{default="" original_proportions}' \
+      --combined-proportions '~{default="" combined_proportions}' \
       --tca-weights '~{tca_weights}' \
-      --filter-report '~{filter_report}' \
+      --filter-report '~{default="" filter_report}' \
       --model '~{model}' \
-      --model-log '~{model_log}' \
+      --model-log '~{default="" model_log}' \
       "${hspe_metadata_arguments[@]}" \
       --tca-version '~{tca_version}' \
       --proportion-mode '~{proportion_mode}' \

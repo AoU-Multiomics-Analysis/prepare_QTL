@@ -23,6 +23,54 @@ cleanup_fixture <- function() {
   )
 }
 
+testthat::test_that("restart accepts fitted and cleaned CPM models without changing weights", {
+  original <- cleanup_fixture()
+  cleaned <- prepare_restart_model(original)
+  testthat::expect_identical(cleaned$model$W, original$W)
+  testthat::expect_identical(cleaned$model$C2, original$C2)
+  again <- prepare_restart_model(cleaned$model)
+  testthat::expect_identical(again$model, cleaned$model)
+  testthat::expect_identical(again$report, cleaned$report)
+  # TCA 1.2.1 creates unnamed zero-column matrices when covariates are absent.
+  no_covariates <- cleanup_fixture()
+  rownames(no_covariates$C1) <- NULL
+  rownames(no_covariates$C2) <- NULL
+  testthat::expect_identical(prepare_restart_model(no_covariates)$model$C2, no_covariates$C2)
+  original$expression_scale <- "log2_cpm"
+  testthat::expect_error(prepare_restart_model(original), "linear CPM")
+  original$expression_scale <- NULL
+  testthat::expect_error(prepare_restart_model(original), "linear CPM")
+  invalid <- cleanup_fixture()
+  invalid$W[1, 1] <- NA_real_
+  testthat::expect_error(prepare_restart_model(invalid), "weights")
+})
+
+testthat::test_that("restart aligns BED genes but does not silently drop missing model genes", {
+  model <- prepare_restart_model(cleanup_fixture())$model
+  X <- matrix(1:9, 3L, dimnames = list(c("keep2", "extra", "keep1"), c("s1", "s2", "s3")))
+  testthat::expect_identical(align_restart_expression(X, model), X[c(3, 1), , drop = FALSE])
+  testthat::expect_error(align_restart_expression(X[-1, ], model), "missing.*keep2")
+  testthat::expect_error(align_restart_expression(X[, 3:1], model), "sample order")
+})
+
+testthat::test_that("restart cleanup CLI accepts a cleaned model and writes its stored weights", {
+  withr::local_dir(pipeline_root)
+  work <- withr::local_tempdir()
+  model <- clean_tca_model(cleanup_fixture())$model
+  path <- file.path(work, "model.rds")
+  saveRDS(model, path)
+  output <- system2(file.path(R.home("bin"), "Rscript"), shQuote(c(
+    "scripts/cell_type_specific_expression/clean_tca_model.R", "--reuse-model", "--model", path,
+    "--output-dir", file.path(work, "output")
+  )), stdout = TRUE, stderr = TRUE)
+  testthat::expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
+  testthat::expect_identical(readRDS(file.path(work, "output", "tca_model_cleaned.rds")), model)
+  testthat::expect_equal(read_numeric_matrix(file.path(work, "output", "tca_weights.tsv"), "sample_id"), model$W)
+  qc <- build_restart_qc_summary(tibble::tibble(metric = "gene_count", value = 2), model$W, model)
+  testthat::expect_true(is.na(qc$value[qc$metric == "tca_convergence"]))
+  testthat::expect_identical(qc$status[qc$metric == "tca_convergence"], "unavailable_model_restart")
+})
+
 testthat::test_that("cleanup removes the failing gene from every gene parameter only", {
   original <- cleanup_fixture()
   result <- clean_tca_model(original)
@@ -150,4 +198,13 @@ testthat::test_that("cleanup CLI saves a final model consumed by the real export
   testthat::expect_identical(exported$coordinates$gene_id, c("keep1", "keep2"))
   testthat::expect_identical(exported$coordinates$start, c(0L, 20L))
   testthat::expect_equal(as.numeric(exported$cpm[1, 1]), 1 + .25 * 1.25 / 3.3125)
+
+  # Restart uses retained model genes even if the source BED has a different row order.
+  restart_bed <- file.path(work, "restart.bed")
+  write_expression_bed(restart_bed, coordinates[3:1, ], X[3:1, , drop = FALSE])
+  invisible(run_script("export_tca_beds.R", c("--expression", restart_bed, "--model", clean_path,
+      "--weights", weights_path, "--reuse-model", "--output-dir", file.path(work, "restart"))))
+  restarted <- read_expression_bed(file.path(work, "restart", "a.bed.gz"))
+  testthat::expect_identical(restarted$coordinates, exported$coordinates)
+  testthat::expect_equal(restarted$cpm, exported$cpm)
 })
