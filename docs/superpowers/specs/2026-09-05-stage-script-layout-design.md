@@ -44,6 +44,29 @@ directories as their stage roots. Shared common scripts keep their explicit
 list of consuming stages. This is a repository-wide registry convention, not
 a requirement to rename directories that already form a stage boundary.
 
+## Stage images and shared bases
+
+The user approved separate stage images on 2026-09-05. Each stage will have its
+own image repository and immutable digest default. Stages with compatible
+dependencies share a published base image pinned by digest. Bases contain
+dependencies, not the repository's analysis scripts. A stage layer contains
+its own code, its required shared modules, and compatibility entry points.
+Different languages or incompatible dependency sets use different bases.
+
+Do not rebuild the dependency base for a stage-script change. A dependency or
+base recipe change selects every child stage. Include the resolved base digest
+in each child build fingerprint; the same source with a different base is a
+different image. Never use a mutable base tag for a released child image.
+Resolve and verify base images before child builds. Retain both base and child
+digests. The actual publication needs release-publish approval.
+
+Stage-image repositories, child/base build ordering, and pin-repository
+transition rules must be installed as trusted policy before the source/image
+migration release. The first implementation plan covers the independently
+testable directory and routing policy. A second plan must cover this build
+graph and its security review before the image migration begins. It must not
+be presented as implemented by the first plan.
+
 ## Registration and validation
 
 Use directory globs in ci/image-stages.yml. New paths under a registered root
