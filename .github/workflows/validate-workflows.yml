@@ -55,3 +55,26 @@ jobs:
 
       - name: Parse Dockstore WDLs
         run: python scripts/validate_dockstore.py | tail -n +2 | xargs -n 1 miniwdl check
+
+      - name: Check WDL and logging contracts
+        run: |
+          set -euo pipefail
+          miniwdl check workflows/cell_type_specific_expression/deconvolution.wdl
+          miniwdl check workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+          python tests/cell_type_specific_expression/test_hspe_batch_wdl.py
+          python tests/cell_type_specific_expression/test_gene_summary_wdl.py
+          python tests/cell_type_specific_expression/test_tca_cleanup_wdl.py
+          python tests/cell_type_specific_expression/test_qtl_manifest_wdl.py
+          python tests/cell_type_specific_expression/test_reference_filter_wdl.py
+          python tests/cell_type_specific_expression/test_terra_file_paths.py
+          python tests/test_expression_input_wdl.py
+          python scripts/check_wdl_file_scope.py workflows
+          python3 scripts/check_wdl_logging.py \
+            workflows/cell_type_specific_expression \
+            workflows/expression/prepare_eQTL.wdl \
+            workflows/common/calculate_phenotypePCs.wdl \
+            workflows/common/MergeCovariates.wdl \
+            workflows/common/ResidualizePhenotypes.wdl
+
+      - name: Check CI path selection
+        run: python tests/test_ci_path_filters.py
