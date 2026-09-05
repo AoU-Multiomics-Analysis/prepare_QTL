@@ -182,8 +182,7 @@ run_build_manifest <- function() {
   ))
   required_options <- c(
     "outputs", "export_qc_summary",
-    "original_proportions", "combined_proportions", "tca_weights",
-    "filter_report", "model", "model_log",
+    "tca_weights", "model",
     "proportion_mode", "log2_pseudocount", "min_lm22_overlap",
     "hspe_marker_fraction", "hspe_marker_method",
     "hspe_quantile_normalize", "group_mean_threshold", "zero_floor",
@@ -191,6 +190,17 @@ run_build_manifest <- function() {
     "effective_parameters_output",
     "container_image", "output", "qc_output"
   )
+  restart <- identical(options$proportion_mode, "precomputed_model")
+  if (!restart) {
+    required_options <- c(required_options, "original_proportions", "combined_proportions",
+                          "filter_report", "model_log")
+  } else {
+    required_options <- setdiff(required_options, c(
+      "log2_pseudocount", "min_lm22_overlap", "hspe_marker_fraction", "hspe_marker_method",
+      "hspe_quantile_normalize", "group_mean_threshold", "zero_floor", "tca_max_iters",
+      "gene_types", "random_seed"
+    ))
+  }
   missing_options <- required_options[vapply(
     options[required_options],
     function(value) is.null(value) || !nzchar(value),
@@ -236,16 +246,16 @@ run_build_manifest <- function() {
     show_col_types = FALSE,
     progress = FALSE
   )
-  original_proportions <- read_numeric_matrix(
+  original_proportions <- if (restart) NULL else read_numeric_matrix(
     options$original_proportions,
     "sample_id"
   )
-  combined_proportions <- read_numeric_matrix(
+  combined_proportions <- if (restart) NULL else read_numeric_matrix(
     options$combined_proportions,
     "sample_id"
   )
   tca_weights <- read_numeric_matrix(options$tca_weights, "sample_id")
-  filter_report <- readr::read_tsv(
+  filter_report <- if (restart) NULL else readr::read_tsv(
     options$filter_report,
     col_types = readr::cols(
       cell_group = readr::col_character(),
@@ -260,14 +270,14 @@ run_build_manifest <- function() {
     progress = FALSE
   )
   tca_model <- readRDS(options$model)
-  tca_log_lines <- readLines(options$model_log, warn = FALSE)
+  tca_log_lines <- if (restart) character() else readLines(options$model_log, warn = FALSE)
   hspe_metadata <- if (is.null(options$hspe_metadata) ||
       !nzchar(options$hspe_metadata)) {
     NULL
   } else {
     jsonlite::read_json(options$hspe_metadata, simplifyVector = FALSE)
   }
-  quantile_normalize <- tolower(options$hspe_quantile_normalize)
+  quantile_normalize <- if (restart) "false" else tolower(options$hspe_quantile_normalize)
   if (!quantile_normalize %in% c("true", "false")) {
     stop(
       "hspe_quantile_normalize must be true or false",
@@ -278,8 +288,11 @@ run_build_manifest <- function() {
   if (!tca_parallel %in% c("true", "false")) {
     stop("tca_parallel must be true or false", call. = FALSE)
   }
-  gene_types <- parse_gene_types(options$gene_types)
-  parameters <- list(
+  gene_types <- if (restart) character() else parse_gene_types(options$gene_types)
+  parameters <- if (restart) {
+    list(proportion_mode = "precomputed_model", scale = "cpm",
+         tca_parallel = identical(tca_parallel, "true"))
+  } else list(
     proportion_mode = options$proportion_mode,
     log2_pseudocount = validate_log2_pseudocount(
       options$log2_pseudocount
@@ -302,11 +315,11 @@ run_build_manifest <- function() {
       "lm22_types:%d retained_groups:%d log2_pseudocount:%g gene_types:%s"
     ),
     nrow(outputs),
-    nrow(original_proportions),
-    ncol(original_proportions),
+    nrow(tca_weights),
+    if (restart) 0L else ncol(original_proportions),
     ncol(tca_weights),
-    parameters$log2_pseudocount,
-    paste(parameters$gene_type, collapse = ",")
+    if (restart) NA_real_ else parameters$log2_pseudocount,
+    paste(gene_types, collapse = ",")
   )
   paths_message <- sprintf(
     "stage=manifest input_paths=%s output_paths=%s",
@@ -324,7 +337,9 @@ run_build_manifest <- function() {
     parameters = parameters,
     container_image = options$container_image
   )
-  qc_summary <- build_pipeline_qc_summary(
+  qc_summary <- if (restart) {
+    build_restart_qc_summary(export_qc_summary, tca_weights, tca_model)
+  } else build_pipeline_qc_summary(
     export_summary = export_qc_summary,
     original_proportions = original_proportions,
     combined_proportions = combined_proportions,

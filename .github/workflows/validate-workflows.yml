@@ -64,6 +64,7 @@ jobs:
           python tests/cell_type_specific_expression/test_hspe_batch_wdl.py
           python tests/cell_type_specific_expression/test_gene_summary_wdl.py
           python tests/cell_type_specific_expression/test_tca_cleanup_wdl.py
+          python tests/cell_type_specific_expression/test_model_restart_wdl.py
           python tests/cell_type_specific_expression/test_qtl_manifest_wdl.py
           python tests/cell_type_specific_expression/test_reference_filter_wdl.py
           python tests/cell_type_specific_expression/test_terra_file_paths.py

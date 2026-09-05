@@ -1075,3 +1075,37 @@ import if you need to keep multiple cohorts or runs in one workspace.
 Keep the referenced submission files: the TSV contains links, not copies.
 Call-cached outputs can link to an earlier run. The separate deconvolution
 `output_manifest` is unchanged. No provenance file is added.
+# Restart from a TCA model
+
+Both entry points accept the optional `File? precomputed_tca_model` input.
+For the complete workflow, set
+`PrepareCellTypeEqtlWorkflow.precomputed_tca_model` to the cloud path of a model RDS.
+It has priority over `precomputed_proportions`. If absent, the existing run mode
+is unchanged.
+
+Supply a pipeline model with `expression_scale = "cpm"`: either `tca_model`
+(cleaned) or `tca_model_unfiltered` (fitted). Models on a log scale, or without
+a recorded scale, are rejected. Numerical cleanup runs before export; an already
+cleaned model keeps its recorded exclusions.
+
+The expression BED must contain matching **linear CPM values**, the same samples
+in the same order, and all retained model genes. Extra genes are ignored, and
+gene rows and BED coordinates are aligned to the model. The workflow cannot
+confirm that values came from the original fit; use the same dataset and scale.
+
+Restart skips GTF gene filtering, HSPE, proportion processing, and TCA fitting.
+The model's genes, cell types, weights, and covariates are authoritative. New
+gene-type filters, proportion thresholds, fitting settings, and deconvolution
+covariates do not change the saved model. The existing required GTF and LM22
+inputs remain required for interface compatibility, but restart does not read
+them for deconvolution. QTL sample and covariate inputs still apply downstream.
+
+BED export, reference filtering, summaries, QTL preparation, and manifests still
+run. Outputs from skipped stages are null. `tca_model` and `tca_weights` remain
+available. QC marks unavailable fitting/proportion metrics as
+`unavailable_model_restart`; the effective parameters do not claim new settings
+were used to fit the supplied model.
+
+GitHub Actions tests restart from the model produced by the existing smoke run.
+It checks skipped stages, identical BED contents, and downstream QTL outputs.
+This is not a complete Terra validation.

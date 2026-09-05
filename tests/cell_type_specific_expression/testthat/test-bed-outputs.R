@@ -740,6 +740,22 @@ testthat::test_that("manifest CLI consumes export-time hashes and basenames", {
     "duplicate_gene_symbol_input_row_count" %in% final_qc$metric
   )
   testthat::expect_false("duplicate_gene_symbol_count" %in% final_qc$metric)
+
+  # Restart has no estimation/fitting audit files. Do not open their old paths.
+  arguments[match("--proportion-mode", arguments) + 1L] <- "precomputed_model"
+  arguments[match("--gene-types", arguments) + 1L] <- ""
+  arguments[match("--log2-pseudocount", arguments) + 1L] <- "-1"
+  for (flag in c("--original-proportions", "--combined-proportions", "--filter-report", "--model-log")) {
+    arguments[match(flag, arguments) + 1L] <- "missing-skipped-stage-file"
+  }
+  status <- system2("Rscript", shQuote(arguments))
+  testthat::expect_identical(status, 0L)
+  restarted <- jsonlite::read_json(effective_parameters_path)
+  testthat::expect_identical(restarted$proportion_mode, "precomputed_model")
+  testthat::expect_null(restarted$tca_max_iters)
+  restart_qc <- readr::read_tsv(qc_path, show_col_types = FALSE)
+  testthat::expect_identical(restart_qc$status[restart_qc$metric == "tca_convergence"],
+                            "unavailable_model_restart")
 })
 
 testthat::test_that("QC plots use a minimal theme without titles", {

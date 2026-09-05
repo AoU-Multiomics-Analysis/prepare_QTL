@@ -205,6 +205,9 @@ jobs:
             "$PWD/tests/cell_type_specific_expression/fixtures/precomputed-e2e.inputs.json" \
             "$PWD/tests/cell_type_specific_expression/fixtures"
 
+      - name: Restart from the cleaned model and compare outputs
+        run: python tests/cell_type_specific_expression/smoke/run_model_restart.py
+
       - name: Upload failure logs, manifests, and QC files
         if: failure()
         uses: actions/upload-artifact@v4

@@ -64,6 +64,7 @@ task FitTca {
 
 task CleanTcaModel {
   input {
+    Boolean reuse_model = false
     File unfiltered_model
     String docker_image
     Int preemptible_attempts = 0
@@ -78,6 +79,7 @@ task CleanTcaModel {
     printf 'stage=%s start_time=%s dimensions=pending\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/clean_tca_model.R \
+      ~{if reuse_model then "--reuse-model" else ""} \
       --model '~{sub(unfiltered_model, "'", "'\"'\"'")}' \
       --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s outputs=%s completion_time=%s\n' \
@@ -87,6 +89,7 @@ task CleanTcaModel {
 
   output {
     File model = "outputs/tca_model_cleaned.rds"
+    File tca_weights = "outputs/tca_weights.tsv"
     File excluded_genes = "outputs/tca_numerical_excluded_genes.tsv"
     File log = "clean_tca_model.log"
   }
@@ -103,6 +106,7 @@ task CleanTcaModel {
 
 task ExportTcaBeds {
   input {
+    Boolean reuse_model = false
     File expression
     File model
     File tca_weights
@@ -132,6 +136,7 @@ task ExportTcaBeds {
       covariates_arguments=(--covariates "$covariates_path")
     fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/export_tca_beds.R \
+      ~{if reuse_model then "--reuse-model" else ""} \
       --expression '~{expression}' \
       --model '~{model}' \
       --weights '~{tca_weights}' \

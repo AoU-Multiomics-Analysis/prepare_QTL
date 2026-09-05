@@ -13,6 +13,7 @@ workflow CellTypeDeconvolution {
     File expression
     File gtf
     File lm22
+    File? precomputed_tca_model
     File? precomputed_proportions
     File? covariates
     String deconvolution_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"
@@ -54,35 +55,40 @@ workflow CellTypeDeconvolution {
   }
 
   String tca_version = "1.2.1"
-  call expression_tasks.FilterExpressionGenes {
-    input:
-      input_expression = expression,
-      gtf = gtf,
-      gene_type = gene_type,
-      log2_pseudocount = log2_pseudocount,
-      docker_image = deconvolution_docker_image,
-      cpu = hspe_cpu,
-      memory = hspe_memory,
-      disk_gb = hspe_disk_gb,
-      preemptible_attempts = preemptible_attempts,
-      max_retries = max_retries
+  if (!defined(precomputed_tca_model)) {
+    File? fit_covariates = covariates
+    call expression_tasks.FilterExpressionGenes {
+      input:
+        input_expression = expression,
+        gtf = gtf,
+        gene_type = gene_type,
+        log2_pseudocount = log2_pseudocount,
+        docker_image = deconvolution_docker_image,
+        cpu = hspe_cpu,
+        memory = hspe_memory,
+        disk_gb = hspe_disk_gb,
+        preemptible_attempts = preemptible_attempts,
+        max_retries = max_retries
+    }
+
+    call proportion_tasks.ValidateProportionMode {
+      input:
+        precomputed_proportions = precomputed_proportions,
+        docker_image = deconvolution_docker_image,
+        preemptible_attempts = preemptible_attempts,
+        max_retries = max_retries
+    }
+
   }
 
-  call proportion_tasks.ValidateProportionMode {
-    input:
-      precomputed_proportions = precomputed_proportions,
-      docker_image = deconvolution_docker_image,
-      preemptible_attempts = preemptible_attempts,
-      max_retries = max_retries
-  }
-
-  String proportion_mode = ValidateProportionMode.selected_mode
+  String proportion_mode = if defined(precomputed_tca_model) then "precomputed_model"
+    else select_first([ValidateProportionMode.selected_mode])
   String hspe_marker_method = "ratio"
 
-  if (ValidateProportionMode.estimate_proportions) {
+  if (!defined(precomputed_tca_model) && !defined(precomputed_proportions)) {
     call hspe_tasks.PrepareHspeBatches {
       input:
-        expression = FilterExpressionGenes.expression,
+        expression = select_first([FilterExpressionGenes.expression]),
         log2_pseudocount = log2_pseudocount,
         gtf = gtf,
         lm22 = lm22,
@@ -125,42 +131,49 @@ workflow CellTypeDeconvolution {
     }
   }
 
-  File proportions_for_processing = if ValidateProportionMode.estimate_proportions
-    then select_first([MergeHspeBatches.proportions])
-    else select_first([precomputed_proportions])
+  if (!defined(precomputed_tca_model)) {
+    File proportions_for_processing = if !defined(precomputed_proportions)
+      then select_first([MergeHspeBatches.proportions])
+      else select_first([precomputed_proportions])
 
-  call proportion_tasks.ProcessProportions {
-    input:
-      proportions = proportions_for_processing,
-      mean_threshold = group_mean_threshold,
-      zero_floor = zero_floor,
-      docker_image = deconvolution_docker_image,
-      cpu = proportions_cpu,
-      memory = proportions_memory,
-      disk_gb = proportions_disk_gb,
-      preemptible_attempts = preemptible_attempts,
-      max_retries = max_retries
+    call proportion_tasks.ProcessProportions {
+      input:
+        proportions = proportions_for_processing,
+        mean_threshold = group_mean_threshold,
+        zero_floor = zero_floor,
+        docker_image = deconvolution_docker_image,
+        cpu = proportions_cpu,
+        memory = proportions_memory,
+        disk_gb = proportions_disk_gb,
+        preemptible_attempts = preemptible_attempts,
+        max_retries = max_retries
+    }
+
+    call tca_tasks.FitTca {
+      input:
+        expression = select_first([FilterExpressionGenes.expression]),
+        tca_weights = ProcessProportions.tca_weights,
+        covariates = covariates,
+        max_iters = tca_max_iters,
+        random_seed = random_seed,
+        parallel = tca_parallel,
+        docker_image = deconvolution_docker_image,
+        cpu = fit_cpu,
+        memory = fit_memory,
+        disk_gb = fit_disk_gb,
+        preemptible_attempts = preemptible_attempts,
+        max_retries = max_retries
+    }
+
   }
 
-  call tca_tasks.FitTca {
-    input:
-      expression = FilterExpressionGenes.expression,
-      tca_weights = ProcessProportions.tca_weights,
-      covariates = covariates,
-      max_iters = tca_max_iters,
-      random_seed = random_seed,
-      parallel = tca_parallel,
-      docker_image = deconvolution_docker_image,
-      cpu = fit_cpu,
-      memory = fit_memory,
-      disk_gb = fit_disk_gb,
-      preemptible_attempts = preemptible_attempts,
-      max_retries = max_retries
-  }
+  File export_expression = if defined(precomputed_tca_model) then expression
+    else select_first([FilterExpressionGenes.expression])
 
   call tca_tasks.CleanTcaModel {
     input:
-      unfiltered_model = FitTca.model,
+      unfiltered_model = select_first([precomputed_tca_model, FitTca.model]),
+      reuse_model = defined(precomputed_tca_model),
       docker_image = deconvolution_docker_image,
       preemptible_attempts = preemptible_attempts,
       max_retries = max_retries
@@ -168,10 +181,11 @@ workflow CellTypeDeconvolution {
 
   call tca_tasks.ExportTcaBeds {
     input:
-      expression = FilterExpressionGenes.expression,
+      expression = export_expression,
       model = CleanTcaModel.model,
-      tca_weights = ProcessProportions.tca_weights,
-      covariates = covariates,
+      tca_weights = CleanTcaModel.tca_weights,
+      covariates = fit_covariates,
+      reuse_model = defined(precomputed_tca_model),
       parallel = tca_parallel,
       docker_image = deconvolution_docker_image,
       cpu = export_cpu,
@@ -227,7 +241,7 @@ workflow CellTypeDeconvolution {
       model_log = FitTca.model_log,
       original_proportions = ProcessProportions.original,
       combined_proportions = ProcessProportions.combined,
-      tca_weights = ProcessProportions.tca_weights,
+      tca_weights = CleanTcaModel.tca_weights,
       filter_report = ProcessProportions.filter_report,
       hspe_metadata = MergeHspeBatches.metadata,
       proportion_mode = proportion_mode,
@@ -254,11 +268,11 @@ workflow CellTypeDeconvolution {
   }
 
   output {
-    File filtered_expression = FilterExpressionGenes.expression
-    File gene_type_filter_report = FilterExpressionGenes.report
-    File gene_type_filter_log = FilterExpressionGenes.log
+    File filtered_expression = export_expression
+    File? gene_type_filter_report = FilterExpressionGenes.report
+    File? gene_type_filter_log = FilterExpressionGenes.log
 
-    File proportion_mode_validation_log = ValidateProportionMode.log
+    File? proportion_mode_validation_log = ValidateProportionMode.log
 
     File? estimated_proportions = MergeHspeBatches.proportions
     File? hspe_markers = PrepareHspeBatches.markers
@@ -268,19 +282,19 @@ workflow CellTypeDeconvolution {
     File? hspe_log = MergeHspeBatches.log
     File? hspe_sample_diagnostics = MergeHspeBatches.diagnostics
 
-    File proportions_lm22 = ProcessProportions.original
-    File proportions_combined = ProcessProportions.combined
-    File tca_weights = ProcessProportions.tca_weights
-    File cell_group_filter_report = ProcessProportions.filter_report
-    File proportions_log = ProcessProportions.log
+    File? proportions_lm22 = ProcessProportions.original
+    File? proportions_combined = ProcessProportions.combined
+    File tca_weights = CleanTcaModel.tca_weights
+    File? cell_group_filter_report = ProcessProportions.filter_report
+    File? proportions_log = ProcessProportions.log
 
     File tca_model = CleanTcaModel.model
-    File tca_model_unfiltered = FitTca.model
+    File? tca_model_unfiltered = FitTca.model
     File tca_numerical_excluded_genes = CleanTcaModel.excluded_genes
     File tca_cleanup_log = CleanTcaModel.log
-    File tca_model_log = FitTca.model_log
-    File tca_excluded_genes = FitTca.excluded_genes
-    File fit_tca_log = FitTca.log
+    File? tca_model_log = FitTca.model_log
+    File? tca_excluded_genes = FitTca.excluded_genes
+    File? fit_tca_log = FitTca.log
 
     Array[File] cell_type_beds = ExportTcaBeds.cell_type_beds
     File cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory

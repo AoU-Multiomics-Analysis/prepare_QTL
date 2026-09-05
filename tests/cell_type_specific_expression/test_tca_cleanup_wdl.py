@@ -11,7 +11,8 @@ class TcaCleanupTest(unittest.TestCase):
         doc = WDL.load(str(ROOT / "workflows/cell_type_specific_expression/deconvolution.wdl"))
         calls = {n.name: n for n in doc.workflow.body if isinstance(n, WDL.Tree.Call)}
         self.assertIn("CleanTcaModel", calls)
-        self.assertEqual(str(calls["CleanTcaModel"].inputs["unfiltered_model"]), "FitTca.model")
+        self.assertEqual(str(calls["CleanTcaModel"].inputs["unfiltered_model"]),
+                         "select_first([precomputed_tca_model, FitTca.model])")
         for consumer in ("ExportTcaBeds", "BuildManifest"):
             self.assertEqual(str(calls[consumer].inputs["model"]), "CleanTcaModel.model")
         outputs = {n.name: n for n in doc.workflow.outputs}

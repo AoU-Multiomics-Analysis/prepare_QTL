@@ -10,7 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 class HspeScatterTest(unittest.TestCase):
     def test_workers_receive_small_files_and_merge_precedes_group_filtering(self):
         doc = WDL.load(str(ROOT / "workflows/cell_type_specific_expression/deconvolution.wdl"))
-        condition = next(n for n in doc.workflow.body if isinstance(n, WDL.Tree.Conditional))
+        condition = next(n for n in doc.workflow.body if isinstance(n, WDL.Tree.Conditional)
+                         and any(isinstance(c, WDL.Tree.Call) and c.name == "PrepareHspeBatches"
+                                 for c in n.body))
         calls = {n.name: n for n in condition.body if isinstance(n, WDL.Tree.Call)}
         self.assertIn("PrepareHspeBatches", calls)
         self.assertIn("MergeHspeBatches", calls)
@@ -20,7 +22,8 @@ class HspeScatterTest(unittest.TestCase):
         worker_files = {n.name for n in worker.callee.inputs if isinstance(n.type, WDL.Type.File)}
         self.assertEqual(worker_files, {"prepared", "batch"})
         self.assertEqual(str(calls["MergeHspeBatches"].inputs["batch_results"].type), "Array[File]")
-        selected = next(n for n in doc.workflow.body
+        selected = next(n for block in doc.workflow.body if isinstance(block, WDL.Tree.Conditional)
+                        for n in block.body
                         if isinstance(n, WDL.Tree.Decl) and n.name == "proportions_for_processing")
         self.assertIn("MergeHspeBatches.proportions", str(selected.expr))
 

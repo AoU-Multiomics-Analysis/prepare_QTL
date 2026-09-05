@@ -57,9 +57,9 @@ testthat::test_that("gene types filter expression before deconvolution", {
   testthat::expect_equal(
     stringr::str_count(
       standalone,
-      stringr::fixed("expression = FilterExpressionGenes.expression")
+      stringr::fixed("expression = select_first([FilterExpressionGenes.expression])")
     ),
-    4L
+    2L
   )
   testthat::expect_match(standalone, "gene_type = gene_type", fixed = TRUE)
   testthat::expect_match(integrated, "gene_type = gene_type", fixed = TRUE)
