@@ -1,0 +1,32 @@
+name: Pinned Image Smoke (Manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned_smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install WDL runner
+        run: python -m pip install miniwdl==1.15.0
+      - name: Check stage routing
+        run: python tests/test_stage_image_inputs.py
+      - name: Run with published digest defaults
+        run: python tests/cell_type_specific_expression/smoke/run_pinned_images.py
+      - name: Preserve run logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinned-image-smoke-${{ github.run_id }}
+          path: ci-runs/
+          if-no-files-found: warn

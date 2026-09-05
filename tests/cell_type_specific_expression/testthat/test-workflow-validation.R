@@ -390,13 +390,14 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
   prefix <- "PrepareCellTypeEqtlWorkflow."
   required_shared_inputs <- c(
     "expression", "gtf", "lm22", "SampleList", "AdditionalCovariates", "OutputPrefix",
-    "deconvolution_docker_image", "qtl_docker_image", "log2_pseudocount",
+    "estimation_docker_image", "fit_docker_image", "export_docker_image",
+    "downstream_docker_image", "qtl_docker_image", "log2_pseudocount",
     "gene_type"
   )
   purrr::walk(list(hspe_inputs, precomputed_inputs), function(inputs) {
     testthat::expect_true(all(paste0(prefix, required_shared_inputs) %in% names(inputs)))
     testthat::expect_identical(
-      inputs[[paste0(prefix, "deconvolution_docker_image")]],
+      inputs[[paste0(prefix, "downstream_docker_image")]],
       "cell-type-specific-expression:test"
     )
     testthat::expect_identical(

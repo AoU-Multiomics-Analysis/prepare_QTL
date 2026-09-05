@@ -200,7 +200,13 @@ common_inputs <- list(
     file.path(fixture_root, "samples.tsv"),
   "PrepareCellTypeEqtlWorkflow.AdditionalCovariates" =
     file.path(fixture_root, "additional_covariates.tsv"),
-  "PrepareCellTypeEqtlWorkflow.deconvolution_docker_image" =
+  "PrepareCellTypeEqtlWorkflow.estimation_docker_image" =
+    "cell-type-specific-expression:test",
+  "PrepareCellTypeEqtlWorkflow.fit_docker_image" =
+    "cell-type-specific-expression:test",
+  "PrepareCellTypeEqtlWorkflow.export_docker_image" =
+    "cell-type-specific-expression:test",
+  "PrepareCellTypeEqtlWorkflow.downstream_docker_image" =
     "cell-type-specific-expression:test",
   "PrepareCellTypeEqtlWorkflow.qtl_docker_image" = "prepare-qtl:test",
   "PrepareCellTypeEqtlWorkflow.preemptible_attempts" = 0L,

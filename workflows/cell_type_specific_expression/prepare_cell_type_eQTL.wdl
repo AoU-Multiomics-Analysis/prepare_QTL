@@ -16,8 +16,11 @@ workflow PrepareCellTypeEqtlWorkflow {
     File AdditionalCovariates
     String OutputPrefix
 
-    String deconvolution_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression:main"
-    String qtl_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
+    String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
+    String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
+    String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
+    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"
+    String qtl_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
     Int preemptible_attempts = 2
     Int max_retries = 2
 
@@ -70,7 +73,10 @@ workflow PrepareCellTypeEqtlWorkflow {
       precomputed_tca_model = precomputed_tca_model,
       precomputed_proportions = precomputed_proportions,
       covariates = deconvolution_covariates,
-      deconvolution_docker_image = deconvolution_docker_image,
+      estimation_docker_image = estimation_docker_image,
+      fit_docker_image = fit_docker_image,
+      export_docker_image = export_docker_image,
+      downstream_docker_image = downstream_docker_image,
       preemptible_attempts = preemptible_attempts,
       max_retries = max_retries,
       min_lm22_overlap = min_lm22_overlap,
@@ -112,7 +118,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       cell_type_bed_inventory = CellTypeDeconvolution.filtered_cell_type_bed_inventory,
       cell_type_beds = CellTypeDeconvolution.filtered_cell_type_beds,
       output_prefix = OutputPrefix,
-      docker_image = deconvolution_docker_image,
+      docker_image = downstream_docker_image,
       cpu = scatter_cpu,
       memory = scatter_memory,
       disk_gb = scatter_disk_gb,
@@ -163,7 +169,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       negative_summary = CellTypeDeconvolution.negative_expression_summary,
       gene_comparison = CellTypeDeconvolution.reference_gene_comparison,
       filter_metrics = CellTypeDeconvolution.reference_filter_metrics,
-      docker_image = deconvolution_docker_image,
+      docker_image = downstream_docker_image,
       cpu = scatter_cpu,
       memory = scatter_memory,
       disk_gb = scatter_disk_gb,
@@ -172,6 +178,13 @@ workflow PrepareCellTypeEqtlWorkflow {
   }
 
   output {
+    Map[String, String] stage_images = {
+      "estimation": estimation_docker_image,
+      "fit": fit_docker_image,
+      "export": export_docker_image,
+      "downstream": downstream_docker_image,
+      "qtl": qtl_docker_image
+    }
     File filtered_expression = CellTypeDeconvolution.filtered_expression
     File? gene_type_filter_report = CellTypeDeconvolution.gene_type_filter_report
     File? gene_type_filter_log = CellTypeDeconvolution.gene_type_filter_log
