@@ -189,6 +189,27 @@ class SettingsPlannerTests(unittest.TestCase):
         self.assertTrue(any('release-publish' in conflict and 'reviewer' in conflict.lower()
                             for conflict in plan['conflicts']))
 
+    def test_extra_or_malformed_environment_reviewer_is_a_conflict(self):
+        invalid_reviewer_sets = [
+            [
+                {'type': 'User', 'reviewer': {'id': 7}},
+                {'type': 'Team', 'reviewer': {'id': 88}},
+            ],
+            [
+                {'type': 'User', 'reviewer': {'id': 7}},
+                {'type': 'User', 'reviewer': {}},
+            ],
+        ]
+        for reviewers in invalid_reviewer_sets:
+            with self.subTest(reviewers=reviewers):
+                snapshot = empty_settings()
+                snapshot['environments']['release-publish'] = protected_environment(
+                    reviewers=reviewers)
+                plan = plan_settings(snapshot, None)
+                self.assertTrue(any(
+                    'release-publish' in conflict and 'reviewer' in conflict.lower()
+                    for conflict in plan['conflicts']))
+
     def test_already_complete_snapshot_has_no_settings_writes(self):
         snapshot = empty_settings()
         snapshot['environments'] = {
@@ -443,7 +464,6 @@ class SettingsInspectionTests(unittest.TestCase):
         ])
         self.assertEqual(gh.page_calls, [
             ('/repos/owner/repo/actions/variables', 'variables'),
-            ('/repositories/42/environments/release-commit/secrets', 'secrets'),
         ])
         self.assertEqual(gh.manifest_calls, ['ghcr.io/owner/image'])
 
@@ -508,15 +528,27 @@ class SettingsInspectionTests(unittest.TestCase):
         self.assertTrue(any('image-stages.yml' in notice
                             for notice in snapshot['readiness_notices']))
 
+    def test_absent_commit_environment_does_not_list_its_secrets(self):
+        class MissingEnvironmentGitHub(InspectGitHub):
+            def pages(self, route, key):
+                if route == '/repositories/42/environments/release-commit/secrets':
+                    raise SetupError('The environment does not exist.')
+                return super().pages(route, key)
+
+        snapshot = inspect_settings(MissingEnvironmentGitHub(),
+                                    'owner/repo', ['reviewer'])
+        self.assertFalse(snapshot['secret_present'])
+
 
 class StatefulGitHub(InspectGitHub):
-    def __init__(self, *, corrupt_environment=False):
+    def __init__(self, *, corrupt_environment=False, created_reviewers=None):
         super().__init__()
         self.environments = {'release-publish': None, 'release-commit': None}
         self.variables = {}
         self.label = None
         self.writes = []
         self.corrupt_environment = corrupt_environment
+        self.created_reviewers = created_reviewers
 
     def get(self, route, *, optional=False):
         for name in self.environments:
@@ -547,6 +579,8 @@ class StatefulGitHub(InspectGitHub):
             stored = copy.deepcopy(body)
             if self.corrupt_environment:
                 stored['reviewers'] = []
+            if self.created_reviewers is not None:
+                stored['reviewers'] = copy.deepcopy(self.created_reviewers)
             self.environments[name] = {'environment': stored, 'branches': []}
         elif route.endswith('/actions/variables'):
             self.variables[body['name']] = body['value']
@@ -610,6 +644,29 @@ class SettingsApplyTests(unittest.TestCase):
         with self.assertRaises(SetupError):
             apply_settings(gh, empty_settings(), plan, [])
         self.assertEqual(gh.writes, [])
+
+    def test_creation_rejects_extra_or_malformed_environment_reviewer(self):
+        invalid_reviewer_sets = [
+            [
+                {'type': 'User', 'id': 7},
+                {'type': 'Team', 'id': 88},
+            ],
+            [
+                {'type': 'User', 'id': 7},
+                {'type': 'User'},
+            ],
+        ]
+        for reviewers in invalid_reviewer_sets:
+            with self.subTest(reviewers=reviewers):
+                gh = StatefulGitHub(created_reviewers=reviewers)
+                completed = []
+                with self.assertRaises(SetupError) as caught:
+                    apply_settings(
+                        gh, empty_settings(), plan_settings(empty_settings(), None),
+                        completed)
+                self.assertEqual(len(gh.writes), 1)
+                self.assertEqual(completed, ['environment:release-publish'])
+                self.assertIn('manual repair', str(caught.exception).lower())
 
 
 if __name__ == '__main__':

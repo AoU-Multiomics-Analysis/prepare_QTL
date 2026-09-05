@@ -333,10 +333,14 @@ def inspect_settings(gh, repository: str, reviewers: list[str]) -> dict:
             variables[name] = value
         else:
             raise SetupError('GitHub returned invalid repository variable data.')
-    secret_records = gh.pages(
-        f'/repositories/{repository_id}/environments/release-commit/secrets', 'secrets')
-    secret_present = any(
-        record.get('name') == 'RELEASE_APP_PRIVATE_KEY' for record in secret_records)
+    secret_present = False
+    if environments['release-commit'] is not None:
+        secret_records = gh.pages(
+            f'/repositories/{repository_id}/environments/release-commit/secrets',
+            'secrets')
+        secret_present = any(
+            record.get('name') == 'RELEASE_APP_PRIVATE_KEY'
+            for record in secret_records)
     label_present = gh.get(
         f'/repos/{full_name}/labels/release-ready', optional=True) is not None
 
@@ -362,14 +366,27 @@ def _reviewer_ids(reviewers):
     return {reviewer['id'] for reviewer in reviewers}
 
 
-def _environment_reviewer_ids(environment):
-    ids = set()
-    for entry in environment.get('reviewers') or []:
-        reviewer = entry.get('reviewer') or {}
-        reviewer_id = entry.get('id', reviewer.get('id'))
-        if entry.get('type') == 'User' and isinstance(reviewer_id, int):
-            ids.add(reviewer_id)
-    return ids
+def _environment_reviewers(environment):
+    entries = environment.get('reviewers')
+    if not isinstance(entries, list):
+        return None
+    reviewers = set()
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get('type') != 'User':
+            return None
+        nested = entry.get('reviewer')
+        if nested is not None and not isinstance(nested, dict):
+            return None
+        reviewer_id = entry.get('id')
+        if reviewer_id is None and nested is not None:
+            reviewer_id = nested.get('id')
+        if type(reviewer_id) is not int:
+            return None
+        reviewer = ('User', reviewer_id)
+        if reviewer in reviewers:
+            return None
+        reviewers.add(reviewer)
+    return reviewers
 
 
 def plan_settings(snapshot: dict, requested_app_id: int | None) -> dict:
@@ -405,7 +422,8 @@ def plan_settings(snapshot: dict, requested_app_id: int | None) -> dict:
             'The existing release App secret cannot be inspected; its value and validity are unknown.')
 
     if not conflicts:
-        requested_reviewer_ids = _reviewer_ids(reviewers)
+        requested_reviewer_set = {('User', reviewer['id'])
+                                  for reviewer in reviewers}
         protection = {
             'wait_timer': 0,
             'prevent_self_review': False,
@@ -429,7 +447,7 @@ def plan_settings(snapshot: dict, requested_app_id: int | None) -> dict:
                 })
                 continue
             environment = current.get('environment') or {}
-            if _environment_reviewer_ids(environment) != requested_reviewer_ids:
+            if _environment_reviewers(environment) != requested_reviewer_set:
                 conflicts.append(
                     f'Environment {name} does not have the requested reviewer set.')
             if environment.get('deployment_branch_policy') != {
@@ -472,14 +490,9 @@ def _live_variable(gh, repository, name):
 
 def _environment_payload_matches(environment, expected):
     normalized = _normalize_environment(environment)
-    actual_reviewers = set()
-    for entry in normalized.get('reviewers') or []:
-        reviewer_id = entry.get('id')
-        if reviewer_id is None:
-            reviewer_id = (entry.get('reviewer') or {}).get('id')
-        if entry.get('type') == 'User' and isinstance(reviewer_id, int):
-            actual_reviewers.add(reviewer_id)
-    expected_reviewers = {entry['id'] for entry in expected['reviewers']}
+    actual_reviewers = _environment_reviewers(normalized)
+    expected_reviewers = {('User', entry['id'])
+                          for entry in expected['reviewers']}
     return (
         normalized.get('wait_timer') == expected['wait_timer']
         and normalized.get('prevent_self_review') == expected['prevent_self_review']
