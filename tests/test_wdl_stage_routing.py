@@ -209,6 +209,12 @@ class WdlStageRoutingTest(unittest.TestCase):
                               f"xargs -0 -n {count} -P 2 bash -c '{program}' _")
                 self.assertEqual(self.errors(), [])
 
+    def test_comment_quotes_do_not_change_literal_transfer_program(self):
+        self.workflow(command=self.command + '\n' +
+                      "# Don't change transfer settings\n" +
+                      '''xargs -0 -n 2 -P 2 bash -c 'gsutil cp "$1" "$2"' _''')
+        self.assertEqual(self.errors(), [])
+
     def test_modified_xargs_transfer_program_requires_review(self):
         for count, program in enumerate(self.TRANSFER_PROGRAMS, start=2):
             for extra in ('; python3 "$SCRIPT"', '; touch unreviewed'):
@@ -219,6 +225,23 @@ class WdlStageRoutingTest(unittest.TestCase):
                     errors = self.errors()
                     self.assertTrue(any('bash' in error and 'contract' in error
                                         for error in errors), errors)
+
+    def test_double_quoted_transfer_program_requires_review(self):
+        for count, program in enumerate(self.TRANSFER_PROGRAMS, start=2):
+            with self.subTest(count=count):
+                expanded = '"' + program.replace('"', '\\"') + '"'
+                self.workflow(command=self.command + '\n' +
+                              f'xargs -0 -n {count} -P 2 bash -c {expanded} _')
+                errors = self.errors()
+                self.assertTrue(any('bash' in error and 'contract' in error
+                                    for error in errors), errors)
+
+    def test_mixed_quoted_transfer_program_requires_review(self):
+        self.workflow(command=self.command + '\n' +
+                      '''xargs -0 -n 2 -P 2 bash -c 'gsutil cp '"\\"$1\\" \\"$2\\"" _''')
+        errors = self.errors()
+        self.assertTrue(any('bash' in error and 'contract' in error
+                            for error in errors), errors)
 
     def test_ordinary_read_variable_named_source_remains_supported(self):
         self.workflow(command='read -r source destination\n' + self.command)
