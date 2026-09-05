@@ -228,6 +228,7 @@ jobs:
             ci-runs/**/*filter*.tsv
             ci-runs/**/gene_comparison.tsv.gz
             ci-runs/**/negative_summary.tsv.gz
+            ci-runs/**/*.bed.gz
             ci-runs/**/reference_metadata.json
             ci-runs/**/plots/*.pdf
           if-no-files-found: warn

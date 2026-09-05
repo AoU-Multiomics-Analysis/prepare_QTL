@@ -47,8 +47,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install miniwdl
-        run: python -m pip install --disable-pip-version-check miniwdl
+      - name: Install descriptor validation dependencies
+        run: python -m pip install --disable-pip-version-check miniwdl==1.15.0 PyYAML==6.0.2
 
       - name: Validate Dockstore registration
         run: python scripts/validate_dockstore.py
