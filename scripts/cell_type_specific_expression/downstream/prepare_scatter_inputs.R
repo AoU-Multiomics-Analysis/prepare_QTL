@@ -34,6 +34,8 @@ write_scatter_contract <- function(contract, output_dir) {
 
 run_prepare_scatter_inputs <- function() {
   option_list <- list(
+    optparse::make_option("--sample-list", dest = "sample_list", type = "character",
+      default = NULL, help = "Optional sample selection list; intersect with BED samples."),
     optparse::make_option(
       "--inventory",
       type = "character",
@@ -133,6 +135,10 @@ run_prepare_scatter_inputs <- function() {
     output_prefix = output_prefix
   )
   output_files <- write_scatter_contract(contract, options$output_dir)
+  cohort_samples <- derive_scatter_samples(contract$expression_bed, options$sample_list)
+  sample_path <- file.path(options$output_dir, "cohort_samples.txt")
+  writeLines(cohort_samples, sample_path)
+  output_files <- c(output_files, sample_path)
   completion_message <- sprintf(
     paste0(
       "stage=prepare_scatter_inputs validated_cell_count=%d ",

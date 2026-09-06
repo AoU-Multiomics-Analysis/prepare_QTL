@@ -14,7 +14,7 @@ Use this checklist for the integrated human whole-blood pipeline,
 | `expression` | Yes | Gene-by-sample BED; finite, nonnegative **linear CPM**, not counts, TPM, log2 CPM, INT, or scaled values. | Supplies expression for HSPE and TCA. |
 | `gtf` | Yes, in both proportion modes | GTF with gene records, `gene_id`, and `gene_type` or `gene_biotype`. HSPE also needs usable `gene_name` values. | Filters gene types and maps gene IDs to LM22 symbols. |
 | `lm22` | Yes, even with supplied proportions | Original positive, linear LM22 reference values; genes in rows and the 22 LM22 cell types in columns. Do not pre-log this file. | Supplies the HSPE reference when proportions are estimated. |
-| `SampleList` | Yes | One sample ID per line, with no header or an optional `research_id`, `sample_id`, or `ID` header. | Selects and orders samples for downstream eQTL preparation, **not** for HSPE or TCA. |
+| `SampleList` | No | One sample ID per line, with no header or an optional `research_id`, `sample_id`, or `ID` header. | Optionally restricts downstream eQTL samples to IDs present in both this list and the BED headers. BED order is retained. Does not subset HSPE or TCA. |
 | `AdditionalCovariates` | Yes | Sample-by-covariate TSV with `sample_id`; numeric covariate columns. | Merges supplied covariates with phenotype PCs for each cell type and output branch. |
 | `precomputed_proportions` | No | Sample-by-cell-type TSV; `sample_id` first, followed by all 22 LM22 columns. Fractions, not percentages. | Skips HSPE estimation. Grouping and TCA still run. |
 | `deconvolution_covariates` | No | Sample-by-covariate TSV; `sample_id` first, followed by finite numeric columns. | Supplies covariates to the TCA model. It is not a substitute for `AdditionalCovariates`. |
@@ -400,7 +400,7 @@ a value.
 | `haemopedia_counts` | `File?` | `None` | Raw human Haemopedia counts; absence means negative-only post-export filtering. |
 | `reference_min_mean_log2_cpm1` | `Float` | `0.01` | Strict mean-log expression threshold in both datasets. |
 | `reference_residual_cutoff` | `Float?` | `None` | Optional positive absolute standardized-residual cutoff; one pass, off by default. Requires the reference. |
-| `SampleList` | `File` | Required | Sample list with an optional `research_id`, `sample_id`, or `ID` header; passed to every scattered expression-QTL call. Does not subset HSPE or TCA. |
+| `SampleList` | `File?` | Unset | Optional sample selection. `PrepareScatterInputs` checks that cell-type BED headers have the same sample IDs and order, then writes `cohort_samples.txt`. With no list, all BED samples are used. With a list, the intersection is used in BED order; excluded requested IDs are counted in the log. Empty selections and duplicate IDs fail. Each eQTL call receives the generated file. Does not subset HSPE or TCA. |
 | `AdditionalCovariates` | `File` | Required | QTL covariates merged with selected phenotype PCs in each branch. |
 | `OutputPrefix` | `String` | Required | Basename-safe token. It must start with an ASCII letter or number. It can contain only letters, numbers, dots, underscores, and hyphens. Each scatter call adds the cell-type slug. |
 | `estimation_docker_image` | `String` | `"ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9f7af7c16fa3dc7a0b82c042a40145fa26afce4a96547791e0b29a9e8de4d754"` | Gene filtering, HSPE, and proportion processing. |
@@ -633,7 +633,7 @@ This example runs the standalone workflow with precomputed proportions:
 ```
 
 For the integrated workflow, use the `PrepareCellTypeEqtlWorkflow` input
-prefix. Add the required `SampleList`, `AdditionalCovariates`, and
+prefix. Add the optional `SampleList` and required `AdditionalCovariates` and
 `OutputPrefix` inputs. For example:
 
 ```json
@@ -705,7 +705,7 @@ Before a Terra submission, check:
 1. The expression scale matches the selected workflow input.
 2. BED and GTF gene IDs use matching identifiers and version suffixes.
 3. Proportions and TCA covariates match all BED samples in the correct order.
-4. QTL covariates cover every sample selected in `SampleList`.
+4. QTL covariates cover every sample in the derived cohort list (all BED samples when `SampleList` is unset).
 5. The HSPE pseudocount is suitable for zeros in the retained bulk matrix.
 6. The workflow revision and both image versions are recorded.
 

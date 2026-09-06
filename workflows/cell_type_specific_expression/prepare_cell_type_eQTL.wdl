@@ -12,14 +12,14 @@ workflow PrepareCellTypeEqtlWorkflow {
     File? precomputed_tca_model
     File? precomputed_proportions
     File? deconvolution_covariates
-    File SampleList
+    File? SampleList
     File AdditionalCovariates
     String OutputPrefix
 
     String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
     String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
     String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
-    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:f0ea17e8729df4a886b4bdaf47da5d12da860390ac100b95b6d1848c7bf07ed2"
+    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:3f68dd8ee827b46e2e9d4524de57f784c8487c40e16516d752ec331f0c4dec16"
     String qtl_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     Int preemptible_attempts = 2
     Int max_retries = 2
@@ -117,6 +117,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     input:
       cell_type_bed_inventory = CellTypeDeconvolution.filtered_cell_type_bed_inventory,
       cell_type_beds = CellTypeDeconvolution.filtered_cell_type_beds,
+      sample_list = SampleList,
       output_prefix = OutputPrefix,
       docker_image = downstream_docker_image,
       cpu = scatter_cpu,
@@ -138,7 +139,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       input:
         OutputPrefix = PrepareScatterInputs.output_prefixes[index],
         CpmBed = select_first(matched_filtered_bed),
-        SampleList = SampleList,
+        SampleList = PrepareScatterInputs.cohort_samples,
         AdditionalCovariates = AdditionalCovariates,
         ResidualizeNormalizedInputs = false,
         DockerImage = qtl_docker_image,
