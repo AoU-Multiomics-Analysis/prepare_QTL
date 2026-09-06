@@ -7,6 +7,7 @@ import "tasks/tca.wdl" as tca_tasks
 import "tasks/qc.wdl" as qc_tasks
 import "tasks/gene_summary.wdl" as summary_tasks
 import "tasks/reference_filter.wdl" as reference_filter_tasks
+import "tasks/filter_scatter.wdl" as filter_scatter_tasks
 
 workflow CellTypeDeconvolution {
   input {
@@ -19,7 +20,7 @@ workflow CellTypeDeconvolution {
     String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
     String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
     String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
-    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
+    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:f0ea17e8729df4a886b4bdaf47da5d12da860390ac100b95b6d1848c7bf07ed2"
     Int preemptible_attempts = 2
     Int max_retries = 2
     Float min_lm22_overlap = 0.80
@@ -221,16 +222,34 @@ workflow CellTypeDeconvolution {
     }
   }
 
-  call reference_filter_tasks.FilterCellTypeBeds {
+  scatter (cell_type_bed in ExportTcaBeds.cell_type_beds) {
+    call filter_scatter_tasks.FilterCellTypeBed {
+      input:
+        cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
+        cell_type_bed = cell_type_bed,
+        reference_summary = PrepareHaemopedia.summary,
+        min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
+        residual_cutoff = reference_residual_cutoff,
+        docker_image = downstream_docker_image,
+        memory = gene_summary_memory,
+        disk_gb = export_disk_gb,
+        preemptible_attempts = preemptible_attempts,
+        max_retries = max_retries
+    }
+  }
+
+  call filter_scatter_tasks.MergeFilterReports as FilterCellTypeBeds {
     input:
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
-      cell_type_beds = ExportTcaBeds.cell_type_beds,
-      reference_summary = PrepareHaemopedia.summary,
-      min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
-      residual_cutoff = reference_residual_cutoff,
+      inventories = FilterCellTypeBed.filtered_inventory,
+      comparisons = FilterCellTypeBed.gene_comparison,
+      metrics = FilterCellTypeBed.filter_metrics,
+      samples = FilterCellTypeBed.sample_ids,
+      logs = FilterCellTypeBed.log,
+      post_residual = defined(reference_residual_cutoff),
       docker_image = downstream_docker_image,
       memory = gene_summary_memory,
-      disk_gb = export_disk_gb,
+      disk_gb = 20,
       preemptible_attempts = preemptible_attempts,
       max_retries = max_retries
   }
@@ -309,7 +328,7 @@ workflow CellTypeDeconvolution {
     File cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory
     File cell_type_gene_summary = SummarizeCellTypeBeds.summary
     File gene_summary_log = SummarizeCellTypeBeds.log
-    Array[File] filtered_cell_type_beds = FilterCellTypeBeds.filtered_beds
+    Array[File] filtered_cell_type_beds = FilterCellTypeBed.filtered_bed
     File filtered_cell_type_bed_inventory = FilterCellTypeBeds.filtered_inventory
     File negative_expression_summary = FilterCellTypeBeds.negative_summary
     File reference_gene_comparison = FilterCellTypeBeds.gene_comparison

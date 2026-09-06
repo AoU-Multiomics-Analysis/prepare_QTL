@@ -113,7 +113,7 @@ validate_inventory_reference_lineages <- function(inventory, reference_summary) 
 
 filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_summary = NULL,
                                   min_mean_log2_cpm1 = 0.01, residual_cutoff = NULL,
-                                  chunk_size = 256L) {
+                                  chunk_size = 256L, make_plots = TRUE) {
   validate_scatter_inventory(inventory)
   chunk_size <- validate_tensor_positive_integer(chunk_size, "chunk_size")
   residual_cutoff <- validate_residual_cutoff(residual_cutoff)
@@ -239,8 +239,8 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
   readr::write_tsv(negative, file.path(output_dir, "negative_summary.tsv.gz"), na = "NA")
   readr::write_tsv(all_comparisons, file.path(output_dir, "gene_comparison.tsv.gz"), na = "NA")
   readr::write_tsv(dplyr::bind_rows(metrics), file.path(output_dir, "filter_metrics.tsv"), na = "NA")
-  save_negative_plots(negative, file.path(output_dir, "plots"))
-  purrr::walk2(seq_len(nrow(inventory)), inventory$slug, function(i, slug) {
+  if (make_plots) save_negative_plots(negative, file.path(output_dir, "plots"))
+  if (make_plots) purrr::walk2(seq_len(nrow(inventory)), inventory$slug, function(i, slug) {
     save_reference_plots(comparisons[[i]], inventory$cell_group[[i]], slug, file.path(output_dir, "plots"))
     if (!is.null(residual_cutoff)) {
       retained_plot <- dplyr::filter(comparisons[[i]], .data$retained)
@@ -257,5 +257,6 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
       n_genes = purrr::map_int(comparisons, ~ sum(.x$retained)))
   readr::write_tsv(filtered_inventory, file.path(output_dir, "filtered_inventory.tsv"))
   writeLines(output_paths, file.path(output_dir, "filtered_beds.txt"))
-  invisible(list(inventory = filtered_inventory, comparisons = all_comparisons, metrics = dplyr::bind_rows(metrics)))
+  invisible(list(inventory = filtered_inventory, comparisons = all_comparisons,
+                 metrics = dplyr::bind_rows(metrics), samples = cohort_samples))
 }
