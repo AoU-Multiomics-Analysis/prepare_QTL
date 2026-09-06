@@ -28,7 +28,7 @@ task PrepareScatterInputs {
 ~{sep='\n' cell_type_beds}
 CELL_TYPE_BED_PATHS
     sample_args=()
-    if ~{if defined(sample_list) then "true" else "false"}; then
+    if [[ '~{defined(sample_list)}' == 'true' ]]; then
       sample_args=(--sample-list '~{if defined(sample_list) then sub(select_first([sample_list]), "'", "'\"'\"'") else ""}')
     fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/prepare_scatter_inputs.R \
