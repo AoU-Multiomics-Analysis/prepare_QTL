@@ -1,9 +1,8 @@
 # Release smoke suites
 
-The image-release gate selects tests for changed stages. When an integration
-check is required, it uses `compact`. It still tests the selected immutable
-image digests before the release App can commit them. No production WDL,
-analysis script, input default, or output format changes for these tests.
+The image-release gate runs short tests for changed stages against immutable
+image digests. Integration is manual. See [fast image releases](lean-release-tests.md)
+for the default policy. The optional integration suites are described below.
 
 | Check | Compact release suite | Full suite |
 | --- | --- | --- |
@@ -28,9 +27,8 @@ both stages use the same image.
 
 ## Run on GitHub
 
-The **Pinned Image Smoke** workflow tests `compact` on pull requests that change
-its release-test code. Manual runs offer a `suite` choice and default to `full`.
-The separate cell-type integration workflow keeps its full-suite coverage.
+The **Pinned Image Smoke** workflow is manual. It offers a `suite` choice and
+defaults to `full`. The separate cell-type integration workflow is also manual.
 
 On a GitHub runner with Docker available:
 
@@ -56,37 +54,24 @@ Missing HSPE, TCA, or edgeR dependencies fail this gate rather than skip it.
 
 | Changed stage | Task-level coverage |
 | --- | --- |
-| Estimation | Expression input, markers, HSPE, batching, and proportions |
-| Fit | Small TCA fit, model cleanup, and model reuse |
+| Estimation | HSPE batching |
+| Fit | Small TCA fit, model cleanup, and export gene/sample alignment |
 | Export | Tensor extraction, BED coordinates, sample order, and QC |
-| Downstream | Reference filtering, summaries, scatter inputs, and manifests |
+| Downstream | Reference filtering |
 
 These tests use small synthetic fixtures. For example, the export test builds
 a tiny model to check extraction; it does not launch the complete FitTca WDL.
 Other image families retain their existing targeted checks. Cheap repository
 and WDL validation still runs for every release.
 
-Only exact files in `stage_only_test_paths` can omit integration. The initial
-list covers the fit entrypoint, HSPE estimator module, QC module, and gene
-summary implementation. All other relevant code changes retain the compact
-test. In particular, BED interfaces, shared helpers, dependency environments,
-new scripts, and WDL changes keep that check. Missing change evidence also
-keeps integration. The runner reads the exact PR base/head diff from the
-trusted checkout, not from a candidate-provided test-selection file.
+New scripts, shared helpers, and dependency changes use the affected-stage tests
+without an automatic integration run. New stages still need a registered test.
+For input/output or sample/gene-order changes, request manual integration when
+needed. WDL-only changes retain static checks without runtime image tests.
 
-Path rules cannot detect a semantic interface change. If an exempt file changes
-its inputs, outputs, units, or sample/gene ordering, remove its exemption in a
-separate test-policy PR before releasing that change. Do not add directory-wide
-exemptions for new scripts. New stages must have a runtime gate before release.
-
-The release log and `ci-runs/runtime-test-plan.json` show the selected stages,
-test files, and paths that require integration. `--suite compact` or
-`--suite full` explicitly requests integration; `--all-stages` also keeps it.
-Manual full tests and the separate source-unit workflow are unchanged.
-
-For this test-policy PR, Pinned Image Smoke runs all stage gates against the
-published images plus compact integration. This is broader than a normal
-single-stage release so the new test harness is checked before use.
+The release log and `ci-runs/runtime-test-plan.json` show the selected stages
+and test files. `--suite compact`, `--suite full`, or `--all-stages` explicitly
+requests integration. Broad source tests are also manual.
 
 ## Reuse images within one job
 

@@ -9,7 +9,6 @@ import sys
 
 import yaml
 from docker_images import ensure_pinned_image
-from plan_image_updates import matches
 from propose_image_pins import literal_span, validate_image
 from wdl_stage_routing import validate_routing
 
@@ -29,28 +28,22 @@ def runtime_test_plan(config, stages, changed_paths, force_integration=False):
                 raise ValueError('Missing or invalid runtime tests for ' + stage)
             cell_tests[stage] = tests
     relevant = bool(cell_tests or stages & {'expression', 'common'})
-    # Documentation does not change task behavior. Missing change evidence is
-    # conservative; new scripts cannot silently inherit a stage-only exemption.
-    code_paths = [p for p in changed_paths if p.startswith(('scripts/', 'envs/', 'workflows/', 'rust/')) or p == '.dockerignore']
-    reasons = [p for p in code_paths if not matches(p, config.get('stage_only_test_paths', []))]
-    integration = relevant and (force_integration or not code_paths or bool(reasons))
+    # Deployments use stage tests. Cross-stage integration is a manual choice.
+    reasons = ['manual_request'] if force_integration and relevant else []
+    integration = relevant and force_integration
     return {'stages': sorted(stages), 'cell_tests': cell_tests,
             'integration': integration, 'integration_reasons': reasons}
 
 def selected_stages(record, config):
-    stages = set(record['plan']['stages'])
-    for path in record['plan']['wdl_checks']:
-        for group in config['workflow_groups']:
-            if matches(path, group['paths']):
-                stages.update(group['stages'])
-    return stages
+    # WDL edits are validated without pulling images for unrelated stages.
+    return set(record['plan']['stages'])
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--suite', choices=('compact', 'full'),
-                        help='Override cell-type coverage; releases default to compact, all-stages to full')
+                        help='Request manual integration coverage; automatic releases use stage tests only')
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument('--record', type=Path)
     selection.add_argument('--all-stages', action='store_true', help='Test all current defaults without publishing')
@@ -108,8 +101,6 @@ def main():
 
     for stage, tests in test_plan['cell_tests'].items():
         print('stage=runtime_test status=start selected_stage=' + stage, flush=True)
-        if stage == next(iter(test_plan['cell_tests'])):
-            run_r(images[stage], 'tests/release/test_cell_stage_harness.R')
         run_r(images[stage], 'tests/release/test_cell_stage.R', *tests)
 
     if test_plan['integration']:

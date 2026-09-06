@@ -59,6 +59,7 @@ jobs:
               ref: 'main',
               inputs: {
                 pr: String(context.payload.pull_request.number),
+                expected_head: context.payload.pull_request.head.sha,
                 commit_pins: process.env.COMMIT_PINS === 'true' ? 'true' : 'false'
               }
             });

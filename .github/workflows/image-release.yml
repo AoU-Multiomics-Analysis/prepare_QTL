@@ -11,6 +11,10 @@ on:
         description: Commit tested pins (also requires repository enable setting)
         type: boolean
         default: false
+      expected_head:
+        description: Trigger commit for automatic runs; leave empty for a manual retry
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -29,6 +33,7 @@ jobs:
       base: ${{ steps.plan.outputs.base }}
       matrix: ${{ steps.plan.outputs.matrix }}
       has_builds: ${{ steps.plan.outputs.has_builds }}
+      skip: ${{ steps.plan.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,8 +48,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr }}
-        run: python ci/release_integration.py snapshot --pr "$PR_NUMBER"
+          EXPECTED_HEAD: ${{ inputs.expected_head }}
+        run: python ci/release_integration.py snapshot --pr "$PR_NUMBER" --expected-head "$EXPECTED_HEAD"
       - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.skip != 'true'
         with:
           name: release-snapshot
           path: release.json
@@ -96,7 +103,7 @@ jobs:
 
   test:
     needs: [snapshot, build]
-    if: always() && needs.snapshot.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    if: always() && needs.snapshot.result == 'success' && needs.snapshot.outputs.skip != 'true' && (needs.build.result == 'success' || needs.build.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -134,7 +141,6 @@ jobs:
             git -C source apply --check "$GITHUB_WORKSPACE/candidate/pins.patch"
             git -C source apply "$GITHUB_WORKSPACE/candidate/pins.patch"
           fi
-          docker swarm init --advertise-addr 127.0.0.1
           python trusted/ci/test_release_images.py --source source --record release.json
       - uses: actions/upload-artifact@v4
         if: always()

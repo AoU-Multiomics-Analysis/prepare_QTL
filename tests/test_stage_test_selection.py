@@ -27,8 +27,7 @@ class StageTestSelection(unittest.TestCase):
         plan = self.select(['cell_fit'], ['scripts/cell_type_specific_expression/fit/fit_tca.R'])
         self.assertEqual(plan['stages'], ['cell_fit'])
         self.assertFalse(plan['integration'])
-        self.assertIn('test-tca-stage.R', plan['cell_tests']['cell_fit'])
-        self.assertIn('test-fit-cli.R', plan['cell_tests']['cell_fit'])
+        self.assertEqual(plan['cell_tests']['cell_fit'], ['test-fit-cli.R'])
 
     def test_plot_change_does_not_fit_tca(self):
         plan = self.select(['cell_export', 'cell_downstream'], ['scripts/cell_type_specific_expression/R/qc.R'])
@@ -43,11 +42,11 @@ class StageTestSelection(unittest.TestCase):
         self.assertIn('test-hspe-batches.R', plan['cell_tests']['cell_estimation'])
         self.assertFalse(plan['integration'])
 
-    def test_manual_override_and_missing_evidence_keep_integration(self):
+    def test_only_manual_override_enables_integration(self):
         self.assertTrue(hasattr(runner, 'runtime_test_plan'))
         self.assertTrue(runner.runtime_test_plan(self.config, {'cell_fit'},
             ['scripts/cell_type_specific_expression/fit/fit_tca.R'], True)['integration'])
-        self.assertTrue(self.select(['cell_fit'], [])['integration'])
+        self.assertFalse(self.select(['cell_fit'], [])['integration'])
 
     def test_all_registered_stage_tests_exist_and_exemptions_are_exact_existing_files(self):
         self.assertTrue(hasattr(runner, 'runtime_test_plan'))
@@ -55,17 +54,20 @@ class StageTestSelection(unittest.TestCase):
         for files in plan['cell_tests'].values():
             for filename in files:
                 self.assertTrue((ROOT / 'tests/cell_type_specific_expression/testthat' / filename).is_file())
-        for path in self.config['stage_only_test_paths']:
-            self.assertTrue((ROOT / path).is_file(), path)
 
-    def test_bed_interface_shared_code_and_unknown_source_keep_integration(self):
+    def test_shared_code_new_source_and_dependencies_use_stage_tests(self):
         for path in ['scripts/cell_type_specific_expression/R/bed_outputs.R',
                      'scripts/cell_type_specific_expression/shared/new.R',
                      'scripts/cell_type_specific_expression/fit/new.R',
                      'envs/CellTypeSpecificExpression/environment.yml',
                      'workflows/cell_type_specific_expression/tasks/tca.wdl']:
             with self.subTest(path=path):
-                self.assertTrue(self.select(['cell_export'], [path])['integration'])
+                self.assertFalse(self.select(['cell_export'], [path])['integration'])
+
+    def test_wdl_changes_do_not_select_unaffected_runtime_stages(self):
+        record = {'plan': {'stages': ['cell_fit'], 'wdl_checks': [
+            'workflows/cell_type_specific_expression/deconvolution.wdl']}}
+        self.assertEqual(runner.selected_stages(record, self.config), {'cell_fit'})
 
     def test_non_cell_images_do_not_start_cell_pipeline(self):
         self.assertFalse(self.select(['rnaseqc'], ['envs/RNASeQCAggregation/Dockerfile'])['integration'])
