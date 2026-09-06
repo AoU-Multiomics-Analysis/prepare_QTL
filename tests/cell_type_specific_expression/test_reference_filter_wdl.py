@@ -128,6 +128,31 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                          "CellTypeDeconvolution.filtered_cell_type_beds")
         self.assertEqual(str(scatter.inputs["cell_type_bed_inventory"]),
                          "CellTypeDeconvolution.filtered_cell_type_bed_inventory")
+        eqtl = self.workflow_call(self.qtl, "PrepareCellTypeEqtl")
+        if "sample_list" not in scatter.inputs:
+            self.assertEqual(str(eqtl.inputs["SampleList"]), "SampleList")
+            return
+        self.assertEqual(str(scatter.inputs["sample_list"]), "SampleList")
+        self.assertEqual(str(eqtl.inputs["SampleList"]), "PrepareScatterInputs.cohort_samples")
+        task = scatter.callee
+        with tempfile.TemporaryDirectory() as directory:
+            local_sample = str(Path(directory) / "donor's samples.txt")
+            for present in (True, False):
+                env = WDL.Env.Bindings()
+                env = env.bind("sample_list", WDL.Value.File(local_sample) if present else WDL.Value.Null())
+                env = env.bind("cell_type_beds", WDL.Value.Array(WDL.Type.File(), [WDL.Value.File(directory + "/cd4.bed.gz")]))
+                env = env.bind("cell_type_bed_inventory", WDL.Value.File(directory + "/inventory.tsv"))
+                env = env.bind("output_prefix", WDL.Value.String("cohort"))
+                command = render_after_localization(task, env, directory)
+                self.assertNotIn("gs://", command)
+                # Execute the argument setup, without R or any cloud job.
+                setup = command.split("    Rscript", 1)[0]
+                result = subprocess.run(["bash", "-c", setup + '\n printf "%s\\n" "${sample_args[@]}"'],
+                    cwd=directory, text=True, capture_output=True, check=True)
+                if present:
+                    self.assertIn("--sample-list\n" + local_sample, result.stdout)
+                else:
+                    self.assertNotIn("--sample-list", result.stdout)
 
     def test_filter_task_has_typed_inputs_and_logging(self):
         task_path = ROOT / "workflows/cell_type_specific_expression/tasks/reference_filter.wdl"

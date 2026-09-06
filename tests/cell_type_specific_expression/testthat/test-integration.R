@@ -38,6 +38,34 @@ testthat::test_that("scatter contract preserves inventory order and display name
     contract$output_prefix,
     c("cohort.cd4_t_cells", "cohort.monocytes")
   )
+  if (!exists("derive_scatter_samples", mode = "function")) {
+    return(invisible())
+  }
+  beds <- c(tempfile(fileext = ".gz"), tempfile(fileext = ".gz"))
+  sample_file <- tempfile()
+  on.exit(unlink(c(beds, sample_file)), add = TRUE)
+  for (bed in beds) {
+    con <- gzfile(bed, "wt")
+    writeLines("#chr\tstart\tend\tgene_id\ts2\ts1", con)
+    close(con)
+  }
+  testthat::expect_identical(derive_scatter_samples(beds), c("s2", "s1"))
+  writeLines(c("research_id", "s1", "absent", "s2"), sample_file)
+  testthat::expect_message(
+    selected <- derive_scatter_samples(beds, sample_file), "excluded:1"
+  )
+  testthat::expect_identical(selected, c("s2", "s1"))
+  writeLines("s1", sample_file)
+  testthat::expect_identical(derive_scatter_samples(beds, sample_file), "s1")
+  writeLines("absent", sample_file)
+  testthat::expect_error(derive_scatter_samples(beds, sample_file), "No samples")
+  writeLines(c("s1", "s1"), sample_file)
+  testthat::expect_error(derive_scatter_samples(beds, sample_file), "unique")
+  testthat::expect_error(derive_scatter_samples("gs://bucket/bed.gz"), "localization")
+  con <- gzfile(beds[[2L]], "wt")
+  writeLines("#chr\tstart\tend\tgene_id\ts1\ts2", con)
+  close(con)
+  testthat::expect_error(derive_scatter_samples(beds), "same sample IDs and order")
 })
 
 testthat::test_that("scatter contract rejects unsafe output-prefix tokens", {
@@ -198,10 +226,13 @@ testthat::test_that("scatter-input CLI writes aligned metadata files", {
   output_prefix_path <- file.path(temporary_directory, "output_prefix.txt")
   output_directory <- file.path(temporary_directory, "scatter")
   readr::write_tsv(make_scatter_inventory(), inventory_path)
-  writeLines(
-    c("/localized/cd4_t_cells.bed.gz", "/localized/monocytes.bed.gz"),
-    bed_paths_path
-  )
+  beds <- file.path(temporary_directory, make_scatter_inventory()$path)
+  for (bed in beds) {
+    con <- gzfile(bed, "wt")
+    writeLines("#chr\tstart\tend\tgene_id\ts2\ts1", con)
+    close(con)
+  }
+  writeLines(beds, bed_paths_path)
   writeLines("cohort", output_prefix_path)
 
   status <- system2(
@@ -229,8 +260,13 @@ testthat::test_that("scatter-input CLI writes aligned metadata files", {
   )
   testthat::expect_equal(
     readLines(file.path(output_directory, "expression_beds.txt")),
-    c("/localized/cd4_t_cells.bed.gz", "/localized/monocytes.bed.gz")
+    beds
   )
+  if (exists("derive_scatter_samples", mode = "function")) {
+    testthat::expect_identical(
+      readLines(file.path(output_directory, "cohort_samples.txt")), c("s2", "s1")
+    )
+  }
   testthat::expect_equal(
     readLines(file.path(output_directory, "output_prefixes.txt")),
     c("cohort.cd4_t_cells", "cohort.monocytes")
