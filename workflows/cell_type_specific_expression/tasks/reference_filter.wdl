@@ -96,7 +96,8 @@ task FilterCellTypeBeds {
   >>>
 
   output {
-    Array[File] filtered_beds = read_lines("outputs/filtered_beds.txt")
+    # Declare actual generated files for Cromwell output collection.
+    Array[File] filtered_beds = glob("outputs/beds/*.filtered.bed.gz")
     File filtered_inventory = "outputs/filtered_inventory.tsv"
     File negative_summary = "outputs/negative_summary.tsv.gz"
     File gene_comparison = "outputs/gene_comparison.tsv.gz"

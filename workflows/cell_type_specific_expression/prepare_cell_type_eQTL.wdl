@@ -127,10 +127,17 @@ workflow PrepareCellTypeEqtlWorkflow {
   }
 
   scatter (index in range(length(PrepareScatterInputs.cell_types))) {
+    # The inventory supplies validated labels, never a reconstructed file path.
+    # Glob order can differ from inventory order. Preserve each actual File URI.
+    scatter (filtered_bed in CellTypeDeconvolution.filtered_cell_type_beds) {
+      if (basename(filtered_bed) == PrepareScatterInputs.cell_type_slugs[index] + ".filtered.bed.gz") {
+        File matched_filtered_bed = filtered_bed
+      }
+    }
     call eqtl.eQTLPrepareData as PrepareCellTypeEqtl {
       input:
         OutputPrefix = PrepareScatterInputs.output_prefixes[index],
-        CpmBed = PrepareScatterInputs.expression_beds[index],
+        CpmBed = select_first(matched_filtered_bed),
         SampleList = SampleList,
         AdditionalCovariates = AdditionalCovariates,
         ResidualizeNormalizedInputs = false,
