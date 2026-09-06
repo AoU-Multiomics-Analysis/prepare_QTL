@@ -37,7 +37,7 @@ workflow AggregateMethylationCohort {
         Int CorrelationDiskGB = 250
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
+        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String methylation_rust_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
     }
 
