@@ -220,6 +220,38 @@ build and migration plan.
 
 ## Build reuse and image retention
 
+### CI events and duplicate work
+
+Source PRs run descriptor checks, release-policy checks, and relevant unit tests.
+Cell-type and expression source unit tests pull the pinned dependency images;
+they do not build images or run the complete workflow. A dependency change can
+need a tested new digest before these source unit tests pass.
+
+The `release-ready` label starts the stage release: build or reuse the selected
+image, test the mixed image defaults, and commit the tested pins. The dispatcher
+does not repeat a release for a single digest-only commit from
+`aou-prepare-qtl-release[bot]`. It checks the parent SHA, author, message, file
+statuses, and changed lines. Missing or uncertain metadata uses the normal
+release path. Other WDL edits and source edits still dispatch. Adding the label
+explicitly can request another trial.
+
+After the pin commit, descriptor and policy checks still run. Source unit tests
+compare the previous PR head with the new head and skip an update with no source
+changes. After merge, lightweight descriptor and RNA-SeQC checks remain; images
+are not rebuilt merely because the PR was merged.
+
+The standard, cell-type, and Rust compatibility image builders are manual-only.
+They no longer keep mutable `main` image tags current automatically. Use the
+maintained WDL digest defaults. Manual compatibility builds remain available.
+RNA-SeQC container CI tests without publishing; stage releases own publication.
+
+Candidate changes to the cell-type or RNA-SeQC runtime tests still run their
+container tests on PRs, because the trusted release path rejects candidate
+changes to its own tests. These test-maintenance runs do not repeat after merge.
+An unlabelled source PR has not passed the stage release: do not merge runtime
+changes until their release tests and final pin checks pass. This trigger change
+does not add branch protection or automatic merging.
+
 `ci/image-stages.yml` maps build inputs and stage consumers.
 `ci/release-pins.yml` lists the exact WDL defaults that can change. See
 [repository image routing](repository-image-routing.md) for input names.
@@ -228,8 +260,8 @@ Each release image gets a `release-src-<fingerprint>` tag and a source-fingerpri
 label. The fingerprint includes tracked build-file contents, paths, and modes.
 WDL pin commits do not change it. A repeat run reuses the matching image and
 does not create a commit when its pins are already current. An automatic pin
-commit can cause one more validation run, but it does not cause another image
-build or another pin commit.
+commit causes another descriptor/policy validation run, but its recognized
+digest-only synchronization does not dispatch another release.
 
 Retain these tags and all digests referenced by released WDLs. Do not overwrite
 release source tags. Removing an image can prevent a historical workflow from

@@ -1,0 +1,95 @@
+name: Source unit checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/cell_type_specific_expression/**"
+      - "scripts/common/**"
+      - "scripts/expression/*.R"
+      - ".github/workflows/source-unit-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-unit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select source changes since the previous PR head
+        id: changes
+        env:
+          BASE: ${{ github.event.before || github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            # A force push can make the previous head unavailable. Test rather
+            # than treating a failed comparison as an empty source diff.
+            if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+              echo 'run=true' >> "$GITHUB_OUTPUT"
+            else
+              changed=$(git diff --name-only "$BASE" "$HEAD" -- scripts/cell_type_specific_expression scripts/common 'scripts/expression/*.R' .github/workflows/source-unit-checks.yml)
+              if [[ -n "$changed" ]]; then
+                echo 'run=true' >> "$GITHUB_OUTPUT"
+              else
+                echo 'run=false' >> "$GITHUB_OUTPUT"
+              fi
+            fi
+          fi
+      - uses: actions/setup-python@v5
+        if: steps.changes.outputs.run == 'true'
+        with:
+          python-version: '3.11'
+      - name: Install the descriptor reader
+        if: steps.changes.outputs.run == 'true'
+        run: python -m pip install miniwdl==1.15.0 PyYAML==6.0.2
+      - name: Read pinned dependency images
+        if: steps.changes.outputs.run == 'true'
+        id: images
+        run: |
+          python - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          from propose_image_pins import literal_span, validate_image
+          text = Path('workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl').read_text()
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for key, name, repository in (
+                  ('cell', 'fit_docker_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression'),
+                  ('standard', 'qtl_docker_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl'),
+              ):
+                  value = literal_span(text, name)[2]
+                  validate_image(value, repository)
+                  output.write(f'{key}={value}\n')
+          PY
+      - name: Run source unit tests without image builds or workflow smoke tests
+        if: steps.changes.outputs.run == 'true'
+        env:
+          CELL_IMAGE: ${{ steps.images.outputs.cell }}
+          STANDARD_IMAGE: ${{ steps.images.outputs.standard }}
+        run: |
+          set -euo pipefail
+          docker pull "$CELL_IMAGE"
+          docker pull "$STANDARD_IMAGE"
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace" -w /workspace \
+            "$CELL_IMAGE" Rscript scripts/cell_type_specific_expression/lint_r.R
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace" -w /workspace \
+            "$CELL_IMAGE" Rscript tests/cell_type_specific_expression/testthat.R
+          for test in test_prepare_expression_log2_cpm.R test_prepare_expression_sample_list.R test_reference_filtered_expression.R; do
+            docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/workspace" -w /workspace \
+              "$STANDARD_IMAGE" Rscript "tests/$test"
+          done

@@ -1,23 +1,8 @@
 name: Methylation Rust Image
 
+# Compatibility image builds are manual; staged releases own automatic builds.
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
-    paths:
-      - "rust/methylation_filter/**"
-      - "rust/methylation_merge/**"
-      - "envs/MethylationRust/**"
-      - ".dockerignore"
-      - ".github/workflows/docker-methylation-rust.yml"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "rust/methylation_filter/**"
-      - "rust/methylation_merge/**"
-      - "envs/MethylationRust/**"
-      - ".dockerignore"
-      - ".github/workflows/docker-methylation-rust.yml"
 
 jobs:
   build_methylation_rust:

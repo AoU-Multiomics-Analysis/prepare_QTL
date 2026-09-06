@@ -1,32 +1,11 @@
 name: Cell-Type-Specific Expression CI
 
+# Source changes use Stage Image Release. Keep candidate test changes testable.
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
-    paths:
-      - "envs/PhenotypePCs/**"
-      - "envs/CellTypeSpecificExpression/**"
-      - "scripts/cell_type_specific_expression/**"
-      - "scripts/common/**"
-      - "scripts/expression/*.R"
-      - "tests/cell_type_specific_expression/*.R"
-      - "tests/cell_type_specific_expression/testthat/**"
-      - "tests/cell_type_specific_expression/smoke/**"
-      - "tests/cell_type_specific_expression/fixtures/**"
-      - "tests/test_prepare_expression_log2_cpm.R"
-      - "tests/test_prepare_expression_sample_list.R"
-      - "tests/test_reference_filtered_expression.R"
-      - ".dockerignore"
-      - ".github/workflows/cell-type-specific-expression-ci.yml"
   pull_request:
-    branches: ["main"]
+    branches: [main]
     paths:
-      - "envs/PhenotypePCs/**"
-      - "envs/CellTypeSpecificExpression/**"
-      - "scripts/cell_type_specific_expression/**"
-      - "scripts/common/**"
-      - "scripts/expression/*.R"
       - "tests/cell_type_specific_expression/*.R"
       - "tests/cell_type_specific_expression/testthat/**"
       - "tests/cell_type_specific_expression/smoke/**"
@@ -34,7 +13,7 @@ on:
       - "tests/test_prepare_expression_log2_cpm.R"
       - "tests/test_prepare_expression_sample_list.R"
       - "tests/test_reference_filtered_expression.R"
-      - ".dockerignore"
+      - "tests/test_prepare_methylation.R"
       - ".github/workflows/cell-type-specific-expression-ci.yml"
 
 permissions:
@@ -116,6 +95,13 @@ jobs:
             --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
             prepare-qtl:test \
             Rscript tests/test_reference_filtered_expression.R
+
+      - name: Test methylation preparation in the standard image
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace:ro" --workdir /workspace \
+            --env PREPARE_METHYLATION_SCRIPT=/tmp/PrepareMethylation.R \
+            prepare-qtl:test Rscript tests/test_prepare_methylation.R
 
       - name: Run the hspe end-to-end smoke workflow
         run: |

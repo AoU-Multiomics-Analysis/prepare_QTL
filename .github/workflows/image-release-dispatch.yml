@@ -23,6 +23,35 @@ jobs:
           COMMIT_PINS: ${{ vars.RELEASE_AUTO_COMMIT }}
         with:
           script: |
+            // Skip only the single, digest-only commit emitted by our release App.
+            // Read metadata from GitHub; never load candidate code or tests.
+            if (context.payload.action === 'synchronize' &&
+                context.payload.sender?.login === 'aou-prepare-qtl-release[bot]') {
+              const {data: commit} = await github.rest.repos.getCommit({
+                ...context.repo, ref: context.payload.pull_request.head.sha
+              });
+              const pin = /^\s*String\s+(\w+_docker_image)\s*=\s*"(ghcr\.io\/[^\s"@]+)@sha256:[0-9a-f]{64}"\s*$/;
+              const onlyPins = file => {
+                if (file.status !== 'modified' || !file.filename.startsWith('workflows/') ||
+                    !file.filename.endsWith('.wdl') || !file.patch) return false;
+                const lines = file.patch.split('\n');
+                const removed = lines.filter(x => x.startsWith('-')).map(x => x.slice(1).match(pin));
+                const added = lines.filter(x => x.startsWith('+')).map(x => x.slice(1).match(pin));
+                return removed.length > 0 && removed.length === file.deletions &&
+                  added.length === file.additions && removed.length === added.length &&
+                  removed.every((old, i) => old && added[i] &&
+                    old[1] === added[i][1] && old[2] === added[i][2]);
+              };
+              if (commit.sha === context.payload.after &&
+                  commit.author?.login === context.payload.sender.login &&
+                  commit.commit.message === 'Pin tested stage images' &&
+                  commit.parents?.length === 1 && commit.parents[0].sha === context.payload.before &&
+                  commit.files?.length > 0 && commit.files.length < 300 &&
+                  commit.files.every(onlyPins)) {
+                core.info('Digest-only App commit: normal PR validation checks the new defaults.');
+                return;
+              }
+            }
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,

@@ -47,6 +47,8 @@ jobs:
         run: |
           python tests/test_release_pin_proposals.py
           python tests/test_release_integration.py
+          python tests/test_release_dispatch.py
+          python tests/test_source_unit_selection.py
           python tests/test_repo_image_routing.py
           python tests/test_model_restart_smoke.py
       - name: Report last commit impact

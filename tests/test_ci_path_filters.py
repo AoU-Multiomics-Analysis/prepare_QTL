@@ -34,27 +34,25 @@ class CiPathTests(unittest.TestCase):
             'workflows/cell_type_specific_expression/deconvolution.wdl': set(),
             'workflows/expression/rnaseqc2_aggregate_batched.wdl': set(),
             'docs/terra-file-paths.md': set(),
-            'scripts/cell_type_specific_expression/run_hspe.R':
-                {'build_and_push', 'build_cell_type_specific_expression', 'smoke'},
-            'scripts/common/MergeCovariates.R': {'build_and_push', 'smoke'},
-            'scripts/expression/merge_rnaseqc.py': {'build_and_push', 'container'},
-            'rust/methylation_merge/src/main.rs': {'build_methylation_rust'},
-            'envs/CellTypeSpecificExpression/environment.yml':
-                {'build_cell_type_specific_expression', 'smoke'},
-            'envs/PhenotypePCs/Dockerfile': {'build_and_push', 'smoke'},
-            'envs/MethylationRust/Dockerfile': {'build_methylation_rust'},
-            'envs/RNASeQCAggregation/environment.yml': {'container'},
+            'scripts/cell_type_specific_expression/run_hspe.R': set(),
+            'scripts/common/MergeCovariates.R': set(),
+            'scripts/expression/merge_rnaseqc.py': set(),
+            'rust/methylation_merge/src/main.rs': set(),
+            'envs/CellTypeSpecificExpression/environment.yml': set(),
+            'envs/PhenotypePCs/Dockerfile': set(),
+            'envs/MethylationRust/Dockerfile': set(),
+            'envs/RNASeQCAggregation/environment.yml': set(),
             'tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json': {'smoke'},
-            'tests/test_prepare_expression_sample_list.R': {'build_and_push', 'smoke'},
+            'tests/test_prepare_expression_sample_list.R': {'smoke'},
+            'tests/test_prepare_methylation.R': {'smoke'},
             'tests/rnaseqc2_aggregation/smoke_container.py': {'container'},
             'tests/cell_type_specific_expression/test_reference_filter_wdl.py': set(),
-            '.dockerignore': {'build_and_push', 'build_cell_type_specific_expression',
-                              'build_methylation_rust', 'smoke', 'container'},
+            '.dockerignore': set(),
         }
         for event in ('push', 'pull_request'):
             for path, expected in cases.items():
                 with self.subTest(event=event, path=path):
-                    self.assertEqual(self.heavy_jobs(path, event), expected)
+                    self.assertEqual(self.heavy_jobs(path, event), expected if event == 'pull_request' else set())
 
     def test_manual_dispatch_runs_all_builds(self):
         self.assertEqual(self.heavy_jobs('', 'workflow_dispatch'),
