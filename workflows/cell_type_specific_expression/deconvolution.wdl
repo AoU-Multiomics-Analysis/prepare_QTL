@@ -20,7 +20,7 @@ workflow CellTypeDeconvolution {
     String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
     String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
     String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
-    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:f0ea17e8729df4a886b4bdaf47da5d12da860390ac100b95b6d1848c7bf07ed2"
+    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:3f68dd8ee827b46e2e9d4524de57f784c8487c40e16516d752ec331f0c4dec16"
     Int preemptible_attempts = 2
     Int max_retries = 2
     Float min_lm22_overlap = 0.80
