@@ -2,11 +2,14 @@
 
 [Back to main README](../README.md)
 
+See [Stage script layout](stage-script-layout.md) for directory ownership and the
+two-part migration needed to keep WDL paths and Docker images compatible.
+
 All scripts are written in R and are invoked from the command line with `Rscript`. They are bundled in the Docker image defined in [`envs/PhenotypePCs/Dockerfile`](../envs/PhenotypePCs/Dockerfile). For modality-specific normalization and filtering details, see [Phenotype normalization and filtering](phenotype-normalization-filtering.md).
 
 ## Shared Dual-Output Behavior
 
-[`PrepareExpression.R`](../scripts/expression/PrepareExpression.R), [`PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R), and [`PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) each write three BED files:
+[`PrepareExpression.R`](../scripts/expression/prepare/PrepareExpression.R), [`PrepareProteomics.R`](../scripts/proteomics/PrepareProteomics.R), and [`PrepareSpliceData.R`](../scripts/splicing/PrepareSpliceData.R) each write three BED files:
 
 - `.INT`: Rank-based inverse normal transformed molecular phenotypes.
 - `.scaled`: Molecular phenotypes transformed with `scale(..., center = TRUE, scale = TRUE)`. Raw-count and linear-CPM BED expression modes transform CPMs with `log2(CPM + 1)` first. Pre-normalized log2-CPM expression, proteomics, and splicing values are scaled directly.
@@ -30,7 +33,7 @@ The scripts still accept `--RankNormalize` for backwards compatibility, but the 
 
 Prepares an existing merged methylation BED. It accepts a headerless one-column sample list or one with a `sample_id`, `SampleID`, or `ID` header and requires every requested sample to exist. It removes `.meth_region_stats` suffixes, filters features by chromosome and missingness, and mean-imputes the remaining missing values. At least two samples and two retained features are required for downstream PCs. It writes raw, inverse-normalized, and scaled BED files. The raw output keeps all selected samples. The two normalized outputs remove connectivity outliers independently and write separate outlier reports.
 
-## `scripts/expression/PrepareExpression.R`
+## `scripts/expression/prepare/PrepareExpression.R`
 
 Prepares RNA-seq gene expression data for eQTL analysis.
 

@@ -89,7 +89,7 @@ testthat::test_that("summary CLI writes a compressed output and logs completion"
   output <- file.path(fixture$directory, "summary.tsv.gz")
   readr::write_tsv(fixture$inventory, inventory_path)
   writeLines(rev(unname(fixture$paths)), paths_path)
-  cli <- file.path(script_root, "summarize_cell_type_beds.R")
+  cli <- file.path(script_root, "downstream", "summarize_cell_type_beds.R")
   logs <- system2(file.path(R.home("bin"), "Rscript"),
     shQuote(c(cli, inventory_path, paths_path, output)), stdout = TRUE, stderr = TRUE)
   testthat::expect_null(attr(logs, "status"))

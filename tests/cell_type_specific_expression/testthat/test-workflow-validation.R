@@ -38,7 +38,7 @@ testthat::test_that("precomputed proportions select whether hspe runs", {
 run_validation_cli <- function(precomputed_defined) {
   script <- testthat::test_path(
     "..", "..", "..", "scripts", "cell_type_specific_expression",
-    "validate_proportion_mode.R"
+    "estimation", "validate_proportion_mode.R"
   )
   if (!file.exists(script)) {
     return(list(status = 127L, output = "validation script is absent"))

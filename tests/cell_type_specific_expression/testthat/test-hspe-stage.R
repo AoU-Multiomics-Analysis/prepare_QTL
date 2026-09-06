@@ -356,7 +356,7 @@ testthat::test_that("the hspe CLI writes its five declared outputs", {
   status <- system2(
     file.path(R.home("bin"), "Rscript"),
     c(
-      "scripts/cell_type_specific_expression/run_hspe.R", "--expression",
+      "scripts/cell_type_specific_expression/estimation/run_hspe.R", "--expression",
       expression_path,
       "--gtf", gtf_path, "--lm22", lm22_path, "--output-dir", output_dir,
       "--random-seed", "123"

@@ -115,21 +115,21 @@ jobs:
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R \
+            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/prepare/PrepareExpression.R \
             "$STANDARD_IMAGE" \
             Rscript tests/test_prepare_expression_log2_cpm.R
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R \
+            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/prepare/PrepareExpression.R \
             "$STANDARD_IMAGE" \
             Rscript tests/test_prepare_expression_sample_list.R
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R \
+            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/prepare/PrepareExpression.R \
             "$STANDARD_IMAGE" \
             Rscript tests/test_reference_filtered_expression.R
 

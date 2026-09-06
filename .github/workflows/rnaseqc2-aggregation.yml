@@ -8,6 +8,7 @@ on:
     paths:
       - "envs/RNASeQCAggregation/**"
       - "scripts/check_wdl_logging.py"
+      - "scripts/expression/rnaseqc/merge_rnaseqc.py"
       - "scripts/expression/merge_rnaseqc.py"
       - "workflows/expression/rnaseqc2_aggregate_batched.wdl"
       - "workflows/expression/examples/rnaseqc2_aggregation/**"
@@ -19,6 +20,7 @@ on:
     paths:
       - "envs/RNASeQCAggregation/**"
       - "scripts/check_wdl_logging.py"
+      - "scripts/expression/rnaseqc/merge_rnaseqc.py"
       - "scripts/expression/merge_rnaseqc.py"
       - "workflows/expression/rnaseqc2_aggregate_batched.wdl"
       - "workflows/expression/examples/rnaseqc2_aggregation/**"

@@ -5,7 +5,7 @@ This workflow merges RNA-SeQC files in two stages. Each scatter shard merges at 
 ## Files
 
 - [`workflows/expression/rnaseqc2_aggregate_batched.wdl`](../workflows/expression/rnaseqc2_aggregate_batched.wdl): WDL 1.0 workflow for Terra.
-- [`scripts/expression/merge_rnaseqc.py`](../scripts/expression/merge_rnaseqc.py): standard-library Python merger.
+- [`scripts/expression/rnaseqc/merge_rnaseqc.py`](../scripts/expression/rnaseqc/merge_rnaseqc.py): standard-library Python merger.
 - [`envs/RNASeQCAggregation/`](../envs/RNASeQCAggregation): dedicated image and pinned package versions.
 - [`sample_manifest.example.tsv`](../workflows/expression/examples/rnaseqc2_aggregation/sample_manifest.example.tsv): combined manifest example.
 - [`inputs.example.json`](../workflows/expression/examples/rnaseqc2_aggregation/inputs.example.json): example Terra input JSON.
@@ -97,7 +97,7 @@ The workflow uses `ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregat
 The default `docker_image` is pinned to the tested image's SHA-256 digest.
 Updating the registry's `main` tag does not change this workflow version.
 All three tasks use the same image and call the bundled script at
-`/opt/prepare_qtl/scripts/expression/merge_rnaseqc.py`. If you override
+`/opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py`. If you override
 `docker_image`, use a tested image digest that contains this script.
 
 The image uses micromamba with pinned Python, `gsutil`, `crcmod`, Bash,

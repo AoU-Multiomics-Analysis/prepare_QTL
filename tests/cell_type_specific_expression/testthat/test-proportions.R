@@ -121,7 +121,7 @@ testthat::test_that("the proportion CLI writes its four declared outputs", {
   status <- system2(
     file.path(R.home("bin"), "Rscript"),
     c(
-      "scripts/cell_type_specific_expression/process_proportions.R",
+      "scripts/cell_type_specific_expression/estimation/process_proportions.R",
       "--proportions", proportions_path,
       "--output-dir", output_dir
     )

@@ -36,7 +36,7 @@ sample_path <- file.path(directory, "samples.txt")
 writeLines(c("S3", "S1", "S2"), sample_path)
 output_prefix <- file.path(directory, "qtl")
 prepare_script <- Sys.getenv("PREPARE_EXPRESSION_SCRIPT",
-  unset = file.path(root, "scripts/expression/PrepareExpression.R"))
+  unset = file.path(root, "scripts/expression/prepare/PrepareExpression.R"))
 logs <- suppressWarnings(system2("Rscript", shQuote(c(prepare_script,
   "--CpmBed", filtered_path, "--SampleList", sample_path, "--OutputPrefix", output_prefix)),
   stdout = TRUE, stderr = TRUE))

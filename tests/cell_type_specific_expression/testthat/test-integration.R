@@ -190,7 +190,7 @@ testthat::test_that("scatter-input CLI writes aligned metadata files", {
     root,
     "scripts",
     "cell_type_specific_expression",
-    "prepare_scatter_inputs.R"
+    "downstream", "prepare_scatter_inputs.R"
   )
   temporary_directory <- withr::local_tempdir()
   inventory_path <- file.path(temporary_directory, "inventory.tsv")
@@ -243,7 +243,7 @@ testthat::test_that("scatter-input CLI rejects a multiline output-prefix file", 
     root,
     "scripts",
     "cell_type_specific_expression",
-    "prepare_scatter_inputs.R"
+    "downstream", "prepare_scatter_inputs.R"
   )
   temporary_directory <- withr::local_tempdir()
   inventory_path <- file.path(temporary_directory, "inventory.tsv")
@@ -275,7 +275,7 @@ testthat::test_that("scatter-input CLI preserves and rejects carriage returns", 
     root,
     "scripts",
     "cell_type_specific_expression",
-    "prepare_scatter_inputs.R"
+    "downstream", "prepare_scatter_inputs.R"
   )
   temporary_directory <- withr::local_tempdir()
   inventory_path <- file.path(temporary_directory, "inventory.tsv")

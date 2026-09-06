@@ -803,7 +803,7 @@ To clean an existing fit without refitting, run this command inside the
 matching updated cell-type image:
 
 ```bash
-Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/clean_tca_model.R \
+Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/fit/clean_tca_model.R \
   --model /path/to/tca_model.rds \
   --output-dir /path/to/cleaned
 ```

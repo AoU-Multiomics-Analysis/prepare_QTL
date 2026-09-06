@@ -15,7 +15,7 @@ except ImportError:
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 WDL = PROJECT_DIR / "workflows" / "expression" / "rnaseqc2_aggregate_batched.wdl"
-SCRIPT = PROJECT_DIR / "scripts" / "expression" / "merge_rnaseqc.py"
+SCRIPT = PROJECT_DIR / "scripts" / "expression" / "rnaseqc" / "merge_rnaseqc.py"
 
 
 def workflow_file_writes(node) -> list[str]:
@@ -128,7 +128,7 @@ class BatchCommandTest(unittest.TestCase):
         task = next(task for task in miniwdl.load(str(WDL)).tasks
                     if task.name == "aggregate_rnaseqc_batch")
         command = task.command.eval(bindings, miniwdl.StdLib.Base("1.0")).value
-        command = command.replace(
+        command = command.replace("/expression/rnaseqc/", "/expression/").replace(
             "/opt/prepare_qtl/scripts/expression/merge_rnaseqc.py",
             shlex.quote(str(SCRIPT)),
         )

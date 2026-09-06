@@ -37,9 +37,9 @@ class CiPathTests(unittest.TestCase):
             'workflows/cell_type_specific_expression/deconvolution.wdl': set(),
             'workflows/expression/rnaseqc2_aggregate_batched.wdl': set(),
             'docs/terra-file-paths.md': set(),
-            'scripts/cell_type_specific_expression/run_hspe.R': set(),
+            'scripts/cell_type_specific_expression/estimation/run_hspe.R': set(),
             'scripts/common/MergeCovariates.R': set(),
-            'scripts/expression/merge_rnaseqc.py': set(),
+            'scripts/expression/rnaseqc/merge_rnaseqc.py': set(),
             'rust/methylation_merge/src/main.rs': set(),
             'envs/CellTypeSpecificExpression/environment.yml': set(),
             'envs/PhenotypePCs/Dockerfile': set(),
@@ -81,7 +81,7 @@ class IntegrationSelectionTests(unittest.TestCase):
         self.assertNotIn(':test', commands)
         self.assertIn('docker pull "$CELL_IMAGE"', commands)
         self.assertIn('docker pull "$STANDARD_IMAGE"', commands)
-        self.assertIn('PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R', commands)
+        self.assertIn('PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/prepare/PrepareExpression.R', commands)
         self.assertIn('PREPARE_METHYLATION_SCRIPT=/workspace/scripts/methylation/PrepareMethylation.R', commands)
         for step in self.steps:
             if step.get('name', '').startswith(('Pull pinned', 'Run the cell-type-specific R suite',

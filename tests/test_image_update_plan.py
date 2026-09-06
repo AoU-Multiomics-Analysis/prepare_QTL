@@ -18,17 +18,30 @@ class ImagePlanTest(unittest.TestCase):
         cls.config = yaml.safe_load((ROOT / 'ci/image-stages.yml').read_text())
 
     def test_filter_edit_changes_only_downstream_pin(self):
-        plan = self.module.plan_changes(self.config, ['scripts/cell_type_specific_expression/filter_cell_type_beds.R'])
+        plan = self.module.plan_changes(self.config, ['scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R'])
         self.assertEqual(plan['stages'], ['cell_downstream'])
         self.assertEqual(plan['builds'], ['cell_type', 'standard'])
         self.assertEqual(plan['unmapped'], [])
+
+    def test_stage_moves_classify_both_deleted_and_added_paths(self):
+        for old, new, stage in (
+            ('scripts/cell_type_specific_expression/fit_tca.R', 'scripts/cell_type_specific_expression/fit/fit_tca.R', 'cell_fit'),
+            ('scripts/cell_type_specific_expression/run_hspe.R', 'scripts/cell_type_specific_expression/estimation/run_hspe.R', 'cell_estimation'),
+            ('scripts/cell_type_specific_expression/export_tca_beds.R', 'scripts/cell_type_specific_expression/export/export_tca_beds.R', 'cell_export'),
+            ('scripts/cell_type_specific_expression/filter_cell_type_beds.R', 'scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R', 'cell_downstream'),
+            ('scripts/expression/PrepareExpression.R', 'scripts/expression/prepare/PrepareExpression.R', 'expression'),
+            ('scripts/expression/merge_rnaseqc.py', 'scripts/expression/rnaseqc/merge_rnaseqc.py', 'rnaseqc'),
+        ):
+            plan = self.module.plan_changes(self.config, [old, new])
+            self.assertEqual(plan['unmapped'], [], (old, new))
+            self.assertEqual(plan['stages'], [stage])
 
     def test_shared_cell_io_changes_all_cell_stages(self):
         plan = self.module.plan_changes(self.config, ['scripts/cell_type_specific_expression/R/io.R'])
         self.assertEqual(plan['stages'], ['cell_downstream', 'cell_estimation', 'cell_export', 'cell_fit'])
 
     def test_standard_expression_and_rust_changes_are_separate(self):
-        plan = self.module.plan_changes(self.config, ['scripts/expression/PrepareExpression.R', 'rust/methylation_filter/src/main.rs'])
+        plan = self.module.plan_changes(self.config, ['scripts/expression/prepare/PrepareExpression.R', 'rust/methylation_filter/src/main.rs'])
         self.assertEqual(plan['stages'], ['expression', 'methylation_rust'])
         self.assertEqual(plan['builds'], ['methylation_rust', 'standard'])
 
@@ -97,7 +110,7 @@ class ImagePlanTest(unittest.TestCase):
 
     def test_cli_reports_selected_group(self):
         result = subprocess.run([sys.executable, str(ROOT / 'ci/plan_image_updates.py'),
-                                 '--changed', 'scripts/cell_type_specific_expression/filter_cell_type_beds.R'],
+                                 '--changed', 'scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R'],
                                 capture_output=True, text=True, cwd=ROOT)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('`cell_downstream`', result.stdout)

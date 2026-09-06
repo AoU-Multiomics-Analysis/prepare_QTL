@@ -228,7 +228,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         script_root = ROOT / "scripts/cell_type_specific_expression"
         with tempfile.TemporaryDirectory(prefix="reference-filter-task-") as directory:
             work = Path(directory)
-            (work / "pipeline").symlink_to(script_root, target_is_directory=True)
+            (work / "pipeline").symlink_to(script_root / "downstream", target_is_directory=True)
             counts = work / "counts with apostrophe's $(touch unexpected_side_effect).tsv"
             populations = [
                 "NveB", "MemB", "CD4T", "CD8T", "NK", "Mono",
@@ -241,7 +241,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             prepare_env = WDL.Env.Bindings().bind("counts", WDL.Value.File(str(counts)))
             prepare_command = render_after_localization(
                 tasks["PrepareHaemopedia"], prepare_env, directory
-            ).replace(
+            ).replace("/cell_type_specific_expression/downstream/", "/cell_type_specific_expression/").replace(
                 "/opt/prepare_qtl/scripts/cell_type_specific_expression/prepare_haemopedia.R",
                 "pipeline/prepare_haemopedia.R",
             )
@@ -282,7 +282,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             )
             filter_command = render_after_localization(
                 tasks["FilterCellTypeBeds"], filter_env, directory
-            ).replace(
+            ).replace("/cell_type_specific_expression/downstream/", "/cell_type_specific_expression/").replace(
                 "/opt/prepare_qtl/scripts/cell_type_specific_expression/filter_cell_type_beds.R",
                 "pipeline/filter_cell_type_beds.R",
             )

@@ -102,7 +102,7 @@ testthat::test_that("batch commands write localized inputs and merged outputs", 
     testthat::expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
   }
   fixture <- file.path(pipeline_root, "tests/cell_type_specific_expression/fixtures")
-  cli("prepare_hspe_batches.R", c(
+  cli("estimation/prepare_hspe_batches.R", c(
     "--expression", file.path(fixture, "synthetic_expression.bed"),
     "--gtf", file.path(fixture, "synthetic.gtf"),
     "--lm22", file.path(fixture, "synthetic_signature.tsv"),
@@ -124,13 +124,13 @@ testthat::test_that("batch commands write localized inputs and merged outputs", 
     batch_path <- file.path(directory, paste0("small batch ", index, ".rds"))
     out <- file.path(directory, paste0("result ", index))
     saveRDS(batch, batch_path)
-    cli("run_hspe_batch.R", c(shared_path, batch_path, out))
+    cli("estimation/run_hspe_batch.R", c(shared_path, batch_path, out))
     file.path(out, "hspe_batch_result.rds")
   })
   result_list <- file.path(directory, "result paths.txt")
   writeLines(rev(result_paths), result_list)
   merged_dir <- file.path(directory, "merged outputs")
-  cli("merge_hspe_batches.R", c(shared_path, result_list, merged_dir))
+  cli("estimation/merge_hspe_batches.R", c(shared_path, result_list, merged_dir))
   testthat::expect_true(file.exists(file.path(merged_dir, "hspe_metadata.json")))
   p <- read_numeric_matrix(file.path(merged_dir, "hspe_proportions.tsv"), "sample_id")
   testthat::expect_identical(rownames(p), c("S3", "S1", "S2"))
