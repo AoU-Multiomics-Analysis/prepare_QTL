@@ -16,6 +16,26 @@ SUPPORTED_STAGES = {'cell_estimation', 'cell_fit', 'cell_export', 'cell_downstre
                     'expression', 'common', 'proteomics', 'splicing', 'methylation',
                     'methylation_rust', 'rnaseqc'}
 
+
+def runtime_test_plan(config, stages, changed_paths, force_integration=False):
+    if stages - SUPPORTED_STAGES:
+        raise ValueError('No runtime gate for stages: ' + ', '.join(sorted(stages - SUPPORTED_STAGES)))
+    cell_tests = {}
+    for stage in sorted(stages):
+        if stage.startswith('cell_'):
+            tests = config['stages'][stage].get('runtime_tests')
+            if not tests or any(not isinstance(t, str) or '/' in t or not t.endswith('.R') for t in tests):
+                raise ValueError('Missing or invalid runtime tests for ' + stage)
+            cell_tests[stage] = tests
+    relevant = bool(cell_tests or stages & {'expression', 'common'})
+    # Documentation does not change task behavior. Missing change evidence is
+    # conservative; new scripts cannot silently inherit a stage-only exemption.
+    code_paths = [p for p in changed_paths if p.startswith(('scripts/', 'envs/', 'workflows/', 'rust/')) or p == '.dockerignore']
+    reasons = [p for p in code_paths if not matches(p, config.get('stage_only_test_paths', []))]
+    integration = relevant and (force_integration or not code_paths or bool(reasons))
+    return {'stages': sorted(stages), 'cell_tests': cell_tests,
+            'integration': integration, 'integration_reasons': reasons}
+
 def selected_stages(record, config):
     stages = set(record['plan']['stages'])
     for path in record['plan']['wdl_checks']:
@@ -41,7 +61,20 @@ def main():
         raise ValueError('Invalid stage routing:\n' + '\n'.join(routing_errors))
     config = yaml.safe_load((trusted / 'ci/image-stages.yml').read_text())
     targets = yaml.safe_load((trusted / 'ci/release-pins.yml').read_text())
-    stages = set(config['stages']) if args.all_stages else selected_stages(json.loads(args.record.read_text()), config)
+    record = None if args.all_stages else json.loads(args.record.read_text())
+    stages = set(config['stages']) if args.all_stages else selected_stages(record, config)
+    changed_paths = []
+    if record is not None:
+        # prepare fetched these exact revisions into the trusted checkout.
+        changed_paths = subprocess.check_output([
+            'git', '-C', str(trusted), 'diff', '--no-renames', '--name-only', '-z',
+            record['pr']['base']['sha'], record['pr']['head']['sha'], '--'
+        ]).decode().split('\0')
+    test_plan = runtime_test_plan(config, stages, changed_paths,
+                                  force_integration=args.all_stages or args.suite is not None)
+    print('stage=runtime_test_plan ' + json.dumps(test_plan, sort_keys=True), flush=True)
+    (source / 'ci-runs').mkdir(exist_ok=True)
+    (source / 'ci-runs/runtime-test-plan.json').write_text(json.dumps(test_plan, indent=2) + '\n')
     if stages - SUPPORTED_STAGES:
         raise ValueError('No runtime gate for stages: ' + ', '.join(sorted(stages - SUPPORTED_STAGES)))
     for test in ('test_repo_image_routing.py', 'test_stage_image_inputs.py'):
@@ -72,7 +105,13 @@ def main():
             command += ['--env', key + '=' + value]
         subprocess.run(command + [image, 'Rscript', script, *arguments], check=True)
 
-    if any(s.startswith('cell_') for s in stages) or stages & {'expression', 'common'}:
+    for stage, tests in test_plan['cell_tests'].items():
+        print('stage=runtime_test status=start selected_stage=' + stage, flush=True)
+        if stage == next(iter(test_plan['cell_tests'])):
+            run_r(images[stage], 'tests/release/test_cell_stage_harness.R')
+        run_r(images[stage], 'tests/release/test_cell_stage.R', *tests)
+
+    if test_plan['integration']:
         # Runner reads each actual WDL digest default, not one image override.
         subprocess.run([sys.executable, str(trusted / 'tests/cell_type_specific_expression/smoke/run_pinned_images.py'),
                         '--suite', args.suite or ('full' if args.all_stages else 'compact')],
