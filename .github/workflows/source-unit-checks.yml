@@ -6,6 +6,7 @@ on:
     paths:
       - "scripts/cell_type_specific_expression/**"
       - "scripts/common/**"
+      - "scripts/expression/**/*.R"
       - "scripts/expression/*.R"
       - ".github/workflows/source-unit-checks.yml"
   workflow_dispatch:
@@ -42,7 +43,7 @@ jobs:
             if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
               echo 'run=true' >> "$GITHUB_OUTPUT"
             else
-              changed=$(git diff --name-only "$BASE" "$HEAD" -- scripts/cell_type_specific_expression scripts/common 'scripts/expression/*.R' .github/workflows/source-unit-checks.yml)
+              changed=$(git diff --name-only "$BASE" "$HEAD" -- scripts/cell_type_specific_expression scripts/common 'scripts/expression/*.R' 'scripts/expression/**/*.R' .github/workflows/source-unit-checks.yml)
               if [[ -n "$changed" ]]; then
                 echo 'run=true' >> "$GITHUB_OUTPUT"
               else

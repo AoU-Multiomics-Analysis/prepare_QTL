@@ -5,7 +5,7 @@ file_arg <- sub("^--file=", "", grep("^--file=", args, value = TRUE))
 repo_root <- normalizePath(file.path(dirname(file_arg), ".."), mustWork = TRUE)
 script_path <- Sys.getenv(
     "PREPARE_EXPRESSION_SCRIPT",
-    unset = file.path(repo_root, "scripts", "expression", "PrepareExpression.R")
+    unset = file.path(repo_root, "scripts", "expression", "prepare", "PrepareExpression.R")
 )
 
 assert_true <- function(condition, message) {

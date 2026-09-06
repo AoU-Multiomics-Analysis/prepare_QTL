@@ -148,7 +148,7 @@ testthat::test_that("QTL manifest CLI preserves cloud URLs from safely serialize
     unlist(use.names = FALSE)
   output <- file.path(directory, "manifest.tsv")
   status <- suppressWarnings(system2(
-    "Rscript", shQuote(c("scripts/cell_type_specific_expression/build_qtl_manifest.R",
+    "Rscript", shQuote(c("scripts/cell_type_specific_expression/downstream/build_qtl_manifest.R",
                         arguments, "--output", output))
   ))
   testthat::expect_identical(status, 0L)

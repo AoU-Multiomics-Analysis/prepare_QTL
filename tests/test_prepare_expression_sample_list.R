@@ -4,7 +4,7 @@ file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)[[1
 test_path <- gsub("~+~", " ", sub("^--file=", "", file_arg), fixed = TRUE)
 root <- normalizePath(file.path(dirname(test_path), ".."))
 script <- Sys.getenv("PREPARE_EXPRESSION_SCRIPT",
-  unset = file.path(root, "scripts/expression/PrepareExpression.R"))
+  unset = file.path(root, "scripts/expression/prepare/PrepareExpression.R"))
 
 check <- function(condition, message) {
   if (!isTRUE(condition)) stop(message, call. = FALSE)

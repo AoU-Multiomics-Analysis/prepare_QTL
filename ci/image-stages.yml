@@ -23,6 +23,7 @@ images:
     environment_paths: ["envs/RNASeQCAggregation/**", ".dockerignore"]
 
 stages:
+  # Legacy entrypoints remain mapped while Git reports their deletion during migration.
   cell_estimation:
     image: cell_type
     script_roots: ["scripts/cell_type_specific_expression/estimation"]
@@ -75,33 +76,37 @@ stages:
       - scripts/cell_type_specific_expression/R/tca_stage.R
   expression:
     image: standard
+    sources: ["scripts/expression/PrepareExpression.R"]
     script_roots: ["scripts/expression/prepare"]
-    sources: ["scripts/expression/PrepareExpression.R", "scripts/common/**"]
   common:
     image: standard
-    sources: ["scripts/common/**"]
   proteomics:
     image: standard
     script_roots: ["scripts/proteomics"]
-    sources: ["scripts/proteomics/**", "scripts/common/**"]
   splicing:
     image: standard
     script_roots: ["scripts/splicing"]
-    sources: ["scripts/splicing/**", "scripts/common/**"]
   methylation:
     image: standard
     script_roots: ["scripts/methylation"]
-    sources: ["scripts/methylation/**", "scripts/common/**"]
   methylation_rust:
     image: methylation_rust
     script_roots: ["rust/methylation_filter", "rust/methylation_merge"]
     sources: ["rust/methylation_filter/**", "rust/methylation_merge/**"]
   rnaseqc:
     image: rnaseqc
-    script_roots: ["scripts/expression/rnaseqc"]
     sources: ["scripts/expression/merge_rnaseqc.py"]
+    script_roots: ["scripts/expression/rnaseqc"]
+
 
 shared:
+  # Shared tools are explicit: new common files need a consumer review.
+  - sources:
+      - scripts/common/calculate_PCs.R
+      - scripts/common/PCOutputUtils.R
+      - scripts/common/MergeCovariates.R
+      - scripts/common/ResidualizePhenotypes.R
+    stages: [common, expression, proteomics, splicing, methylation]
   - sources:
       - scripts/cell_type_specific_expression/bootstrap.R
       - scripts/cell_type_specific_expression/R/io.R
@@ -122,9 +127,13 @@ ignored_sources:
   - scripts/cell_type_specific_expression/tools/**
 
 # The standard image also copies direct R scripts from these directories to /tmp.
+runtime_aliases:
+  # Both source paths exist in the prerequisite; the staged copy is canonical.
+  /tmp/PrepareExpression.R: scripts/expression/prepare/PrepareExpression.R
 legacy_runtime_roots:
   - scripts/common
   - scripts/expression
+  - scripts/expression/prepare
   - scripts/methylation
   - scripts/proteomics
   - scripts/splicing

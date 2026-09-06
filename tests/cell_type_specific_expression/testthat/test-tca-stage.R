@@ -125,7 +125,7 @@ testthat::test_that("constant-gene removal reports gene_id and preserves order",
 
 testthat::test_that("the TCA CLI does not create shard artifacts", {
   text <- paste(readLines(
-    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit_tca.R"),
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit", "fit_tca.R"),
     warn = FALSE
   ), collapse = "\n")
   testthat::expect_false(grepl("--shard-size", text, fixed = TRUE))
@@ -138,7 +138,7 @@ testthat::test_that("TCA parallel execution accepts only an explicit logical fla
   testthat::expect_error(validate_boolean_flag(NA, "parallel"), "true or false")
 
   fit_cli <- paste(readLines(
-    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit_tca.R"),
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit", "fit_tca.R"),
     warn = FALSE
   ), collapse = "\n")
   fit_stage <- paste(readLines(tca_stage_path, warn = FALSE), collapse = "\n")
@@ -170,7 +170,7 @@ testthat::test_that("TCA fit arguments preserve enabled and disabled parallel se
 
 testthat::test_that("TCA fit reads a direct CPM BED", {
   text <- paste(readLines(
-    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit_tca.R"),
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "fit", "fit_tca.R"),
     warn = FALSE
   ), collapse = "\n")
   testthat::expect_match(text, '"--expression"', fixed = TRUE)

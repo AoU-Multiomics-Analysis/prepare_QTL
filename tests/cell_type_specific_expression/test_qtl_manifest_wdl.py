@@ -131,15 +131,15 @@ class QtlManifestWdlTest(unittest.TestCase):
             for decl in self.task.postinputs:
                 env = env.bind(decl.name, decl.expr.eval(env, stdlib))
             command = self.task.command.eval(env, stdlib).value
-            script = ROOT / "scripts/cell_type_specific_expression/build_qtl_manifest.R"
+            script = ROOT / "scripts/cell_type_specific_expression/downstream/build_qtl_manifest.R"
             # Rscript can encode spaces in --file before the script sees it.
             # A relative test-only link also matches the container's space-free path.
             (Path(directory) / "pipeline").symlink_to(script.parent, target_is_directory=True)
-            command = command.replace(
+            command = command.replace("/cell_type_specific_expression/downstream/", "/cell_type_specific_expression/").replace(
                 "/opt/prepare_qtl/scripts/cell_type_specific_expression/build_qtl_manifest.R",
                 "pipeline/build_qtl_manifest.R",
             )
-            process_env = dict(os.environ, CELL_TYPE_SPECIFIC_EXPRESSION_ROOT=str(script.parent))
+            process_env = dict(os.environ, CELL_TYPE_SPECIFIC_EXPRESSION_ROOT=str(script.parent.parent))
             result = subprocess.run(["bash", "-c", command], cwd=directory,
                                     env=process_env, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

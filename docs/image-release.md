@@ -6,7 +6,7 @@ to change a Terra image input by hand.
 
 ## Example: change the reference filter
 
-1. Open a PR that changes `scripts/cell_type_specific_expression/filter_cell_type_beds.R`.
+1. Open a PR that changes `scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R`.
 2. The release plan selects `cell_downstream`. The release workflow builds the
    cell-type image, or reuses an image with the same source fingerprint.
 3. The test job applies the proposed downstream digest to an isolated copy of

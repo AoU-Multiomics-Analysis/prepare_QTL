@@ -8,7 +8,7 @@ publish packages, open PRs, or submit Terra jobs.
 
 ```sh
 python ci/plan_image_updates.py \
-  --changed scripts/cell_type_specific_expression/filter_cell_type_beds.R
+  --changed scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R
 ```
 
 Expected: image build dependencies are `cell_type` and `standard`; the only

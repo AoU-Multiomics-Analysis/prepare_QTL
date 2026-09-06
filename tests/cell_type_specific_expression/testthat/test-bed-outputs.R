@@ -120,7 +120,7 @@ testthat::test_that("direct CPM BED coordinates align to filtered TCA genes", {
 
 testthat::test_that("TCA export reads a direct CPM BED", {
   text <- paste(readLines(
-    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export_tca_beds.R"),
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export", "export_tca_beds.R"),
     warn = FALSE
   ), collapse = "\n")
   testthat::expect_match(text, '"--expression"', fixed = TRUE)
@@ -192,7 +192,7 @@ testthat::test_that("full tensor extraction preserves model source and matrix or
 
 testthat::test_that("tensor export passes the explicit parallel flag to TCA", {
   export_cli <- paste(readLines(
-    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export_tca_beds.R"),
+    testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export", "export_tca_beds.R"),
     warn = FALSE
   ), collapse = "\n")
   bed_outputs <- paste(readLines(
@@ -348,7 +348,7 @@ testthat::test_that("TCA export reconstructs without optional covariates", {
   model$mus_hat <- matrix(0, nrow = length(gene_ids), ncol = length(cell_groups),
                           dimnames = list(gene_ids, cell_groups))
   saveRDS(model, model_path)
-  script <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export_tca_beds.R")
+  script <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "export", "export_tca_beds.R")
   arguments <- c(
     script,
     "--expression", expression_path,
@@ -663,7 +663,7 @@ testthat::test_that("manifest CLI consumes export-time hashes and basenames", {
   )
   qc_path <- file.path(working_directory, "final qc.tsv")
   log_path <- file.path(working_directory, "manifest log.txt")
-  script <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "build_deconvolution_manifest.R")
+  script <- testthat::test_path("..", "..", "..", "scripts", "cell_type_specific_expression", "downstream", "build_deconvolution_manifest.R")
   arguments <- c(
     script,
     "--outputs", inventory_path,

@@ -10,7 +10,7 @@ SCRIPT = (
     Path(os.environ["RNASEQC_MERGE_SCRIPT"])
     if "RNASEQC_MERGE_SCRIPT" in os.environ
     else Path(__file__).resolve().parents[2]
-    / "scripts" / "expression" / "merge_rnaseqc.py"
+    / "scripts" / "expression" / "rnaseqc" / "merge_rnaseqc.py"
 )
 
 

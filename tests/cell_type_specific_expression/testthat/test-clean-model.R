@@ -60,7 +60,7 @@ testthat::test_that("restart cleanup CLI accepts a cleaned model and writes its 
   path <- file.path(work, "model.rds")
   saveRDS(model, path)
   output <- system2(file.path(R.home("bin"), "Rscript"), shQuote(c(
-    "scripts/cell_type_specific_expression/clean_tca_model.R", "--reuse-model", "--model", path,
+    "scripts/cell_type_specific_expression/fit/clean_tca_model.R", "--reuse-model", "--model", path,
     "--output-dir", file.path(work, "output")
   )), stdout = TRUE, stderr = TRUE)
   testthat::expect_null(attr(output, "status"), info = paste(output, collapse = "\n"))
@@ -173,7 +173,7 @@ testthat::test_that("cleanup CLI saves a final model consumed by the real export
     testthat::expect_true(is.null(status) || status == 0L, info = paste(output, collapse = "\n"))
     output
   }
-  invisible(run_script("clean_tca_model.R", c("--model", raw_path, "--output-dir", file.path(work, "clean"))))
+  invisible(run_script("fit/clean_tca_model.R", c("--model", raw_path, "--output-dir", file.path(work, "clean"))))
   clean_path <- file.path(work, "clean", "tca_model_cleaned.rds")
   testthat::expect_true(file.exists(clean_path))
   if (!file.exists(clean_path)) return(invisible(NULL))
@@ -192,7 +192,7 @@ testthat::test_that("cleanup CLI saves a final model consumed by the real export
   write_numeric_matrix(model$W, weights_path, "sample_id")
   testthat::expect_error(TCA::tensor(X, model, verbose = FALSE, log_file = NULL),
                          "computationally singular")
-  invisible(run_script("export_tca_beds.R", c("--expression", bed_path, "--model", clean_path,
+  invisible(run_script("export/export_tca_beds.R", c("--expression", bed_path, "--model", clean_path,
       "--weights", weights_path, "--output-dir", file.path(work, "export"))))
   exported <- read_expression_bed(file.path(work, "export", "a.bed.gz"))
   testthat::expect_identical(exported$coordinates$gene_id, c("keep1", "keep2"))
@@ -202,7 +202,7 @@ testthat::test_that("cleanup CLI saves a final model consumed by the real export
   # Restart uses retained model genes even if the source BED has a different row order.
   restart_bed <- file.path(work, "restart.bed")
   write_expression_bed(restart_bed, coordinates[3:1, ], X[3:1, , drop = FALSE])
-  invisible(run_script("export_tca_beds.R", c("--expression", restart_bed, "--model", clean_path,
+  invisible(run_script("export/export_tca_beds.R", c("--expression", restart_bed, "--model", clean_path,
       "--weights", weights_path, "--reuse-model", "--output-dir", file.path(work, "restart"))))
   restarted <- read_expression_bed(file.path(work, "restart", "a.bed.gz"))
   testthat::expect_identical(restarted$coordinates, exported$coordinates)

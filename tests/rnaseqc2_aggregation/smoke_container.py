@@ -3,13 +3,20 @@
 import argparse
 import gzip
 import json
+import re
 import subprocess
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WDL = ROOT / "workflows/expression/rnaseqc2_aggregate_batched.wdl"
-SCRIPT = "/opt/prepare_qtl/scripts/expression/merge_rnaseqc.py"
+
+def script_for_wdl(wdl: Path) -> str:
+    # Read the candidate descriptor, not the trusted test runner's checkout.
+    paths = set(re.findall(r"python3 (/opt/prepare_qtl/scripts/expression/(?:rnaseqc/)?merge_rnaseqc[.]py)", wdl.read_text()))
+    if len(paths) != 1:
+        raise ValueError("RNA-SeQC tasks must use one consistent script path")
+    return paths.pop()
 
 
 def run_task(image: str, task: str, inputs: dict, directory: Path) -> dict:
@@ -164,6 +171,7 @@ def main() -> None:
     parser.add_argument("--source-root", type=Path, default=ROOT)
     args = parser.parse_args()
     WDL = args.source_root.resolve() / "workflows/expression/rnaseqc2_aggregate_batched.wdl"
+    script = script_for_wdl(WDL)
     # Mount only tests. The production script must come from the image.
     # Bypass the entrypoint, as a WDL backend can do, to test the runtime PATH.
     subprocess.run(
@@ -171,7 +179,7 @@ def main() -> None:
             "docker", "run", "--rm", "--network", "none",
             "--entrypoint", "/bin/bash",
             "--volume", f"{ROOT / 'tests/rnaseqc2_aggregation'}:/tests:ro",
-            "--workdir", "/tmp", "--env", f"RNASEQC_MERGE_SCRIPT={SCRIPT}",
+            "--workdir", "/tmp", "--env", f"RNASEQC_MERGE_SCRIPT={script}",
             args.image, "-c", r"""
 set -euo pipefail
 python3 -m unittest discover -s /tests -p test_merge_rnaseqc.py -v

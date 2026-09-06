@@ -102,7 +102,7 @@ testthat::test_that("filter CLI preserves retained BED rows across chunks and pa
   bed_list <- file.path(tmp, "bed paths with spaces.txt")
   writeLines(bed, bed_list)
   output <- file.path(tmp, "output with spaces")
-  status <- system2("Rscript", c(shQuote(file.path(script_root, "filter_cell_type_beds.R")),
+  status <- system2("Rscript", c(shQuote(file.path(script_root, "downstream", "filter_cell_type_beds.R")),
                                   "--inventory", shQuote(inventory_path),
                                   "--bed-list", shQuote(bed_list), "--chunk-size", "2",
                                   "--output-dir", shQuote(output)))
@@ -131,7 +131,7 @@ testthat::test_that("reference preparation CLI writes normalized provenance outp
     NveB.1 = c(10L, 4L), NveB.2 = c(20L, 2L), MemB.1 = c(3L, 30L), CD4T.1 = c(5L, 8L))
   readr::write_tsv(counts, counts_path)
   output <- file.path(tmp, "reference output")
-  status <- system2("Rscript", c(shQuote(file.path(script_root, "prepare_haemopedia.R")),
+  status <- system2("Rscript", c(shQuote(file.path(script_root, "downstream", "prepare_haemopedia.R")),
                                   shQuote(counts_path), shQuote(output)))
   testthat::expect_equal(status, 0L)
   summary <- readr::read_tsv(file.path(output, "reference_summary.tsv.gz"), show_col_types = FALSE)

@@ -25,7 +25,7 @@ The connectivity outlier TSV contains `SampleID` and `Z_score` columns. If a tra
 
 ## Expression
 
-Expression preparation is implemented in [`scripts/expression/PrepareExpression.R`](../scripts/expression/PrepareExpression.R) and wrapped by [`workflows/expression/prepare_eQTL.wdl`](../workflows/expression/prepare_eQTL.wdl).
+Expression preparation is implemented in [`scripts/expression/prepare/PrepareExpression.R`](../scripts/expression/prepare/PrepareExpression.R) and wrapped by [`workflows/expression/prepare_eQTL.wdl`](../workflows/expression/prepare_eQTL.wdl).
 
 **Input phenotype:** RNA-seq gene count GCT or TSV with `Name`, `Description`, and sample count columns.
 

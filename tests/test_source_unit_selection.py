@@ -34,10 +34,12 @@ class SourceSelectionTests(unittest.TestCase):
                 return git('rev-parse', 'HEAD')
 
             base = commit('README', 'fixture')
-            source = commit('scripts/cell_type_specific_expression/run_hspe.R', '# source')
+            source = commit('scripts/cell_type_specific_expression/estimation/run_hspe.R', '# source')
             pins = commit('workflows/main.wdl', '# pins')
+            nested = commit('scripts/expression/prepare/new_tool.R', '# nested source')
             for before, after, expected in ((base, source, 'true'), (source, pins, 'false'),
-                                             (base, pins, 'true'), ('f' * 40, pins, 'true')):
+                                             (base, pins, 'true'), ('f' * 40, pins, 'true'),
+                                             (pins, nested, 'true')):
                 with self.subTest(before=before, after=after):
                     output = repo / 'job-output'
                     output.write_text('')

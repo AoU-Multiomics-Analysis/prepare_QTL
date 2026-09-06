@@ -70,6 +70,7 @@ jobs:
           python tests/cell_type_specific_expression/test_terra_file_paths.py
           python tests/test_expression_input_wdl.py
           python tests/test_filtered_bed_outputs.py
+          python tests/test_stage_layout.py
           python scripts/check_wdl_file_scope.py workflows
           python3 scripts/check_wdl_logging.py \
             workflows/cell_type_specific_expression \

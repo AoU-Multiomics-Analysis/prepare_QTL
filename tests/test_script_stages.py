@@ -64,6 +64,12 @@ class ScriptStagesTest(unittest.TestCase):
             set(),
         )
 
+    def test_common_tools_keep_all_consumers_but_new_helpers_need_review(self):
+        for name in ('calculate_PCs.R', 'PCOutputUtils.R', 'MergeCovariates.R', 'ResidualizePhenotypes.R'):
+            self.assertEqual(self.module.stages_for_script(self.config, 'scripts/common/' + name),
+                             {'common', 'expression', 'proteomics', 'splicing', 'methylation'})
+        self.assertEqual(self.module.stages_for_script(self.config, 'scripts/common/new_helper.R'), set())
+
     def test_source_paths_must_be_safe_normalized_posix_paths(self):
         invalid_paths = [
             '/scripts/proteomics/tool.R',
@@ -123,10 +129,10 @@ class ScriptStagesTest(unittest.TestCase):
         self.assertEqual(
             self.module.source_for_runtime(
                 self.config,
-                '/opt/prepare_qtl/scripts/expression/merge_rnaseqc.py',
+                '/opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py',
                 ROOT,
             ),
-            'scripts/expression/merge_rnaseqc.py',
+            'scripts/expression/rnaseqc/merge_rnaseqc.py',
         )
 
     def test_canonical_runtime_path_can_contain_spaces_and_quotes(self):
@@ -143,7 +149,7 @@ class ScriptStagesTest(unittest.TestCase):
         self.assertEqual(
             self.module.source_for_runtime(
                 self.config, '/tmp/PrepareExpression.R', ROOT),
-            'scripts/expression/PrepareExpression.R',
+            'scripts/expression/prepare/PrepareExpression.R',
         )
 
     def test_legacy_tmp_runtime_rejects_unknown_source(self):
