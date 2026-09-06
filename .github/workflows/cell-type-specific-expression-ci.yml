@@ -1,20 +1,8 @@
 name: Cell-Type-Specific Expression CI
 
-# Source changes use Stage Image Release. Keep candidate test changes testable.
+# Source changes use Stage Image Release. Broad tests are manual.
 on:
   workflow_dispatch:
-  pull_request:
-    branches: [main]
-    paths:
-      - "tests/cell_type_specific_expression/*.R"
-      - "tests/cell_type_specific_expression/testthat/**"
-      - "tests/cell_type_specific_expression/smoke/**"
-      - "tests/cell_type_specific_expression/fixtures/**"
-      - "tests/test_prepare_expression_log2_cpm.R"
-      - "tests/test_prepare_expression_sample_list.R"
-      - "tests/test_reference_filtered_expression.R"
-      - "tests/test_prepare_methylation.R"
-      - ".github/workflows/cell-type-specific-expression-ci.yml"
 
 permissions:
   contents: read

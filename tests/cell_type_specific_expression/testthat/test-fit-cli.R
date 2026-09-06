@@ -1,4 +1,5 @@
 source(testthat::test_path("helper-load.R"), local = .GlobalEnv)
+source(file.path(script_root, "bootstrap.R"), local = .GlobalEnv)
 
 testthat::test_that("fit CLI writes a usable CPM model, excluded-gene report and log", {
   testthat::skip_if_not_installed("TCA")
@@ -38,4 +39,17 @@ testthat::test_that("fit CLI writes a usable CPM model, excluded-gene report and
   testthat::expect_equal(nrow(report), 0L)
   testthat::expect_match(paste(readLines(file.path(output, "tca_model.log")), collapse = "\n"),
                         "stage_complete", fixed = TRUE)
+  # Check the fitted-model handoff on the same tiny fixture. This does not
+  # start HSPE, prepare-eQTL, or a WDL workflow.
+  cleaned <- file.path(directory, "cleaned")
+  messages <- system2(file.path(R.home("bin"), "Rscript"), shQuote(c(
+    file.path(script_root, "fit", "clean_tca_model.R"),
+    "--model", file.path(output, "tca_model.rds"), "--output-dir", cleaned
+  )), stdout = TRUE, stderr = TRUE)
+  status <- attr(messages, "status")
+  testthat::expect_true(is.null(status) || status == 0L, info = paste(messages, collapse = "\n"))
+  clean_model <- readRDS(file.path(cleaned, "tca_model_cleaned.rds"))
+  aligned <- align_expression_to_tca_model(X, clean_model)
+  testthat::expect_identical(rownames(aligned), rownames(clean_model$mus_hat))
+  testthat::expect_identical(colnames(aligned), rownames(clean_model$W))
 })

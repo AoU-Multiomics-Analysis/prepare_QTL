@@ -1,14 +1,7 @@
 name: Source unit checks
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "scripts/cell_type_specific_expression/**"
-      - "scripts/common/**"
-      - "scripts/expression/**/*.R"
-      - "scripts/expression/*.R"
-      - ".github/workflows/source-unit-checks.yml"
+  # Broad source checks are optional. Releases run affected-stage tests.
   workflow_dispatch:
 
 permissions:

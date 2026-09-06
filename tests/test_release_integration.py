@@ -25,6 +25,16 @@ class ReleasePolicyTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(ValueError):
                 self.release.validate_pr({**self.pr, field: replacement}, 'owner/repo')
 
+    def test_queued_release_skips_when_trigger_head_has_changed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'release.json'
+            with mock.patch.object(self.release, 'api', return_value=self.pr), \
+                 mock.patch.object(self.release.subprocess, 'run') as execute:
+                self.release.snapshot(Path(directory), 'owner/repo', 7, output,
+                                      expected_head='c' * 40)
+            self.assertFalse(output.exists())
+            execute.assert_not_called()
+
     def test_rejects_stale_head_or_base(self):
         self.release.validate_pr(self.pr, 'owner/repo', self.pr)
         for field in ('base', 'head'):
@@ -105,14 +115,14 @@ class FingerprintTests(unittest.TestCase):
 
 
 class ReleaseTestSelection(unittest.TestCase):
-    def test_wdl_changes_select_consumers_without_builds(self):
+    def test_wdl_changes_do_not_select_builds_or_runtime_tests(self):
         from test_release_images import selected_stages
         from plan_image_updates import plan_changes
         root = Path(__file__).resolve().parents[1]
         config = yaml.safe_load((root / 'ci/image-stages.yml').read_text())
         plan = plan_changes(config, ['workflows/methylation/cohort_aggregation.wdl'])
         self.assertEqual(plan['builds'], [])
-        self.assertEqual(selected_stages({'plan': plan}, config), {'methylation', 'methylation_rust'})
+        self.assertEqual(selected_stages({'plan': plan}, config), set())
 
     def test_each_registered_stage_has_a_runtime_gate(self):
         from test_release_images import SUPPORTED_STAGES

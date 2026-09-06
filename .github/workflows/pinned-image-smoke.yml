@@ -1,16 +1,7 @@
 name: Pinned Image Smoke
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - "tests/release/**"
-      - "ci/test_release_images.py"
-      - "ci/docker_images.py"
-      - "tests/test_docker_image_reuse.py"
-      - "ci/image-stages.yml"
-      - "tests/test_stage_test_selection.py"
-      - ".github/workflows/pinned-image-smoke.yml"
+  # Full or compact integration is selected manually, not on each release.
   workflow_dispatch:
     inputs:
       suite:

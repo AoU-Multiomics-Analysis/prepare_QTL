@@ -67,9 +67,15 @@ def save(path, value):
     Path(path).write_text(json.dumps(value, indent=2) + '\n')
 
 
-def snapshot(repo, repository, number, output):
+def snapshot(repo, repository, number, output, expected_head=None):
     pr = api(repository, f'pulls/{number}')
     validate_pr(pr, repository)
+    if expected_head and pr['head']['sha'] != expected_head:
+        print('Release request superseded: skip queued build and tests')
+        if os.environ.get('GITHUB_OUTPUT'):
+            with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+                stream.write('skip=true\nhas_builds=false\n')
+        return
     subprocess.run(['git', '-C', str(repo), 'fetch', 'origin', pr['base']['sha'], pr['head']['sha']], check=True)
     # The checked-out policy must be exactly the current PR base on main.
     if git(repo, 'rev-parse', 'HEAD') != pr['base']['sha']:
@@ -163,6 +169,7 @@ def main():
     parser.add_argument('--repo', type=Path, default=Path.cwd())
     parser.add_argument('--repository', default=os.environ.get('GITHUB_REPOSITORY'))
     parser.add_argument('--pr', type=int)
+    parser.add_argument('--expected-head', default='')
     parser.add_argument('--record', type=Path, default=Path('release.json'))
     parser.add_argument('--builds', type=Path, default=Path('build-results'))
     parser.add_argument('--source', type=Path)
@@ -172,7 +179,7 @@ def main():
     if args.operation == 'snapshot':
         if not args.pr or args.pr <= 0:
             parser.error('--pr must be a positive PR number')
-        snapshot(args.repo, args.repository, args.pr, args.record)
+        snapshot(args.repo, args.repository, args.pr, args.record, args.expected_head)
         return
     record = json.loads(args.record.read_text())
     validate_pr(record['pr'], args.repository)

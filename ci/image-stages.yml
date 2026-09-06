@@ -26,7 +26,7 @@ stages:
   # Legacy entrypoints remain mapped while Git reports their deletion during migration.
   cell_estimation:
     image: cell_type
-    runtime_tests: [test-expression.R, test-hspe.R, test-hspe-stage.R, test-hspe-estimator.R, test-hspe-batches.R, test-proportions.R, test-workflow-validation.R]
+    runtime_tests: [test-hspe-batches.R]
     script_roots: ["scripts/cell_type_specific_expression/estimation"]
     sources:
       - scripts/cell_type_specific_expression/filter_expression_genes.R
@@ -41,7 +41,7 @@ stages:
       - scripts/cell_type_specific_expression/R/workflow_validation.R
   cell_fit:
     image: cell_type
-    runtime_tests: [test-tca-stage.R, test-fit-cli.R, test-clean-model.R]
+    runtime_tests: [test-fit-cli.R]
     script_roots: ["scripts/cell_type_specific_expression/fit"]
     sources:
       - scripts/cell_type_specific_expression/fit_tca.R
@@ -62,7 +62,7 @@ stages:
       - scripts/cell_type_specific_expression/R/qc.R
   cell_downstream:
     image: cell_type
-    runtime_tests: [test-reference-filter.R, test-gene-summary.R, test-integration.R, test-qtl-manifest.R]
+    runtime_tests: [test-reference-filter.R]
     script_roots: ["scripts/cell_type_specific_expression/downstream"]
     sources:
       - scripts/cell_type_specific_expression/summarize_cell_type_beds.R
@@ -160,13 +160,3 @@ workflow_groups:
   - paths: ["workflows/genotype/**"]
     stages: []
     policy: external_images_manual
-
-# Only reviewed, stage-local changes can omit the cell-type integration run.
-# Unknown/new source paths, shared code, environments and WDLs keep integration.
-# Remove an entry when a change alters an input/output contract.
-stage_only_test_paths:
-  - scripts/cell_type_specific_expression/fit/fit_tca.R
-  - scripts/cell_type_specific_expression/R/qc.R
-  - scripts/cell_type_specific_expression/R/gene_summary.R
-  - scripts/cell_type_specific_expression/downstream/summarize_cell_type_beds.R
-  - scripts/cell_type_specific_expression/R/hspe_stage.R

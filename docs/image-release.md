@@ -222,10 +222,9 @@ build and migration plan.
 
 ### CI events and duplicate work
 
-Source PRs run descriptor checks, release-policy checks, and relevant unit tests.
-Cell-type and expression source unit tests pull the pinned dependency images;
-they do not build images or run the complete workflow. A dependency change can
-need a tested new digest before these source unit tests pass.
+Source PRs run descriptor and release-policy checks. Labeled releases run short
+affected-stage tests. Broad source tests are manual. See
+[fast image releases](lean-release-tests.md).
 
 The `release-ready` label starts the stage release: build or reuse the selected
 image, test the mixed image defaults, and commit the tested pins. The dispatcher
@@ -235,9 +234,9 @@ statuses, and changed lines. Missing or uncertain metadata uses the normal
 release path. Other WDL edits and source edits still dispatch. Adding the label
 explicitly can request another trial.
 
-After the pin commit, descriptor and policy checks still run. Source unit tests
-compare the previous PR head with the new head and skip an update with no source
-changes. After merge, lightweight descriptor and RNA-SeQC checks remain; images
+After the pin commit, descriptor and policy checks still run. Automatic release
+requests record their trigger SHA; queued requests skip if the head has changed.
+After merge, lightweight descriptor and RNA-SeQC checks remain; images
 are not rebuilt merely because the PR was merged.
 
 The standard, cell-type, and Rust compatibility image builders are manual-only.
@@ -245,18 +244,11 @@ They no longer keep mutable `main` image tags current automatically. Use the
 maintained WDL digest defaults. Manual compatibility builds remain available.
 RNA-SeQC container CI tests without publishing; stage releases own publication.
 
-Candidate changes to the cell-type or RNA-SeQC runtime tests still run their
-container tests on PRs, because the trusted release path rejects candidate
-changes to its own tests. These test-maintenance runs do not repeat after merge.
-Cell-type test PRs pull published dependency images pinned by digest in the WDL.
-The R tests use checked-out scripts mounted into those images. No images are
-built in this job. Dependency changes need a tested image from the release process. The HSPE workflow,
-precomputed workflow, and saved-model restart run only when smoke scripts,
-fixtures, or the reference-fixture generator change, or on manual dispatch.
+Cell-type runtime-test and CI changes can be checked with manual source or
+integration runs. The trusted release path still rejects candidate changes to
+its own test policy: merge policy changes separately before releasing scripts.
 Full workflow tests use the existing pinned-image runner and all stage defaults.
-A change to the CI YAML alone runs the image pulls and R tests; use manual dispatch
-to check changes to the integration steps. Stage release tests still run the
-complete integration suite.
+RNA-SeQC retains its separate container-test policy.
 An unlabelled source PR has not passed the stage release: do not merge runtime
 changes until their release tests and final pin checks pass. This trigger change
 does not add branch protection or automatic merging.
