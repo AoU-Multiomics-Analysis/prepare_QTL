@@ -3,6 +3,7 @@
 file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 script_path <- normalizePath(sub("^--file=", "", file_arg[[1L]]))
 source(file.path(dirname(dirname(script_path)), "bootstrap.R"))
+source(file.path(dirname(script_path), "variance_preflight.R"))
 
 tca_log_path <- NULL
 
@@ -127,8 +128,15 @@ run_tca_stage <- function() {
   message(output_message)
   append_tca_log(tca_log_path, output_message)
 
+  validate_tca_inputs(X, W, C2)
+  variable <- remove_constant_features(X)
+  if (!nrow(variable$matrix)) stop("No variable genes remain after constant-gene removal", call. = FALSE)
+  preflight <- screen_tca_variances(variable$matrix, W, C2, output_paths$model_log)
+  exclusions <- dplyr::bind_rows(variable$report, preflight$excluded)
+  # Preserve the report even when a later fitting iteration fails.
+  readr::write_tsv(exclusions, output_paths$excluded_genes, na = "")
   result <- fit_tca_stage(
-    X = X,
+    X = preflight$X,
     W = W,
     C2 = C2,
     num_cores = options$num_cores,
@@ -139,8 +147,14 @@ run_tca_stage <- function() {
   )
   result$model$expression_scale <- "cpm"
   result$model$tca_parallel <- tca_parallel
+  result$model$tca_preflight <- list(
+    method = "first_iteration_variance",
+    tca_version = "1.2.1",
+    original_gene_ids = rownames(variable$matrix),
+    excluded_gene_ids = preflight$excluded$gene_id,
+    report = preflight$report
+  )
   saveRDS(result$model, output_paths$model)
-  readr::write_tsv(result$excluded_genes, output_paths$excluded_genes, na = "")
   complete_message <- sprintf(
     paste0(
       "stage=tca event=stage_complete output_dimensions=genes:%d samples:%d ",
@@ -149,7 +163,7 @@ run_tca_stage <- function() {
     nrow(result$X),
     ncol(result$X),
     ncol(W),
-    nrow(result$excluded_genes)
+    nrow(variable$report)
   )
   message(sprintf("%s utc_complete=%s", complete_message, tca_utc_time()))
   append_tca_log(tca_log_path, complete_message)
