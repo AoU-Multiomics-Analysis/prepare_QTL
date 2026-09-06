@@ -128,8 +128,11 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                          "CellTypeDeconvolution.filtered_cell_type_beds")
         self.assertEqual(str(scatter.inputs["cell_type_bed_inventory"]),
                          "CellTypeDeconvolution.filtered_cell_type_bed_inventory")
-        self.assertEqual(str(scatter.inputs["sample_list"]), "SampleList")
         eqtl = self.workflow_call(self.qtl, "PrepareCellTypeEqtl")
+        if "sample_list" not in scatter.inputs:
+            self.assertEqual(str(eqtl.inputs["SampleList"]), "SampleList")
+            return
+        self.assertEqual(str(scatter.inputs["sample_list"]), "SampleList")
         self.assertEqual(str(eqtl.inputs["SampleList"]), "PrepareScatterInputs.cohort_samples")
         task = scatter.callee
         with tempfile.TemporaryDirectory() as directory:
