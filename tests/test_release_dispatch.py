@@ -23,7 +23,7 @@ class DispatchTests(unittest.TestCase):
                             'sender': {'login': author},
                             'pull_request': {'number': 42, 'head': {'sha': 'head'}}}},
                 'commit': {'sha': 'head', 'author': {'login': author},
-                           'commit': {'message': 'Pin tested stage images'},
+                           'commit': {'message': 'Pin published stage images'},
                            'parents': [{'sha': parent}],
                            'files': [{'filename': filename, 'status': file_status, 'patch': patch,
                                       'additions': additions, 'deletions': 1}]}}

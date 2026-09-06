@@ -44,7 +44,7 @@ jobs:
               };
               if (commit.sha === context.payload.after &&
                   commit.author?.login === context.payload.sender.login &&
-                  commit.commit.message === 'Pin tested stage images' &&
+                  ['Pin tested stage images', 'Pin published stage images'].includes(commit.commit.message) &&
                   commit.parents?.length === 1 && commit.parents[0].sha === context.payload.before &&
                   commit.files?.length > 0 && commit.files.length < 300 &&
                   commit.files.every(onlyPins)) {

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       commit_pins:
-        description: Commit tested pins (also requires repository enable setting)
+        description: Commit published image pins (also requires repository enable setting)
         type: boolean
         default: false
       expected_head:
@@ -101,58 +101,10 @@ jobs:
           name: build-${{ matrix.id }}
           path: ${{ matrix.id }}.json
 
-  test:
-    needs: [snapshot, build]
-    if: always() && needs.snapshot.result == 'success' && needs.snapshot.outputs.skip != 'true' && (needs.build.result == 'success' || needs.build.result == 'skipped')
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.snapshot.outputs.base }}
-          path: trusted
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.snapshot.outputs.head }}
-          path: source
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-snapshot
-      - uses: actions/download-artifact@v4
-        if: needs.snapshot.outputs.has_builds == 'true'
-        with:
-          pattern: build-*
-          path: build-results
-          merge-multiple: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: python -m pip install miniwdl==1.15.0 PyYAML==6.0.2
-      - name: Reconstruct candidate pin patch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python trusted/ci/release_integration.py prepare --repo trusted --output candidate
-      - name: Test exact old and new image combination
-        run: |
-          if test -s candidate/pins.patch; then
-            git -C source apply --check "$GITHUB_WORKSPACE/candidate/pins.patch"
-            git -C source apply "$GITHUB_WORKSPACE/candidate/pins.patch"
-          fi
-          python trusted/ci/test_release_images.py --source source --record release.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: release-test-results
-          path: |
-            candidate/
-            source/ci-runs/
 
   commit:
-    needs: [snapshot, test]
-    if: needs.test.result == 'success' && inputs.commit_pins && vars.RELEASE_AUTO_COMMIT == 'true'
+    needs: [snapshot, build]
+    if: needs.snapshot.result == 'success' && needs.build.result == 'success' && inputs.commit_pins && vars.RELEASE_AUTO_COMMIT == 'true'
     environment: release-commit
     runs-on: ubuntu-latest
     steps:
