@@ -48,7 +48,7 @@ class CiPathTests(unittest.TestCase):
             'tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json': set(),
             'tests/test_prepare_expression_sample_list.R': set(),
             'tests/test_prepare_methylation.R': set(),
-            'tests/rnaseqc2_aggregation/smoke_container.py': {'container'},
+            'tests/rnaseqc2_aggregation/smoke_container.py': set(),
             'tests/cell_type_specific_expression/test_reference_filter_wdl.py': set(),
             '.dockerignore': set(),
         }

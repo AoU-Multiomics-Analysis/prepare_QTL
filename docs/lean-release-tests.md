@@ -1,36 +1,27 @@
 # Fast image releases
 
-Script changes still trigger image deployment for a same-repository PR with the
-`release-ready` label, when release automation is enabled. The release builds
-only the image families required by affected stages. It tests the images and
-updates only the affected WDL digest defaults. Unaffected defaults stay pinned.
+Use one PR for pipeline scripts, WDLs, documentation, and their existing tests.
+The `release-ready` label starts image release when automation is enabled.
+Only affected images are built or reused, and only affected WDL digests change.
+Test-only changes do not rebuild images. Runtime tests do not run during release.
 
-Automatic cell-type releases run one small test file per affected stage:
+WDL validation stays automatic, including syntax, imports, logging, and Terra
+file-scope checks. Image source fingerprints, registry digests, stage routing,
+allowed pin paths, and stale-commit checks still protect the release.
 
-| Stage | Test |
-| --- | --- |
-| Estimation | HSPE batches |
-| Fit | TCA fit, cleanup, and export alignment |
-| Export | BED outputs |
-| Downstream | Reference filtering |
+To run optional tests, select a branch under GitHub Actions and use **Run workflow**:
 
-Other image families keep their existing short task tests. Dependency changes
-select their consumer stages, so those tests also check that the image can start
-and load its packages. They do not start a full cell-type workflow.
+- **Source unit checks**: source code checks using existing dependency images.
+- **Cell-Type-Specific Expression CI**: cell-type analysis checks.
+- **Pinned Image Smoke**: compact or full integration using that branch's pinned images.
+- **Image Release Plan (Report Only)**: release-controller test suites on manual runs.
 
-WDL changes keep syntax, import, routing and Terra file-scope checks. A WDL-only
-change does not build an image or select runtime tests for unrelated stages.
+For tests of a new published image, select the PR branch after its digest update.
+Tests can change in the same PR as scripts. No prerequisite test PR is needed.
+Changes to privileged release policy under `ci/` or `.github/` still merge separately.
+Tests do not block publishing or pin commits. A published image can be untested;
+run manual checks when the change warrants them.
 
-Broad source tests and compact/full integration tests are manual GitHub Actions:
-`Source unit checks`, `Cell-Type-Specific Expression CI`, and `Pinned Image Smoke`.
-Use integration tests after changes to connections between tasks, or when needed
-to investigate a failure. These tests remain available; they are not release gates.
-
-The dispatcher ignores the release App's verified digest-only commit. Each
-automatic request also records its trigger commit. A queued request stops before
-building or testing if the PR head has changed. Manual release requests can omit
-the expected commit to retry the current head.
-
-These checks do not prove that a complete workflow runs on Terra. Pinned image
-digests preserve the selected software; retain workflow revisions and run inputs
-as well to reproduce an analysis.
+The dispatcher ignores verified digest-only App commits and skips superseded
+release requests. There is no automatic PR merge. No complete Terra run is implied
+by publishing an image or passing local or GitHub checks.

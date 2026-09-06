@@ -43,8 +43,8 @@ class ReleasePolicyTests(unittest.TestCase):
                 self.release.validate_pr(changed, 'owner/repo', self.pr)
 
     def test_source_changes_allowed_but_ci_policy_changes_rejected(self):
-        self.release.check_policy_changes(['scripts/fit.R', 'workflows/fit.wdl', 'envs/Dockerfile'])
-        for path in ['ci/release-pins.yml', '.github/workflows/image-release.yml', 'tests/test.R']:
+        self.release.check_policy_changes(['scripts/fit.R', 'workflows/fit.wdl', 'envs/Dockerfile', 'tests/test.R'])
+        for path in ['ci/release-pins.yml', '.github/workflows/image-release.yml']:
             with self.subTest(path=path), self.assertRaises(ValueError):
                 self.release.check_policy_changes([path])
 
@@ -73,10 +73,12 @@ class ReleasePolicyTests(unittest.TestCase):
         self.assertEqual(flow['jobs']['commit']['environment'], 'release-commit')
         self.assertEqual(flow['permissions']['contents'], 'read')
         self.assertNotIn('packages', flow['permissions'])
-        for step in flow['jobs']['test']['steps']:
-            self.assertNotIn('create-github-app-token', step.get('uses', ''))
-            self.assertNotIn('secrets.', str(step))
-        self.assertIn("needs.test.result == 'success'", flow['jobs']['commit']['if'])
+        self.assertNotIn('test', flow['jobs'])
+        self.assertEqual(flow['jobs']['commit']['needs'], ['snapshot', 'build'])
+        self.assertIn("needs.build.result == 'success'", flow['jobs']['commit']['if'])
+        for name in ('source-unit-checks.yml', 'pinned-image-smoke.yml'):
+            manual = yaml.load((root / '.github/workflows' / name).read_text(), Loader=yaml.BaseLoader)
+            self.assertEqual(set(manual['on']), {'workflow_dispatch'})
 
     def test_automatic_dispatch_never_checks_out_pr_code(self):
         root = Path(__file__).resolve().parents[1]

@@ -30,9 +30,9 @@ def validate_pr(pr, repository, previous=None):
 
 
 def check_policy_changes(paths):
-    blocked = [p for p in paths if p.startswith(('ci/', '.github/', 'tests/'))]
+    blocked = [p for p in paths if p.startswith(('ci/', '.github/'))]
     if blocked:
-        raise ValueError('Merge release policy/test changes separately before releasing source: ' + ', '.join(blocked))
+        raise ValueError('Merge release policy changes separately before releasing source: ' + ', '.join(blocked))
 
 
 def source_fingerprint(repo, revision, patterns):
@@ -54,7 +54,7 @@ def validate_build_result(spec, result):
 
 def commit_payload(repository, branch, head, files):
     return {'branch': {'repositoryNameWithOwner': repository, 'branchName': branch},
-            'expectedHeadOid': head, 'message': {'headline': 'Pin tested stage images'},
+            'expectedHeadOid': head, 'message': {'headline': 'Pin published stage images'},
             'fileChanges': {'additions': [{'path': p, 'contents': base64.b64encode(text.encode()).decode()}
                                         for p, text in sorted(files.items())]}}
 

@@ -9,15 +9,15 @@ to change a Terra image input by hand.
 1. Open a PR that changes `scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R`.
 2. The release plan selects `cell_downstream`. The release workflow builds the
    cell-type image, or reuses an image with the same source fingerprint.
-3. The test job applies the proposed downstream digest to an isolated copy of
-   the PR. It keeps the estimation, fit, export, and QTL digests unchanged.
-4. The tests run that image combination. If they pass, the optional commit job
-   adds only the registered image-default edits to the same PR.
+3. The commit job verifies the published digest and source fingerprint.
+   It keeps the estimation, fit, export, and QTL digests unchanged.
+4. The optional commit job adds only the registered image-default edits to the
+   same PR. Analysis tests are manual and do not gate digest updates.
 5. Review and merge the PR. Refresh the `main` workflow version in
    Dockstore/Terra as usual. New submissions use the new downstream default.
 
 ```text
-script PR → source image → candidate WDL pins → tests → pin commit → merge
+script and test PR → source image → verified WDL pins → pin commit → merge
 ```
 
 There is no automatic merge. Existing Terra submissions do not change.
@@ -149,7 +149,7 @@ Use these repository variables:
 | --- | --- | --- |
 | `RELEASE_ENABLED` | `false` | Allows manual stage releases |
 | `RELEASE_AUTO_TRIGGER` | `false` | Dispatches releases for PRs labeled `release-ready` |
-| `RELEASE_AUTO_COMMIT` | `false` | Allows tested pin commits when dispatch also requests them |
+| `RELEASE_AUTO_COMMIT` | `false` | Allows verified digest commits when dispatch also requests them |
 
 The first trial needs only `RELEASE_ENABLED=true` and the publish environment.
 Keep the other two variables false. In Actions, select **Stage Image Release**,
@@ -177,11 +177,11 @@ accept only open, same-repository PRs targeting current `main`. Update the PR
 branch with current `main` before dispatch. A changed base or head stops the
 release; dispatch again after review.
 
-The initial policy rejects PRs that also change `ci/`, `.github/`, or `tests/`.
-Merge reviewed policy and test changes first, then release the source change
-in a separate PR. This is intentional: candidate code cannot replace its own
-release tests. The integration PR itself cannot run this new release path
-until its trusted policy has been merged.
+Release policy changes under `ci/` or `.github/` still require a separate reviewed
+PR. Ordinary scripts and their tests under `tests/` can change in the same PR.
+Tests run only when requested from GitHub Actions and are not release gates.
+WDL validation and release integrity checks remain automatic. This policy update
+must first merge into `main` before releases use it.
 
 Only the build job has package-write permission. It builds candidate source
 after the publish-environment approval. Test jobs have no write credentials.
@@ -222,12 +222,12 @@ build and migration plan.
 
 ### CI events and duplicate work
 
-Source PRs run descriptor and release-policy checks. Labeled releases run short
-affected-stage tests. Broad source tests are manual. See
+Source PRs run descriptor and release-integrity checks. All runtime tests and
+release-controller test suites are manual. See
 [fast image releases](lean-release-tests.md).
 
 The `release-ready` label starts the stage release: build or reuse the selected
-image, test the mixed image defaults, and commit the tested pins. The dispatcher
+image, verify its identity, and commit the published pins. The dispatcher
 does not repeat a release for a single digest-only commit from
 `aou-prepare-qtl-release[bot]`. It checks the parent SHA, author, message, file
 statuses, and changed lines. Missing or uncertain metadata uses the normal
@@ -250,7 +250,7 @@ its own test policy: merge policy changes separately before releasing scripts.
 Full workflow tests use the existing pinned-image runner and all stage defaults.
 RNA-SeQC retains its separate container-test policy.
 An unlabelled source PR has not passed the stage release: do not merge runtime
-changes until their release tests and final pin checks pass. This trigger change
+changes until their image release and final pin checks pass. This trigger change
 does not add branch protection or automatic merging.
 
 `ci/image-stages.yml` maps build inputs and stage consumers.

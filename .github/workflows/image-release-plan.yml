@@ -22,15 +22,18 @@ jobs:
       - name: Install report dependencies
         run: python -m pip install PyYAML==6.0.2 miniwdl==1.15.0
       - name: Test stage directory and task routing policy
+        if: github.event_name == 'workflow_dispatch'
         run: |
           python -m unittest discover -s tests -p test_script_stages.py -v
           python -m unittest discover -s tests -p test_wdl_stage_routing.py -v
       - name: Test release setup without GitHub writes
+        if: github.event_name == 'workflow_dispatch'
         run: |
           python -m pip install -r ci/release-setup-requirements.txt
           python -m unittest discover -s tests -p test_release_setup.py -v
           python -m unittest discover -s tests -p test_release_app_setup.py -v
       - name: Test dependency selection and coverage
+        if: github.event_name == 'workflow_dispatch'
         run: python -m unittest discover -s tests -p test_image_update_plan.py -v
       - name: Report PR impact
         # Stage routing is checked without starting containers.
@@ -39,11 +42,24 @@ jobs:
           PLAN_BASE: ${{ github.event.pull_request.base.sha }}
           PLAN_HEAD: ${{ github.event.pull_request.head.sha }}
         run: python ci/plan_image_updates.py --base "$PLAN_BASE" --head "$PLAN_HEAD" >> "$GITHUB_STEP_SUMMARY"
+      - name: Validate stage routing
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          from wdl_stage_routing import validate_routing
+          errors = validate_routing(Path.cwd(), Path.cwd())
+          if errors:
+              raise SystemExit('\n'.join(errors))
+          PY
       - name: Test stage image routing and defaults
+        if: github.event_name == 'workflow_dispatch'
         run: |
           python tests/test_stage_image_inputs.py
           python tests/test_pinned_smoke_inputs.py
       - name: Test candidate pin patches and stale-result guards
+        if: github.event_name == 'workflow_dispatch'
         run: |
           python tests/test_release_pin_proposals.py
           python tests/test_release_integration.py
