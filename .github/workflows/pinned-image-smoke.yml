@@ -6,6 +6,8 @@ on:
     paths:
       - "tests/release/**"
       - "ci/test_release_images.py"
+      - "ci/image-stages.yml"
+      - "tests/test_stage_test_selection.py"
       - ".github/workflows/pinned-image-smoke.yml"
   workflow_dispatch:
     inputs:
@@ -36,7 +38,9 @@ jobs:
       - name: Install WDL runner
         run: python -m pip install miniwdl==1.15.0 PyYAML==6.0.2
       - name: Check stage routing
-        run: python tests/test_stage_image_inputs.py
+        run: |
+          python tests/test_stage_image_inputs.py
+          python tests/test_stage_test_selection.py
       - name: Run with published digest defaults
         env:
           ALL_STAGES: ${{ github.event_name == 'pull_request' || inputs.all_stages }}
