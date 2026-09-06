@@ -17,7 +17,7 @@ workflow CellTypeDeconvolution {
     File? precomputed_proportions
     File? covariates
     String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
-    String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
+    String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
     String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
     String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
     Int preemptible_attempts = 2
