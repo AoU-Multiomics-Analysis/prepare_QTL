@@ -3,6 +3,7 @@
 file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 script_path <- normalizePath(sub("^--file=", "", file_arg[[1L]]))
 source(file.path(dirname(dirname(script_path)), "bootstrap.R"))
+source(file.path(dirname(script_path), "variance_preflight.R"))
 
 tryCatch({
   options <- optparse::parse_args(optparse::OptionParser(option_list = list(
@@ -20,6 +21,7 @@ tryCatch({
   message(sprintf("stage=clean_tca_model event=start utc_time=%s", tca_utc_time()))
   original <- readRDS(options$model)
   result <- if (options$reuse_model) prepare_restart_model(original) else clean_tca_model(original)
+  result <- attach_tca_preflight_exclusions(result, original)
   dir.create(options$output_dir, recursive = TRUE, showWarnings = FALSE)
   model_path <- file.path(options$output_dir, "tca_model_cleaned.rds")
   report_path <- file.path(options$output_dir, "tca_numerical_excluded_genes.tsv")
@@ -29,7 +31,7 @@ tryCatch({
   message(sprintf(
     paste0("stage=clean_tca_model event=complete input_genes=%d retained_genes=%d ",
            "excluded_genes=%d threshold=%.17g model=%s report=%s utc_time=%s"),
-    nrow(original$sigmas_hat), nrow(result$model$sigmas_hat), nrow(result$report),
+    length(result$model$gene_filter$original_gene_ids), nrow(result$model$sigmas_hat), nrow(result$report),
     .Machine$double.eps, model_path, report_path, tca_utc_time()
   ))
 }, error = function(error) {
