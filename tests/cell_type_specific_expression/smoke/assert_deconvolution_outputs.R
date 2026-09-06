@@ -267,10 +267,8 @@ require_true(
   identical(colnames(tca_weights), expected_groups),
   "The TCA group order does not match expected_groups.txt"
 )
-require_true(
-  identical(colnames(combined), expected_groups),
-  "The combined group order does not match expected_groups.txt"
-)
+# Combined proportions contain all canonical groups; TCA weights contain only
+# retained groups. Both are checked independently above.
 
 filter_report <- readr::read_tsv(
   output_value("cell_group_filter_report"),
@@ -495,7 +493,7 @@ require_true(
     numeric_parameter("hspe_marker_fraction") == 0.10 &&
     identical(parameters$hspe_marker_method, "ratio") &&
     identical(parameters$hspe_quantile_normalize, FALSE) &&
-    numeric_parameter("group_mean_threshold") == 0.0001 &&
+    numeric_parameter("group_mean_threshold") == mean_threshold &&
     numeric_parameter("zero_floor") == 0.000001 &&
     numeric_parameter("tca_max_iters") == 10 &&
     identical(parameters$tca_parallel, expected_tca_parallel) &&

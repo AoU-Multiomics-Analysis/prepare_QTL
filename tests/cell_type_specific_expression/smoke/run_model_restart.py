@@ -12,6 +12,8 @@ WORKFLOW = "workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl"
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--deconvolution-only', action='store_true',
+                        help='Check model reuse and BED export without repeating QTL preparation')
     parser.add_argument(
         "--baseline-outputs",
         type=Path,
@@ -56,13 +58,23 @@ def main(argv=None):
     inputs[PREFIX + "deconvolution_covariates"] = inputs[PREFIX + "lm22"]
     inputs[PREFIX + "gene_type"] = ["ignored_for_model_restart"]
     inputs[PREFIX + "OutputPrefix"] = "synthetic.restart"
+    workflow = WORKFLOW
+    if args.deconvolution_only:
+        import WDL
+        workflow = 'workflows/cell_type_specific_expression/deconvolution.wdl'
+        allowed = {d.name for d in WDL.load(workflow).workflow.inputs}
+        names = {key.removeprefix(PREFIX): value for key, value in inputs.items()}
+        if 'deconvolution_covariates' in names:
+            names['covariates'] = names.pop('deconvolution_covariates')
+        inputs = {'CellTypeDeconvolution.' + key: value for key, value in names.items()
+                  if key in allowed}
     args.restart_inputs.parent.mkdir(parents=True, exist_ok=True)
     args.restart_inputs.write_text(json.dumps(inputs, indent=2))
     subprocess.run(
         [
             "miniwdl",
             "run",
-            WORKFLOW,
+            workflow,
             "--input",
             str(args.restart_inputs),
             "--dir",
@@ -73,6 +85,9 @@ def main(argv=None):
         check=True,
     )
     result = read_outputs(args.output_directory / "outputs.json")
+    if args.deconvolution_only:
+        result = {PREFIX + key.removeprefix('CellTypeDeconvolution.'): value
+                  for key, value in result.items()}
     for name in (
         "estimated_proportions",
         "tca_model_unfiltered",
@@ -93,18 +108,23 @@ def main(argv=None):
                 assert (
                     baseline_bed.read() == restart_bed.read()
                 ), f"Restarted {name} differs from the original export"
-    for name in (
+    qtl_outputs = (
         "int_beds",
         "scaled_beds",
         "int_phenotype_pcs",
         "scaled_phenotype_pcs",
         "int_merged_covariates",
         "scaled_merged_covariates",
-    ):
+    )
+    for name in (() if args.deconvolution_only else qtl_outputs):
         assert len(result[PREFIX + name]) == len(result[PREFIX + "cell_type_beds"])
         assert all(Path(path).is_file() for path in result[PREFIX + name])
-    assert Path(result[PREFIX + "cell_type_qtl_manifest"]).is_file()
-    assert result[PREFIX + "stage_images"] == baseline[PREFIX + "stage_images"]
+    if not args.deconvolution_only:
+        assert Path(result[PREFIX + "cell_type_qtl_manifest"]).is_file()
+    expected_images = dict(baseline[PREFIX + 'stage_images'])
+    if args.deconvolution_only:
+        expected_images.pop('qtl')
+    assert result[PREFIX + "stage_images"] == expected_images
     parameters = json.loads(
         Path(result[PREFIX + "effective_parameters_file"]).read_text()
     )
@@ -114,7 +134,7 @@ def main(argv=None):
     ), "Do not report new fitting settings for an old model"
     print(
         "Model restart: skipped fit; identical exported BEDs; "
-        "QTL outputs and manifest present."
+        + ("deconvolution outputs present." if args.deconvolution_only else "QTL outputs and manifest present.")
     )
 
 
