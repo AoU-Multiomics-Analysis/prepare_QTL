@@ -1,21 +1,8 @@
 name: Cell-Type Expression Image
 
+# Compatibility image builds are manual; staged releases own automatic builds.
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
-    paths:
-      - "scripts/cell_type_specific_expression/**"
-      - "envs/CellTypeSpecificExpression/**"
-      - ".dockerignore"
-      - ".github/workflows/docker-cell-type-expression.yml"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "scripts/cell_type_specific_expression/**"
-      - "envs/CellTypeSpecificExpression/**"
-      - ".dockerignore"
-      - ".github/workflows/docker-cell-type-expression.yml"
 
 jobs:
   build_cell_type_specific_expression:

@@ -15,7 +15,7 @@ on:
       - "docs/rnaseqc2-aggregation.md"
       - ".github/workflows/rnaseqc2-aggregation.yml"
   push:
-    branches: [main, "codex/**"]
+    branches: [main]
     paths:
       - "envs/RNASeQCAggregation/**"
       - "scripts/check_wdl_logging.py"

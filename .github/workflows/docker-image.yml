@@ -1,29 +1,8 @@
 name: Docker Image CI
 
+# Compatibility image builds are manual; staged releases own automatic builds.
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
-    paths:
-      - "scripts/**"
-      - "envs/PhenotypePCs/**"
-      - "tests/test_prepare_methylation.R"
-      - "tests/test_prepare_expression_log2_cpm.R"
-      - "tests/test_prepare_expression_sample_list.R"
-      - ".dockerignore"
-      - ".github/workflows/docker-image.yml"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "scripts/**"
-      - "envs/PhenotypePCs/**"
-      - "tests/test_prepare_methylation.R"
-      - "tests/test_prepare_expression_log2_cpm.R"
-      - "tests/test_prepare_expression_sample_list.R"
-      - ".dockerignore"
-      - ".github/workflows/docker-image.yml"
-
-# The standard image copies all of scripts/.
 jobs:
   build_and_push:
     runs-on: ubuntu-latest

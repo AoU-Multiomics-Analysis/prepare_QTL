@@ -1,6 +1,12 @@
-name: Pinned Image Smoke (Manual)
+name: Pinned Image Smoke
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/release/**"
+      - "ci/test_release_images.py"
+      - ".github/workflows/pinned-image-smoke.yml"
   workflow_dispatch:
     inputs:
       all_stages:
@@ -28,7 +34,7 @@ jobs:
         run: python tests/test_stage_image_inputs.py
       - name: Run with published digest defaults
         env:
-          ALL_STAGES: ${{ inputs.all_stages }}
+          ALL_STAGES: ${{ github.event_name == 'pull_request' || inputs.all_stages }}
         run: |
           docker swarm init --advertise-addr 127.0.0.1
           if test "$ALL_STAGES" = true; then
