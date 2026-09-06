@@ -9,6 +9,11 @@ on:
       - ".github/workflows/pinned-image-smoke.yml"
   workflow_dispatch:
     inputs:
+      suite:
+        description: Cell-type smoke coverage
+        type: choice
+        options: [full, compact]
+        default: full
       all_stages:
         description: Test all registered image families (otherwise cell-type pipeline only)
         type: boolean
@@ -35,12 +40,13 @@ jobs:
       - name: Run with published digest defaults
         env:
           ALL_STAGES: ${{ github.event_name == 'pull_request' || inputs.all_stages }}
+          SUITE: ${{ github.event_name == 'pull_request' && 'compact' || inputs.suite }}
         run: |
           docker swarm init --advertise-addr 127.0.0.1
           if test "$ALL_STAGES" = true; then
-            python ci/test_release_images.py --source . --all-stages
+            python ci/test_release_images.py --source . --all-stages --suite "$SUITE"
           else
-            python tests/cell_type_specific_expression/smoke/run_pinned_images.py
+            python tests/cell_type_specific_expression/smoke/run_pinned_images.py --suite "$SUITE"
           fi
       - name: Preserve run logs
         if: always()

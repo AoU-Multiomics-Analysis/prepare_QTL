@@ -28,6 +28,8 @@ def selected_stages(record, config):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
+    parser.add_argument('--suite', choices=('compact', 'full'),
+                        help='Override cell-type coverage; releases default to compact, all-stages to full')
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument('--record', type=Path)
     selection.add_argument('--all-stages', action='store_true', help='Test all current defaults without publishing')
@@ -72,11 +74,12 @@ def main():
 
     if any(s.startswith('cell_') for s in stages) or stages & {'expression', 'common'}:
         # Runner reads each actual WDL digest default, not one image override.
-        subprocess.run([sys.executable, str(trusted / 'tests/cell_type_specific_expression/smoke/run_pinned_images.py')],
+        subprocess.run([sys.executable, str(trusted / 'tests/cell_type_specific_expression/smoke/run_pinned_images.py'),
+                        '--suite', args.suite or ('full' if args.all_stages else 'compact')],
                        cwd=source, check=True)
-    for stage in stages & {'expression', 'common'}:
+    for image in sorted({images[s] for s in stages & {'expression', 'common'}}):
         for test in ('test_prepare_expression_log2_cpm.R', 'test_prepare_expression_sample_list.R'):
-            run_r(images[stage], 'tests/' + test,
+            run_r(image, 'tests/' + test,
                   environment={'PREPARE_EXPRESSION_SCRIPT': '/tmp/PrepareExpression.R'})
     if 'methylation' in stages:
         run_r(images['methylation'], 'tests/test_prepare_methylation.R',
