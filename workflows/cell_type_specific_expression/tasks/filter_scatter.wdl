@@ -95,8 +95,8 @@ task MergeFilterReports {
       --inventory "$inventory_path" --inventories inventories.txt --comparisons comparisons.txt \
       --metrics metrics.txt --samples samples.txt --logs logs.txt \
       "${optional_arguments[@]}" --output-dir outputs 2>&1 | tee -a "$log"
-    printf 'stage=%s outputs=filtered_inventory,reports,plots completion_time=%s\n' \
-      "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
+    printf 'stage=%s dimensions=cell_types:%s outputs=filtered_inventory,reports,plots completion_time=%s\n' \
+      "$stage" '~{length(inventories)}' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>
   output {
     File filtered_inventory = "outputs/filtered_inventory.tsv"
