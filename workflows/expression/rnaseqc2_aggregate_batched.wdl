@@ -25,7 +25,7 @@ task validate_rnaseqc_manifests {
 
         log "stage=validate_manifest start_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
         log "Validating the combined RNA-SeQC sample manifest"
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py validate-manifest \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py validate-manifest \
             --input "~{sample_manifest}" \
             --batch-size ~{batch_size} \
             --prefix-file "~{prefix_input_file}"
@@ -93,7 +93,7 @@ task aggregate_rnaseqc_batch {
         log "merge_exons=~{merge_exons}"
         log "Preparing batch $batch_number"
         mkdir -p individual_outputs
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py prepare-batch \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py prepare-batch \
             --input "~{sample_manifest}" \
             --batch-index ~{batch_index} \
             --batch-size ~{batch_size} \
@@ -109,21 +109,21 @@ task aggregate_rnaseqc_batch {
         done < transfers.tsv | xargs -0 -n 2 -P ~{num_threads} bash -c 'gsutil cp "$1" "$2"' _
 
         log "Merging TPM GCT files for batch $batch_number"
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py gct \
             --input-list local_tpm.list \
             --output "$batch_prefix.gene_tpm.gct.gz" \
             --sample-output batch_samples.txt \
             --sample-names batch_sample_ids.list
 
         log "Merging count GCT files for batch $batch_number"
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py gct \
             --input-list local_count.list \
             --output "$batch_prefix.gene_reads.gct.gz" \
             --sample-names batch_sample_ids.list
 
         if [[ "~{merge_exons}" == "true" ]]; then
             log "Merging exon-count GCT files for batch $batch_number"
-            python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
+            python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py gct \
                 --input-list local_exon.list \
                 --output "$batch_prefix.exon_reads.gct.gz" \
                 --sample-names batch_sample_ids.list
@@ -132,14 +132,14 @@ task aggregate_rnaseqc_batch {
         fi
 
         log "Merging metrics files for batch $batch_number"
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py metrics-individual \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py metrics-individual \
             --input-list local_metrics.list \
             --output "$batch_prefix.metrics.txt.gz" \
             --sample-names batch_sample_ids.list
 
         if [[ "~{include_insert_sizes}" == "true" ]]; then
             log "Merging insert-size files for batch $batch_number"
-            python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py insert-sizes-individual \
+            python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py insert-sizes-individual \
                 --input-list local_insert.list \
                 --expected-samples batch_samples.txt \
                 --output "$batch_prefix.insert_size_hists.txt.gz"
@@ -202,7 +202,7 @@ task merge_rnaseqc_batches {
         log "stage=merge_cohort start_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
         log "merge_exons=~{merge_exons}"
         log "Merging batch-level TPM GCT files"
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py gct \
             --input-list "~{write_lines(batch_tpm_gcts)}" \
             --output "$prefix.gene_tpm.gct.gz" \
             --sample-output cohort_samples.txt
@@ -211,14 +211,14 @@ task merge_rnaseqc_batches {
         log "dimensions=samples:$sample_count,batches:~{length(batch_tpm_gcts)}"
 
         log "Merging batch-level count GCT files"
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py gct \
             --input-list "~{write_lines(batch_count_gcts)}" \
             --expected-samples cohort_samples.txt \
             --output "$prefix.gene_reads.gct.gz"
 
         if [[ "~{merge_exons}" == "true" ]]; then
             log "Merging batch-level exon-count GCT files"
-            python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py gct \
+            python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py gct \
                 --input-list "~{write_lines(batch_exon_count_gcts)}" \
                 --expected-samples cohort_samples.txt \
                 --output "$prefix.exon_reads.gct.gz"
@@ -227,14 +227,14 @@ task merge_rnaseqc_batches {
         fi
 
         log "Merging batch-level metrics files"
-        python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py metrics-aggregated \
+        python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py metrics-aggregated \
             --input-list "~{write_lines(batch_metrics)}" \
             --expected-samples cohort_samples.txt \
             --output "$prefix.metrics.txt.gz"
 
         if [[ "~{include_insert_sizes}" == "true" ]]; then
             log "Merging batch-level insert-size files"
-            python3 /opt/prepare_qtl/scripts/expression/merge_rnaseqc.py insert-sizes-aggregated \
+            python3 /opt/prepare_qtl/scripts/expression/rnaseqc/merge_rnaseqc.py insert-sizes-aggregated \
                 --input-list "~{write_lines(batch_insert_size_hists)}" \
                 --expected-samples cohort_samples.txt \
                 --output "$prefix.insert_size_hists.txt.gz"
@@ -274,7 +274,7 @@ workflow rnaseqc2_aggregate_batched_workflow {
         Boolean merge_exons
 
         Int batch_size = 100
-        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:c2dc991dc99d8323fe6cc22375cd6560c131afc02122f8a6b2050eb7adba7652"
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
         Int validation_memory_gb = 1
         Int validation_disk_space_gb = 10
         Int batch_memory_gb = 4

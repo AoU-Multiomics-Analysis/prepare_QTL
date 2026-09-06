@@ -22,7 +22,7 @@ task PrepareHaemopedia {
     export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
     # Resolve the File here, after localization; quote apostrophes for the shell.
     counts_path='~{sub(counts, "'", "'\"'\"'")}'
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/prepare_haemopedia.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/prepare_haemopedia.R \
       "$counts_path" outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=reference_prepared outputs=%s completion_time=%s\n' "$stage" \
       'reference_summary.tsv.gz,reference_samples.tsv,reference_metadata.json' \
@@ -83,7 +83,7 @@ task FilterCellTypeBeds {
     if [[ -n "$residual_value" ]]; then
       optional_arguments+=(--residual-cutoff "$residual_value")
     fi
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/filter_cell_type_beds.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R \
       --inventory "$inventory_path" \
       --bed-list bed_paths.txt \
       --min-mean-log2-cpm1 '~{min_mean_log2_cpm1}' \

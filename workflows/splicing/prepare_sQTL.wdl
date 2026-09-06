@@ -49,7 +49,7 @@ workflow sQTLPrepareData  {
         Int memory
         Int disk_space
         Int num_threads
-        String splicing_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:932f67a09f1635c22a8061a5c98c892393d321e7c17d0401531e7093c469c845"
+        String splicing_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
     call PrepareSpliceData {
         input:

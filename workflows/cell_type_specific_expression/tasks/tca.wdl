@@ -31,7 +31,7 @@ task FitTca {
     if [[ -n "$covariates_path" ]]; then
       covariates_arguments=(--covariates "$covariates_path")
     fi
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/fit_tca.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/fit/fit_tca.R \
       --expression '~{expression}' \
       --weights '~{tca_weights}' \
       "${covariates_arguments[@]}" \
@@ -78,7 +78,7 @@ task CleanTcaModel {
     status=0
     printf 'stage=%s start_time=%s dimensions=pending\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/clean_tca_model.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/fit/clean_tca_model.R \
       ~{if reuse_model then "--reuse-model" else ""} \
       --model '~{sub(unfiltered_model, "'", "'\"'\"'")}' \
       --output-dir outputs 2>&1 | tee -a "$log"
@@ -135,7 +135,7 @@ task ExportTcaBeds {
     if [[ -n "$covariates_path" ]]; then
       covariates_arguments=(--covariates "$covariates_path")
     fi
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/export_tca_beds.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/export/export_tca_beds.R \
       ~{if reuse_model then "--reuse-model" else ""} \
       --expression '~{expression}' \
       --model '~{model}' \
