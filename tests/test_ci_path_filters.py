@@ -45,9 +45,9 @@ class CiPathTests(unittest.TestCase):
             'envs/PhenotypePCs/Dockerfile': set(),
             'envs/MethylationRust/Dockerfile': set(),
             'envs/RNASeQCAggregation/environment.yml': set(),
-            'tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json': {'smoke'},
-            'tests/test_prepare_expression_sample_list.R': {'smoke'},
-            'tests/test_prepare_methylation.R': {'smoke'},
+            'tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json': set(),
+            'tests/test_prepare_expression_sample_list.R': set(),
+            'tests/test_prepare_methylation.R': set(),
             'tests/rnaseqc2_aggregation/smoke_container.py': {'container'},
             'tests/cell_type_specific_expression/test_reference_filter_wdl.py': set(),
             '.dockerignore': set(),
@@ -60,7 +60,7 @@ class CiPathTests(unittest.TestCase):
     def test_manual_dispatch_runs_all_builds(self):
         self.assertEqual(self.heavy_jobs('', 'workflow_dispatch'),
                          {'build_and_push', 'build_cell_type_specific_expression',
-                          'build_methylation_rust', 'smoke', 'container'})
+                          'build_methylation_rust', 'container'})
 
 
 class IntegrationSelectionTests(unittest.TestCase):
@@ -70,20 +70,22 @@ class IntegrationSelectionTests(unittest.TestCase):
             Loader=yaml.BaseLoader)
         self.steps = workflow['jobs']['smoke']['steps']
 
-    def test_full_workflow_steps_share_gate_but_builds_and_r_tests_do_not(self):
+    def test_full_workflows_are_gated_and_r_tests_use_pinned_images(self):
         gated = {step['name'] for step in self.steps if 'if' in step
                  and step['if'] == "steps.integration.outputs.run == 'true'"}
         self.assertEqual(gated, {
-            'Install MiniWDL 1.15.0',
-            'Run the hspe end-to-end smoke workflow',
-            'Assert the hspe deconvolution outputs', 'Assert the hspe QTL outputs',
-            'Run the precomputed end-to-end smoke workflow',
-            'Assert the precomputed deconvolution outputs', 'Assert the precomputed QTL outputs',
-            'Restart from the cleaned model and compare outputs',
+            'Run full workflows and saved-model restart with pinned images',
         })
+        commands = '\n'.join(step.get('run', '') for step in self.steps)
+        self.assertNotIn('docker build', commands)
+        self.assertNotIn(':test', commands)
+        self.assertIn('docker pull "$CELL_IMAGE"', commands)
+        self.assertIn('docker pull "$STANDARD_IMAGE"', commands)
+        self.assertIn('PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R', commands)
+        self.assertIn('PREPARE_METHYLATION_SCRIPT=/workspace/scripts/methylation/PrepareMethylation.R', commands)
         for step in self.steps:
-            if 'docker build ' in step.get('run', '') or step.get('name', '').startswith(
-                    ('Run the cell-type-specific R suite', 'Test pre-normalized', 'Test methylation')):
+            if step.get('name', '').startswith(('Pull pinned', 'Run the cell-type-specific R suite',
+                                               'Test pre-normalized', 'Test methylation')):
                 self.assertNotIn('if', step)
 
     def test_real_selector(self):
