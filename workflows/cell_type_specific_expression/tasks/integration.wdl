@@ -26,7 +26,7 @@ task PrepareScatterInputs {
     cat > scatter/cell_type_bed_paths.txt <<'CELL_TYPE_BED_PATHS'
 ~{sep='\n' cell_type_beds}
 CELL_TYPE_BED_PATHS
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/prepare_scatter_inputs.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/prepare_scatter_inputs.R \
       --inventory '~{cell_type_bed_inventory}' \
       --bed-paths scatter/cell_type_bed_paths.txt \
       --output-prefix-file '~{output_prefix_file}' \
@@ -105,7 +105,7 @@ task BuildQtlManifest {
     IFS= read -r filtered_inventory_path < '~{filtered_inventory_path_file}'
     # Task-scoped serialization preserves quoting and keeps file creation off
     # the Terra workflow engine. These strings are upstream output URLs.
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/build_qtl_manifest.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/build_qtl_manifest.R \
       --cell-types '~{write_json(cell_types)}' \
       --cell-type-slugs '~{write_json(cell_type_slugs)}' \
       --int-beds '~{write_json(int_beds)}' \

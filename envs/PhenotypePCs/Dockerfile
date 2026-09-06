@@ -30,6 +30,6 @@ COPY scripts/ /opt/prepare_qtl/scripts/
 # Keep the legacy flat location while Terra workflows transition between the
 # mutable :main image tag and a newly published image. Source files remain
 # organized under /opt/prepare_qtl/scripts/.
-COPY scripts/common/*.R scripts/expression/*.R scripts/methylation/*.R scripts/proteomics/*.R scripts/splicing/*.R /tmp/
+COPY scripts/common/*.R scripts/expression/prepare/*.R scripts/methylation/*.R scripts/proteomics/*.R scripts/splicing/*.R /tmp/
 ## Default command to run when the container starts
 CMD ["bash"]

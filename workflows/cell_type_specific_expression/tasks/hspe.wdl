@@ -28,7 +28,7 @@ task PrepareHspeBatches {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/prepare_hspe_batches.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/prepare_hspe_batches.R \
       --expression '~{expression}' \
       --gtf '~{gtf}' \
       --lm22 '~{lm22}' \
@@ -82,7 +82,7 @@ task RunHspeBatch {
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/run_hspe_batch.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/run_hspe_batch.R \
       '~{prepared}' '~{batch}' outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=one_batch outputs=hspe_batch_result.rds completion_time=%s\n' \
       "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
@@ -125,7 +125,7 @@ task MergeHspeBatches {
     done < '~{write_lines(batch_logs)}'
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/merge_hspe_batches.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/merge_hspe_batches.R \
       '~{prepared}' '~{write_lines(batch_results)}' outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=%s outputs=proportions,metadata,diagnostics completion_time=%s\n' \
       "$stage" "$(wc -l < outputs/hspe_proportions.tsv)" \

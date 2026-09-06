@@ -21,7 +21,7 @@ task SummarizeCellTypeBeds {
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs
     export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/summarize_cell_type_beds.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/summarize_cell_type_beds.R \
       '~{cell_type_bed_inventory}' \
       '~{write_lines(cell_type_beds)}' \
       outputs/cell_type_gene_summary.tsv.gz 2>&1 | tee -a "$log"

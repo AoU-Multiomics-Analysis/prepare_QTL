@@ -18,7 +18,7 @@ task ValidateProportionMode {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/validate_proportion_mode.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/validate_proportion_mode.R \
       --precomputed-defined '~{defined(precomputed_proportions)}' \
       --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=%s outputs=%s completion_time=%s\n' \
@@ -65,7 +65,7 @@ task ProcessProportions {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/process_proportions.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/process_proportions.R \
       --proportions '~{proportions}' \
       --mean-threshold '~{mean_threshold}' \
       --zero-floor '~{zero_floor}' \

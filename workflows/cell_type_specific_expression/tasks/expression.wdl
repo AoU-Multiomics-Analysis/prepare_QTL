@@ -23,7 +23,7 @@ task FilterExpressionGenes {
       "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '~{sep="," gene_type}' | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs
-    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/filter_expression_genes.R \
+    Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/filter_expression_genes.R \
       --expression '~{input_expression}' \
       --gtf '~{gtf}' \
       --gene-types '~{sep="," gene_type}' \
