@@ -107,7 +107,7 @@ testthat::test_that("end-to-end WDL requires QTL covariates and scatters by alig
 
   assignments <- c(
     "OutputPrefix = PrepareScatterInputs.output_prefixes[index]",
-    "CpmBed = PrepareScatterInputs.expression_beds[index]",
+    "CpmBed = select_first(matched_filtered_bed)",
     "SampleList = SampleList",
     "AdditionalCovariates = AdditionalCovariates",
     "ResidualizeNormalizedInputs = false",

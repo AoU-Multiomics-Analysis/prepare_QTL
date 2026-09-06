@@ -26,8 +26,8 @@ class ExpressionInputTest(unittest.TestCase):
         self.assertIn("CpmBed", call.inputs)
         self.assertNotIn("Log2CpmBed", call.inputs)
         bindings = WDL.Env.Bindings().bind("index", WDL.Value.Int(1)).bind(
-            "PrepareScatterInputs.expression_beds",
-            WDL.Value.Array(WDL.Type.File(), [WDL.Value.File("b.bed.gz"), WDL.Value.File("cd4.bed.gz")]))
+            "matched_filtered_bed",
+            WDL.Value.Array(WDL.Type.File(optional=True), [WDL.Value.Null(), WDL.Value.File("cd4.bed.gz")]))
         self.assertEqual(call.inputs["CpmBed"].eval(bindings, STDLIB).value, "cd4.bed.gz")
 
     def test_all_expression_modes_reach_the_r_command_without_changing_paths(self):

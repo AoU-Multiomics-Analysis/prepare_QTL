@@ -47,6 +47,33 @@ If a different backend permits shell-special characters in generated execution
 paths, verify a safe quoting strategy on that backend; do not reintroduce a
 string conversion around the generated File.
 
+## Filtered BED output discovery, 2026-09-06
+
+A Terra `PrepareScatterInputs` localization attempt reported that a filtered
+eosinophil BED object did not exist at the requested `outputs/beds/` cloud path.
+The available log does not show whether the file was absent or uploaded under
+a different path. Do not interpret this as a failure of the expression model.
+
+Declare generated BEDs with `glob("outputs/beds/*.filtered.bed.gz")` in the
+filter task output block. Do not derive the downstream File array by reading
+task-relative strings from `filtered_beds.txt`. That text file can remain an R
+output for diagnostics, but it is not the WDL file-discovery interface.
+
+The inventory remains metadata for cell labels, dimensions, and validation.
+For each validated slug, the QTL scatter selects the actual filtered File whose
+basename is `<slug>.filtered.bed.gz`. The selected File retains its Cromwell
+cloud URI and is localized by the eQTL task. No cloud path is reconstructed from
+the inventory, and glob order need not equal inventory order.
+
+The nested WDL scatter performs only filename matching; it launches no extra
+VM tasks. Missing matches fail rather than selecting another cell type. The
+existing inventory validation rejects duplicate basenames and mismatched sets.
+
+`tests/test_filtered_bed_outputs.py` checks actual glob discovery through a
+simulated task-output collector, stale text paths, preserved cloud File values,
+and reversed file/metadata order. These local tests do not prove Terra output
+transfer behavior. A complete Terra run is still required to confirm this fix.
+
 ## Three separate boundaries
 
 1. **Workflow scope:** Terra's workflow engine need not have a local filesystem.
