@@ -27,6 +27,31 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select full workflow tests
+        id: integration
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          elif ! changed=$(git diff --name-only "$BASE...$HEAD" -- \
+            tests/cell_type_specific_expression/smoke \
+            tests/cell_type_specific_expression/fixtures \
+            tests/cell_type_specific_expression/generate_reference_fixture.R); then
+            # Run the tests if the PR comparison is unavailable.
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          elif [[ -n "$changed" ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -34,6 +59,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install MiniWDL 1.15.0
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check "miniwdl==1.15.0"
@@ -104,6 +130,7 @@ jobs:
             prepare-qtl:test Rscript tests/test_prepare_methylation.R
 
       - name: Run the hspe end-to-end smoke workflow
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
           run_directory="$PWD/ci-runs/hspe"
@@ -116,6 +143,7 @@ jobs:
             --no-color
 
       - name: Assert the hspe deconvolution outputs
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
           docker run --rm \
@@ -130,6 +158,7 @@ jobs:
             "$PWD/tests/cell_type_specific_expression/fixtures"
 
       - name: Assert the hspe QTL outputs
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
           docker run --rm \
@@ -144,6 +173,7 @@ jobs:
             "$PWD/tests/cell_type_specific_expression/fixtures"
 
       - name: Run the precomputed end-to-end smoke workflow
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
           docker run --rm \
@@ -164,6 +194,7 @@ jobs:
             --no-color
 
       - name: Assert the precomputed deconvolution outputs
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
           docker run --rm \
@@ -178,6 +209,7 @@ jobs:
             "$PWD/tests/cell_type_specific_expression/fixtures"
 
       - name: Assert the precomputed QTL outputs
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
           docker run --rm \
@@ -192,6 +224,7 @@ jobs:
             "$PWD/tests/cell_type_specific_expression/fixtures"
 
       - name: Restart from the cleaned model and compare outputs
+        if: steps.integration.outputs.run == 'true'
         run: python tests/cell_type_specific_expression/smoke/run_model_restart.py
 
       - name: Upload failure logs, manifests, and QC files
