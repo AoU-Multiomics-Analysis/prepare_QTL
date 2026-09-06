@@ -27,172 +27,127 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select full workflow tests
+        id: integration
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          elif ! changed=$(git diff --name-only "$BASE...$HEAD" -- \
+            tests/cell_type_specific_expression/smoke \
+            tests/cell_type_specific_expression/fixtures \
+            tests/cell_type_specific_expression/generate_reference_fixture.R); then
+            # Run the tests if the PR comparison is unavailable.
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          elif [[ -n "$changed" ]]; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install MiniWDL 1.15.0
-        run: |
-          set -euo pipefail
-          python -m pip install --disable-pip-version-check "miniwdl==1.15.0"
-          miniwdl --version
+      - name: Install the descriptor reader
+        run: python -m pip install --disable-pip-version-check miniwdl==1.15.0 PyYAML==6.0.2
 
-      - name: Build the standard QTL test image
+      - name: Read pinned dependency images
+        id: images
+        run: |
+          python - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'ci')
+          from propose_image_pins import literal_span, validate_image
+          text = Path('workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl').read_text()
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for key, name, repository in (
+                  ('cell', 'fit_docker_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression'),
+                  ('standard', 'qtl_docker_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl'),
+              ):
+                  value = literal_span(text, name)[2]
+                  validate_image(value, repository)
+                  output.write(f'{key}={value}\n')
+          PY
+      - name: Pull pinned dependency images
+        env:
+          CELL_IMAGE: ${{ steps.images.outputs.cell }}
+          STANDARD_IMAGE: ${{ steps.images.outputs.standard }}
         run: |
           set -euo pipefail
-          docker build \
-            --file envs/PhenotypePCs/Dockerfile \
-            --tag prepare-qtl:test \
-            .
-
-      - name: Build the cell-type-specific test image
-        run: |
-          set -euo pipefail
-          docker build \
-            --file envs/CellTypeSpecificExpression/Dockerfile \
-            --tag cell-type-specific-expression:test \
-            .
+          docker pull "$CELL_IMAGE"
+          docker pull "$STANDARD_IMAGE"
 
       - name: Run the cell-type-specific R suite
+        env:
+          CELL_IMAGE: ${{ steps.images.outputs.cell }}
         run: |
           set -euo pipefail
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            cell-type-specific-expression:test \
+            "$CELL_IMAGE" \
             Rscript scripts/cell_type_specific_expression/lint_r.R
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            cell-type-specific-expression:test \
+            "$CELL_IMAGE" \
             Rscript tests/cell_type_specific_expression/testthat.R
 
       - name: Test pre-normalized expression in the standard image
+        env:
+          STANDARD_IMAGE: ${{ steps.images.outputs.standard }}
         run: |
           set -euo pipefail
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
-            prepare-qtl:test \
+            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R \
+            "$STANDARD_IMAGE" \
             Rscript tests/test_prepare_expression_log2_cpm.R
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
-            prepare-qtl:test \
+            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R \
+            "$STANDARD_IMAGE" \
             Rscript tests/test_prepare_expression_sample_list.R
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
-            --env PREPARE_EXPRESSION_SCRIPT=/tmp/PrepareExpression.R \
-            prepare-qtl:test \
+            --env PREPARE_EXPRESSION_SCRIPT=/workspace/scripts/expression/PrepareExpression.R \
+            "$STANDARD_IMAGE" \
             Rscript tests/test_reference_filtered_expression.R
 
       - name: Test methylation preparation in the standard image
+        env:
+          STANDARD_IMAGE: ${{ steps.images.outputs.standard }}
         run: |
           docker run --rm \
             --volume "$PWD:/workspace:ro" --workdir /workspace \
-            --env PREPARE_METHYLATION_SCRIPT=/tmp/PrepareMethylation.R \
-            prepare-qtl:test Rscript tests/test_prepare_methylation.R
+            --env PREPARE_METHYLATION_SCRIPT=/workspace/scripts/methylation/PrepareMethylation.R \
+            "$STANDARD_IMAGE" Rscript tests/test_prepare_methylation.R
 
-      - name: Run the hspe end-to-end smoke workflow
+      - name: Run full workflows and saved-model restart with pinned images
+        if: steps.integration.outputs.run == 'true'
         run: |
           set -euo pipefail
-          run_directory="$PWD/ci-runs/hspe"
-          mkdir -p "$run_directory"
-          miniwdl run \
-            workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl \
-            --input tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json \
-            --dir "$run_directory/." \
-            --verbose \
-            --no-color
-
-      - name: Assert the hspe deconvolution outputs
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --group-add "$(id -g)" \
-            --volume "$PWD:$PWD" \
-            --workdir "$PWD" \
-            cell-type-specific-expression:test \
-            Rscript tests/cell_type_specific_expression/smoke/assert_deconvolution_outputs.R \
-            "$PWD/ci-runs/hspe/outputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures"
-
-      - name: Assert the hspe QTL outputs
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --group-add "$(id -g)" \
-            --volume "$PWD:$PWD" \
-            --workdir "$PWD" \
-            prepare-qtl:test \
-            Rscript tests/cell_type_specific_expression/smoke/assert_qtl_outputs.R \
-            "$PWD/ci-runs/hspe/outputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures/hspe-e2e.inputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures"
-
-      - name: Run the precomputed end-to-end smoke workflow
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --volume "$PWD:/workspace" \
-            --workdir /workspace \
-            cell-type-specific-expression:test \
-            Rscript tests/cell_type_specific_expression/generate_reference_fixture.R \
-            tests/cell_type_specific_expression/fixtures/synthetic_expression.bed \
-            ci-runs/reference-counts.tsv.gz
-          run_directory="$PWD/ci-runs/precomputed"
-          mkdir -p "$run_directory"
-          miniwdl run \
-            workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl \
-            --input tests/cell_type_specific_expression/fixtures/precomputed-e2e.inputs.json \
-            --dir "$run_directory/." \
-            --verbose \
-            --no-color
-
-      - name: Assert the precomputed deconvolution outputs
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --group-add "$(id -g)" \
-            --volume "$PWD:$PWD" \
-            --workdir "$PWD" \
-            cell-type-specific-expression:test \
-            Rscript tests/cell_type_specific_expression/smoke/assert_deconvolution_outputs.R \
-            "$PWD/ci-runs/precomputed/outputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures/precomputed-e2e.inputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures"
-
-      - name: Assert the precomputed QTL outputs
-        run: |
-          set -euo pipefail
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --group-add "$(id -g)" \
-            --volume "$PWD:$PWD" \
-            --workdir "$PWD" \
-            prepare-qtl:test \
-            Rscript tests/cell_type_specific_expression/smoke/assert_qtl_outputs.R \
-            "$PWD/ci-runs/precomputed/outputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures/precomputed-e2e.inputs.json" \
-            "$PWD/tests/cell_type_specific_expression/fixtures"
-
-      - name: Restart from the cleaned model and compare outputs
-        run: python tests/cell_type_specific_expression/smoke/run_model_restart.py
+          docker swarm init --advertise-addr 127.0.0.1
+          python tests/cell_type_specific_expression/smoke/run_pinned_images.py
 
       - name: Upload failure logs, manifests, and QC files
         if: failure()

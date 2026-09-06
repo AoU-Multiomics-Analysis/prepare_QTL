@@ -248,6 +248,15 @@ RNA-SeQC container CI tests without publishing; stage releases own publication.
 Candidate changes to the cell-type or RNA-SeQC runtime tests still run their
 container tests on PRs, because the trusted release path rejects candidate
 changes to its own tests. These test-maintenance runs do not repeat after merge.
+Cell-type test PRs pull published dependency images pinned by digest in the WDL.
+The R tests use checked-out scripts mounted into those images. No images are
+built in this job. Dependency changes need a tested image from the release process. The HSPE workflow,
+precomputed workflow, and saved-model restart run only when smoke scripts,
+fixtures, or the reference-fixture generator change, or on manual dispatch.
+Full workflow tests use the existing pinned-image runner and all stage defaults.
+A change to the CI YAML alone runs the image pulls and R tests; use manual dispatch
+to check changes to the integration steps. Stage release tests still run the
+complete integration suite.
 An unlabelled source PR has not passed the stage release: do not merge runtime
 changes until their release tests and final pin checks pass. This trigger change
 does not add branch protection or automatic merging.
