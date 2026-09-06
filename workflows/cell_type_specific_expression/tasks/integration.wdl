@@ -4,6 +4,7 @@ task PrepareScatterInputs {
   input {
     File cell_type_bed_inventory
     Array[File] cell_type_beds
+    File? sample_list
     String output_prefix
     String docker_image
     Int cpu = 1
@@ -26,16 +27,21 @@ task PrepareScatterInputs {
     cat > scatter/cell_type_bed_paths.txt <<'CELL_TYPE_BED_PATHS'
 ~{sep='\n' cell_type_beds}
 CELL_TYPE_BED_PATHS
+    sample_args=()
+    if ~{if defined(sample_list) then "true" else "false"}; then
+      sample_args=(--sample-list '~{if defined(sample_list) then sub(select_first([sample_list]), "'", "'\"'\"'") else ""}')
+    fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/prepare_scatter_inputs.R \
+      "${sample_args[@]}" \
       --inventory '~{cell_type_bed_inventory}' \
       --bed-paths scatter/cell_type_bed_paths.txt \
       --output-prefix-file '~{output_prefix_file}' \
       --output-dir scatter \
       --log-file scatter/prepare_scatter_inputs.log 2>&1 | tee -a "$log"
     validated_cell_count="$(wc -l < scatter/cell_types.txt)"
-    output_paths="scatter/cell_types.txt,scatter/cell_type_slugs.txt,scatter/expression_beds.txt,scatter/output_prefixes.txt"
+    output_paths="scatter/cell_types.txt,scatter/cell_type_slugs.txt,scatter/expression_beds.txt,scatter/output_prefixes.txt,scatter/cohort_samples.txt"
     printf 'stage=%s dimensions=validated_cell_count:%s outputs=%s output_paths=%s completion_time=%s\n' \
-      "$stage" "$validated_cell_count" "cell_types,cell_type_slugs,expression_beds,output_prefixes" \
+      "$stage" "$validated_cell_count" "cell_types,cell_type_slugs,expression_beds,output_prefixes,cohort_samples" \
       "$output_paths" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
   >>>
 
@@ -44,6 +50,7 @@ CELL_TYPE_BED_PATHS
     Array[String] cell_type_slugs = read_lines("scatter/cell_type_slugs.txt")
     Array[File] expression_beds = cell_type_beds
     Array[String] output_prefixes = read_lines("scatter/output_prefixes.txt")
+    File cohort_samples = "scatter/cohort_samples.txt"
     File log = "prepare_scatter_inputs.log"
   }
 

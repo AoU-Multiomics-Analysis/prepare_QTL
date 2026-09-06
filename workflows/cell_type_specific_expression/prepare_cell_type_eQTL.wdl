@@ -12,7 +12,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     File? precomputed_tca_model
     File? precomputed_proportions
     File? deconvolution_covariates
-    File SampleList
+    File? SampleList
     File AdditionalCovariates
     String OutputPrefix
 
@@ -117,6 +117,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     input:
       cell_type_bed_inventory = CellTypeDeconvolution.filtered_cell_type_bed_inventory,
       cell_type_beds = CellTypeDeconvolution.filtered_cell_type_beds,
+      sample_list = SampleList,
       output_prefix = OutputPrefix,
       docker_image = downstream_docker_image,
       cpu = scatter_cpu,
@@ -138,7 +139,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       input:
         OutputPrefix = PrepareScatterInputs.output_prefixes[index],
         CpmBed = select_first(matched_filtered_bed),
-        SampleList = SampleList,
+        SampleList = PrepareScatterInputs.cohort_samples,
         AdditionalCovariates = AdditionalCovariates,
         ResidualizeNormalizedInputs = false,
         DockerImage = qtl_docker_image,
