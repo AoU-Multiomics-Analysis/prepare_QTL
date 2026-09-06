@@ -87,3 +87,12 @@ Manual full tests and the separate source-unit workflow are unchanged.
 For this test-policy PR, Pinned Image Smoke runs all stage gates against the
 published images plus compact integration. This is broader than a normal
 single-stage release so the new test harness is checked before use.
+
+## Reuse images within one job
+
+The release runner and pinned smoke runner inspect each exact digest before
+pulling it. If that digest is already present in the job's Docker daemon, the
+runner logs `status=reused` and skips the pull. A different or missing digest
+is pulled normally; a failed pull still fails the test job. Mutable tags are
+not accepted. This does not retain images across fresh GitHub runners or
+change MiniWDL's own Docker behavior.

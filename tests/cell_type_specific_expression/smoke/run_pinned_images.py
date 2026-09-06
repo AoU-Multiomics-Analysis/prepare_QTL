@@ -3,11 +3,14 @@ import argparse
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
 import WDL
+
+# Resolve from this trusted script, not the candidate working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[3] / 'ci'))
+from docker_images import ensure_pinned_image
 
 PREFIX = 'PrepareCellTypeEqtlWorkflow.'
 WORKFLOW = 'workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl'
@@ -74,9 +77,7 @@ def main():
     pins = {decl.name: decl.expr.eval(WDL.Env.Bindings(), WDL.StdLib.Base('1.0')).value
             for decl in doc.workflow.inputs if decl.name.endswith('_docker_image')}
     for image in set(pins.values()):
-        if not re.fullmatch(r'ghcr\.io/[^\s@]+@sha256:[0-9a-f]{64}', image):
-            raise ValueError('Smoke requires immutable image defaults: ' + image)
-        subprocess.run(['docker', 'pull', image], check=True)
+        ensure_pinned_image(image)
 
     def run_r(image, script, *args):
         subprocess.run(['docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',
