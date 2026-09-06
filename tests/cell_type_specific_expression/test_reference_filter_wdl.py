@@ -97,8 +97,18 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         self.assertIn(prepare.name, conditional_calls)
         filter_call = self.workflow_call(self.deconvolution, "FilterCellTypeBeds")
         self.assertNotIn(filter_call.name, conditional_calls)
-        self.assertEqual(str(filter_call.inputs["cell_type_beds"]),
-                         "ExportTcaBeds.cell_type_beds")
+        if filter_call.callee.name == "MergeFilterReports":
+            self.assertEqual(str(filter_call.inputs["comparisons"]),
+                             "FilterCellTypeBed.gene_comparison")
+            shard = self.workflow_call(self.deconvolution, "FilterCellTypeBed")
+            scatter = next(block for block in self.deconvolution.workflow.body
+                           if isinstance(block, WDL.Tree.Scatter) and shard in block.body)
+            self.assertEqual(str(scatter.expr), "ExportTcaBeds.cell_type_beds")
+            self.assertEqual(str(shard.inputs["cell_type_bed"]), "cell_type_bed")
+        else:
+            self.assertEqual(filter_call.callee.name, "FilterCellTypeBeds")
+            self.assertEqual(str(filter_call.inputs["cell_type_beds"]),
+                             "ExportTcaBeds.cell_type_beds")
         self.assertEqual(str(filter_call.inputs["cell_type_bed_inventory"]),
                          "ExportTcaBeds.cell_type_bed_inventory")
 
