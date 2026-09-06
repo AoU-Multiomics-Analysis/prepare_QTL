@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 import yaml
+from docker_images import ensure_pinned_image
 from plan_image_updates import matches
 from propose_image_pins import literal_span, validate_image
 from wdl_stage_routing import validate_routing
@@ -96,7 +97,7 @@ def main():
             raise ValueError('Stage defaults disagree: ' + stage)
         images[stage] = values.pop()
     for image in set(images.values()):
-        subprocess.run(['docker', 'pull', image], check=True)
+        ensure_pinned_image(image)
 
     def run_r(image, script, *arguments, environment=None):
         command = ['docker', 'run', '--rm', '--user', f'{os.getuid()}:{os.getgid()}',

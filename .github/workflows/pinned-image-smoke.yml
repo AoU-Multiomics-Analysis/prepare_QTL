@@ -6,6 +6,8 @@ on:
     paths:
       - "tests/release/**"
       - "ci/test_release_images.py"
+      - "ci/docker_images.py"
+      - "tests/test_docker_image_reuse.py"
       - "ci/image-stages.yml"
       - "tests/test_stage_test_selection.py"
       - ".github/workflows/pinned-image-smoke.yml"
@@ -41,6 +43,7 @@ jobs:
         run: |
           python tests/test_stage_image_inputs.py
           python tests/test_stage_test_selection.py
+          python tests/test_docker_image_reuse.py
       - name: Run with published digest defaults
         env:
           ALL_STAGES: ${{ github.event_name == 'pull_request' || inputs.all_stages }}
