@@ -94,6 +94,60 @@ validate_scatter_bed_paths <- function(bed_paths, expected_paths) {
   bed_paths[match(expected_paths, bed_basenames)]
 }
 
+derive_scatter_samples <- function(bed_paths, sample_list = NULL) {
+  paths <- c(bed_paths, sample_list)
+  if (!length(bed_paths) || anyNA(paths) || any(!nzchar(paths)) ||
+      any(grepl("^[A-Za-z][A-Za-z0-9+.-]*://", paths)) ||
+      any(file.access(paths, 4L) != 0L)) {
+    stop("Sample derivation localization error: inputs must be readable local files", call. = FALSE)
+  }
+  headers <- lapply(bed_paths, function(path) {
+    header <- readr::read_tsv(path, n_max = 0L, name_repair = "minimal",
+      show_col_types = FALSE, progress = FALSE)
+    columns <- names(header)
+    if (length(columns) <= 4L ||
+        !identical(columns[1:4], c("#chr", "start", "end", "gene_id"))) {
+      stop("BED header must start with #chr, start, end, gene_id and contain samples", call. = FALSE)
+    }
+    samples <- columns[-(1:4)]
+    if (anyNA(samples) || any(!nzchar(trimws(samples))) || anyDuplicated(samples)) {
+      stop("BED sample IDs must be nonempty and unique", call. = FALSE)
+    }
+    samples
+  })
+  samples <- headers[[1L]]
+  if (!all(vapply(headers, identical, logical(1), samples))) {
+    stop("Cell-type BEDs must contain the same sample IDs and order", call. = FALSE)
+  }
+  excluded <- 0L
+  if (!is.null(sample_list)) {
+    table <- readr::read_tsv(sample_list, col_names = FALSE,
+      col_types = readr::cols(.default = readr::col_character()),
+      na = character(), skip_empty_rows = FALSE, trim_ws = TRUE,
+      show_col_types = FALSE, progress = FALSE)
+    if (ncol(table) != 1L || nrow(table) == 0L || nrow(readr::problems(table))) {
+      stop("Sample list must contain exactly one nonempty column", call. = FALSE)
+    }
+    requested <- dplyr::pull(table, 1L)
+    if (tolower(requested[[1L]]) %in% c("research_id", "sample_id", "id") &&
+        !(requested[[1L]] %in% samples)) {
+      requested <- requested[-1L]
+    }
+    if (!length(requested) || anyNA(requested) ||
+        any(!nzchar(requested)) || anyDuplicated(requested)) {
+      stop("Sample list IDs must be nonempty and unique", call. = FALSE)
+    }
+    excluded <- sum(!requested %in% samples)
+    samples <- samples[samples %in% requested]
+  }
+  if (!length(samples)) {
+    stop("No samples remain after matching the sample list to BED headers", call. = FALSE)
+  }
+  message(sprintf("stage=prepare_scatter_inputs samples=bed:%d,selected:%d,requested_excluded:%d",
+    length(headers[[1L]]), length(samples), excluded))
+  samples
+}
+
 prepare_scatter_contract <- function(inventory, bed_paths, output_prefix) {
   validate_scatter_inventory(inventory)
   bed_paths <- validate_scatter_bed_paths(bed_paths, inventory$path)
