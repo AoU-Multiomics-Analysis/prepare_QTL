@@ -29,9 +29,9 @@ class WDLTests(unittest.TestCase):
             unusual=p/"local ' $(touch INJECTED) `touch INJECTED2`"
             unusual.mkdir()
             cov=unusual/'cov.tsv'
-            cov.write_text('ID\tS3\tS1\tS2\tS4\ngenPC1\t1\t2\t3\t4\nexprPC1\t4\t2\t1\t3\n')
+            cov.write_text('ID\tS3\tS1\tS2\tS4\nGENETICPC1\t1\t2\t3\t4\nPC1\t4\t2\t1\t3\n')
             prep=p/'prepare'; prep.mkdir()
-            command=render(doc.tasks[0],{'covariates':'gs://bucket/cov.tsv','phenotype_pc_ids':['exprPC1'],'placeholder_chromosome':'chrY','docker_image':'unused'},prep,{'gs://bucket/cov.tsv':str(cov)})
+            command=render(doc.tasks[0],{'covariates':'gs://bucket/cov.tsv','placeholder_chromosome':'chrY','docker_image':'unused'},prep,{'gs://bucket/cov.tsv':str(cov)})
             r=subprocess.run(['bash','-c',command],cwd=prep,text=True,capture_output=True)
             self.assertEqual(r.returncode,0,r.stdout+r.stderr)
             task=doc.imports[0].doc.tasks[0]
@@ -63,39 +63,11 @@ class WDLTests(unittest.TestCase):
             self.assertIn('localization error',r.stdout+r.stderr)
             self.assertFalse((bad/'pc_scan.trans_qtl_pairs.parquet').exists())
 
-    def test_generated_cloud_file_remains_file_typed(self):
-        task=WDL.load(str(ROOT/'workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl')).tasks[0]
-        with tempfile.TemporaryDirectory() as tmp:
-            p=Path(tmp)
-            cov=p/'cov.tsv'
-            cov.write_text('ID\tA\tB\tC\tD\ngenPC1\t1\t2\t3\t4\nexprPC1\t4\t3\t1\t2\n')
-            mapping={}
-            class CloudStdLib(LocalStdLib):
-                def _virtualize_filename(self, filename):
-                    uri='gs://generated/' + Path(filename).name
-                    mapping[uri]=filename
-                    return uri
-            env=WDL.values_from_json({'covariates':str(cov),'phenotype_pc_ids':['exprPC1'],'placeholder_chromosome':'chrY','docker_image':'unused'},task.available_inputs)
-            stdlib=CloudStdLib('1.0',write_dir=str(p/'writes'))
-            parts=[]
-            for part in task.command.parts:
-                if isinstance(part,str): parts.append(part)
-                else:
-                    value=part.expr.eval(env,stdlib)
-                    # Model final command-time mapping of newly created File values.
-                    if isinstance(value,WDL.Value.File):
-                        value=WDL.Value.File(mapping.get(value.value,value.value))
-                    parts.append(value.coerce(WDL.Type.String()).value)
-            command=''.join(parts)
-            self.assertNotIn('gs://generated/',command)
-            run=subprocess.run(['bash','-c',command],cwd=p,capture_output=True,text=True)
-            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
-            self.assertTrue((p/'pc_scan.phenotypes.bed').is_file())
-
     def test_workflow_has_two_calls_and_no_file_writes(self):
         doc=WDL.load(str(ROOT/'workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl'))
         self.assertEqual(sum(isinstance(n,WDL.Tree.Call) for n in doc.workflow.body),2)
         self.assertEqual(doc.wdl_version,'1.0')
+        self.assertNotIn('phenotype_pc_ids', [d.name for d in doc.workflow.inputs])
         def walk(node):
             if isinstance(node,WDL.Expr.Apply):
                 self.assertNotIn(node.function_name,{'write_lines','write_tsv','write_map','write_json','write_objects','write_object'})

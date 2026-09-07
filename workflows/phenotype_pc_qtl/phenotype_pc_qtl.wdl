@@ -5,7 +5,6 @@ import "tasks/tensorqtl_trans_compat.wdl" as trans
 workflow PhenotypePCQTL {
     input {
         File covariates
-        Array[String] phenotype_pc_ids
         File plink_pgen
         File plink_pvar
         File plink_psam
@@ -22,7 +21,6 @@ workflow PhenotypePCQTL {
     call PreparePCPhenotypes {
         input:
             covariates = covariates,
-            phenotype_pc_ids = phenotype_pc_ids,
             placeholder_chromosome = placeholder_chromosome,
             docker_image = tensorqtl_docker
     }
@@ -54,7 +52,6 @@ workflow PhenotypePCQTL {
 
     parameter_meta {
         covariates: "TensorQTL TSV: covariate IDs in the first column, samples in the header."
-        phenotype_pc_ids: "Exact row IDs of ALL phenotype PCs to test and exclude from adjustment. Remaining rows are retained."
         placeholder_chromosome: "Default chrY. Nearby chrY variants can be filtered. Use a label absent from PVAR (e.g. PC_SCAN) to avoid coordinate-based exclusion."
         plink_pvar: "Uncompressed PLINK 2 PVAR with #CHROM header. Files can have different basenames and source directories."
         pval_threshold: "Nominal P-value cutoff for saving sparse pairs; not a PC exclusion rule or FDR threshold."
@@ -64,7 +61,6 @@ workflow PhenotypePCQTL {
 task PreparePCPhenotypes {
     input {
         File covariates
-        Array[String] phenotype_pc_ids
         String placeholder_chromosome
         String docker_image
     }
@@ -97,18 +93,11 @@ def readable(value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--covariates', required=True)
-    parser.add_argument('--phenotype-pc-ids', required=True)
     parser.add_argument('--chromosome', default='chrY')
     args = parser.parse_args()
     matrix = readable(args.covariates)
-    ids_file = readable(args.phenotype_pc_ids)
     if not re.fullmatch(r'[A-Za-z0-9_.-]+', args.chromosome):
         raise ValueError('placeholder chromosome must contain only letters, digits, _, . or -')
-    ids = ids_file.read_text().splitlines()
-    if not ids or any(not x or x.strip() != x or '\t' in x for x in ids):
-        raise ValueError('phenotype PC IDs must be nonempty, one per line, without whitespace padding')
-    if len(set(ids)) != len(ids):
-        raise ValueError('duplicate phenotype PC IDs')
     print('[prepare] Reading covariate matrix', flush=True)
     with matrix.open(newline='') as handle:
         reader = csv.reader(handle, delimiter='\t')
@@ -131,9 +120,9 @@ def main():
             if len(set(values)) < 2:
                 raise ValueError('constant covariate/phenotype PC: ' + row[0])
             rows[row[0]] = row[1:]
-    missing = set(ids) - set(rows)
-    if missing:
-        raise ValueError('phenotype PC IDs absent from matrix: ' + ', '.join(sorted(missing)))
+    ids = [name for name in rows if re.fullmatch(r'PC[0-9]+', name)]
+    if not ids:
+        raise ValueError('no molecular PC rows found; expected case-sensitive names PC1, PC2, etc.')
     selected = set(ids)
     remaining = [x for x in rows if x not in selected]
     if not remaining:
@@ -168,7 +157,6 @@ if __name__ == '__main__':
 PYTHON_SOURCE
         python3 prepare_pc_scan.py \
             --covariates '~{sub(covariates, "'", "'\"'\"'")}' \
-            --phenotype-pc-ids '~{write_lines(phenotype_pc_ids)}' \
             --chromosome '~{sub(placeholder_chromosome, "'", "'\"'\"'")}' 2>&1 | tee preparation.log
     >>>
 
