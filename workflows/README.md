@@ -32,6 +32,7 @@ implementation modules.
 | Methylation | `methylation/AggregateMethylationCohort.wdl` | Cohort aggregation from one compact `CohortManifest`. |
 | Methylation | `methylation/merge_methylation.wdl` | Legacy source-BED manifest/shard entry point. |
 | Phenotype PC scan | `phenotype_pc_qtl/phenotype_pc_qtl.wdl` | Test phenotype PCs against genotypes while adjusting for remaining covariates. |
+| Trans-QTL regions | `genotype/trans_ld_regions.wdl` | Define ancestry-specific LD regions, combine boundaries, and enforce a minimum width of 2 Mb. |
 | Genotypes | `genotype/prepare_VCF.wdl`, `genotype/convertVCF2Plink.wdl`, `genotype/calculateGenotypePCs.wdl`, `genotype/calculateAF.wdl`, `genotype/calculateGenotypeDosage.wdl` | Genotype preparation and derived outputs. |
 
 Every public entry point and the independently callable common helpers are
@@ -59,3 +60,5 @@ When adding, renaming, or removing a public workflow, update `.dockstore.yml`,
 this catalog, and the corresponding user-facing documentation in the same
 change. The workflow-validation action checks descriptor existence, uniqueness,
 and WDL parsing on every pull request and push to `main`.
+
+See the [trans-QTL LD region guide](../docs/trans-ld-regions.md) for inputs, region rules, image builds and validation status.
