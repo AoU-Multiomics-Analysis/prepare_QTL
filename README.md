@@ -61,4 +61,4 @@ See the linked docs above for full input and output details.
 
 ## Phenotype PC association scan
 
-[`phenotype_pc_qtl`](workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl) is a standalone two-step stage that converts selected covariate rows to PC phenotypes and runs tensorQTL trans with the remaining covariates. See [inputs, coordinate policy, and validation](docs/phenotype-pc-qtl.md).
+[`phenotype_pc_qtl`](workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl) is a standalone two-step stage that automatically converts covariate rows named `PC` followed by digits to PC phenotypes and runs tensorQTL trans with the remaining covariates. See [inputs, coordinate policy, and validation](docs/phenotype-pc-qtl.md).

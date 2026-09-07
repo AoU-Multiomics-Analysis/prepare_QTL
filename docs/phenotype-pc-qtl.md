@@ -2,27 +2,27 @@
 
 A two-step WDL 1.0 workflow for Terra/Cromwell:
 
-1. Select existing phenotype PC rows from a tensorQTL covariate matrix. Write them as BED phenotypes and retain every other row as an adjustment covariate.
+1. Automatically select existing rows named PC followed by digits from a tensorQTL covariate matrix. Write them as BED phenotypes and retain every other row as an adjustment covariate.
 2. Run tensorQTL trans against PLINK 2 genotypes using the remaining covariates.
 
 This does not calculate new PCs, select PCs for removal automatically, or modify the original covariate file. Inspect the resulting PC–variant associations and their biology before deciding which PCs to omit from a later trans-QTL analysis. The saved P-value cutoff is not an automatic exclusion rule.
 
 ## Inputs
 
-Use `workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl` with its `workflows/phenotype_pc_qtl/tasks/tensorqtl_trans_compat.wdl` import. Keep their relative paths when uploading or registering the workflow. The example Terra inputs JSON is a workflow submission example, not a script argument wrapper. Replace its example bucket URIs and PC IDs.
+Use `workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl` with its `workflows/phenotype_pc_qtl/tasks/tensorqtl_trans_compat.wdl` import. Keep their relative paths when uploading or registering the workflow. The example Terra inputs JSON is a workflow submission example, not a script argument wrapper. Replace its example bucket URIs and paths.
 
 The covariate TSV has one covariate per row, its ID in column 1, and sample IDs across the header:
 
 ```text
 ID       sample1  sample2  sample3 ...
-genPC1   0.1      0.2      -0.3    ...
-exprPC1  -0.2     0.5      0.1     ...
-exprPC2  0.6      -0.1     0.3     ...
+GENETICPC1   0.1      0.2      -0.3    ...
+PC1  -0.2     0.5      0.1     ...
+PC2  0.6      -0.1     0.3     ...
 ```
 
-Supply `phenotype_pc_ids` as the exact row names of **all phenotype PCs to exclude from adjustment and test**. Example: `["exprPC1", "exprPC2"]`. Names are not inferred. Genetic PCs, sex, cohort indicators, and any other unselected rows stay in the covariate file. If a phenotype PC is not selected, it remains an adjustment covariate. Sample order and numeric text are preserved; values are not normalized again.
+The workflow automatically selects case-sensitive row IDs that match `^PC[0-9]+$`, such as `PC1`, `PC2`, and `PC25`. `GENETICPC1`, `pc1`, and `PC1_extra` do not match and remain adjustment covariates, along with sex, cohort indicators, and every other row. No PC-name input is required. If no rows match, preparation fails with a clear error. Sample order, PC row order, and numeric text are preserved; values are not normalized again.
 
-Inputs must be numeric and finite, with unique sample and covariate IDs and no constant rows. Encode categorical covariates before submission. The workflow rejects constant covariates (including a user-supplied intercept), missing PC IDs, and insufficient residual degrees of freedom by count. It does not test full matrix rank.
+Inputs must be numeric and finite, with unique sample and covariate IDs and no constant rows. Encode categorical covariates before submission. The workflow rejects constant covariates (including a user-supplied intercept), absence of matching PCs, and insufficient residual degrees of freedom by count. It does not test full matrix rank.
 
 All genotype files are explicit WDL `File` inputs. PVAR must be uncompressed text. PSAM must have an IID column; every phenotype sample must be present. Extra genotype samples are allowed because tensorQTL selects phenotype samples. The task stages the three localized files under a common prefix, so their original names and directories need not match.
 
@@ -68,7 +68,7 @@ python -m unittest discover -s tests/phenotype_pc_qtl -v
 java -jar /path/to/womtool-87.jar validate workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl
 ```
 
-Local checks validate the complete WDL import graph and run rendered task commands. Localization tests remap synthetic `gs://` File values into different local directories, include shell metacharacters in filenames, and check that missed localization fails before computation. TensorQTL itself is stubbed in that boundary test. A static AST check rejects workflow-scope file-writing functions. The only `write_lines` call creates a task-local list of PC names; no File inputs are serialized before localization.
+Local checks validate the complete WDL import graph and run rendered task commands. Localization tests remap synthetic `gs://` File values into different local directories, include shell metacharacters in filenames, and check that missed localization fails before computation. TensorQTL itself is stubbed in that boundary test. A static AST check rejects workflow-scope file-writing functions. No command-time file-writing function is needed for PC selection; the script reads the row IDs from the localized matrix.
 
 `.github/workflows/phenotype-pc-qtl.yml` checks this workflow. It runs validation and a separate synthetic numerical scan inside the pinned upstream image. The numerical test checks recovery of a strong simulated association and chrY versus absent-chromosome filtering. It pulls the existing image; it does not build an image.
 
