@@ -58,3 +58,7 @@ The prepare scripts and workflows for eQTL, pQTL, and sQTL share this output pat
 - `ResidualizeNormalizedInputs`: Optional WDL toggle for eQTL, pQTL, and sQTL prepare workflows. When `true`, the workflow writes residualized BEDs for `.INT` and `.scaled` inputs; raw BEDs are not residualized.
 
 See the linked docs above for full input and output details.
+
+## Phenotype PC association scan
+
+[`phenotype_pc_qtl`](workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl) is a standalone two-step stage that converts selected covariate rows to PC phenotypes and runs tensorQTL trans with the remaining covariates. See [inputs, coordinate policy, and validation](docs/phenotype-pc-qtl.md).

@@ -160,3 +160,8 @@ workflow_groups:
   - paths: ["workflows/genotype/**"]
     stages: []
     policy: external_images_manual
+
+  # Inline helpers run in a pinned external tensorQTL image; no local image release.
+  - paths: ["workflows/phenotype_pc_qtl/**"]
+    stages: []
+    policy: external_images_manual
