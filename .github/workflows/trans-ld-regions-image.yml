@@ -1,0 +1,60 @@
+name: Build and test region image
+on:
+  push:
+    branches: [main]
+    paths: ['tools/trans_ld_regions/scripts/**']
+  pull_request:
+    branches: [main]
+    paths: ['tools/trans_ld_regions/scripts/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  trans_ld_image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install host WDL validator
+        run: python -m pip install miniwdl==1.15.0
+      - uses: docker/setup-buildx-action@v3
+      - name: Build pinned runtime for testing
+        uses: docker/build-push-action@v6
+        with:
+          context: tools/trans_ld_regions
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: trans-ld-regions:test
+      - name: Run real PLINK smoke tests in the image
+        run: |
+          set -euo pipefail
+          docker run --rm -e PLINK2=/opt/conda/bin/plink2 \
+            -v "$GITHUB_WORKSPACE:/work:ro" -w /work trans-ld-regions:test \
+            python3 -m unittest discover -s tests/trans_ld_regions -p test_ld.py -v
+          docker run --rm -v "$GITHUB_WORKSPACE:/work:ro" -w /work trans-ld-regions:test \
+            python3 -m unittest discover -s tests/trans_ld_regions -p test_regions.py -v
+      - name: Test localized WDL commands in the image
+        run: python3 tests/trans_ld_regions/smoke_wdl_container.py trans-ld-regions:test
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested image
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+        env:
+          REGION_REPOSITORY: ${{ github.repository }}
+          REGION_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          region_image="ghcr.io/${REGION_REPOSITORY,,}-trans-ld-regions:sha-${REGION_COMMIT}"
+          docker tag trans-ld-regions:test "$region_image"
+          docker push "$region_image"
+          echo "Published $region_image" >> "$GITHUB_STEP_SUMMARY"

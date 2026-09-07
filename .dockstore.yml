@@ -59,3 +59,7 @@ workflows:
   - subclass: WDL
     primaryDescriptorPath: /workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl
     name: phenotype_pc_qtl
+
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/genotype/trans_ld_regions.wdl
+    name: trans_ld_regions

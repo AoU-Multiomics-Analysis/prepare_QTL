@@ -1,0 +1,25 @@
+{
+  "TransLDRegions.genotypes": [
+    {
+      "chromosome": "1",
+      "format": "bed",
+      "genotype": "gs://YOUR_BUCKET/genotypes/chr1.bed",
+      "variants": "gs://YOUR_BUCKET/genotypes/chr1.bim",
+      "samples": "gs://YOUR_BUCKET/genotypes/chr1.fam"
+    }
+  ],
+  "TransLDRegions.association_files": ["gs://YOUR_BUCKET/trans/selected_associations.tsv.gz"],
+  "TransLDRegions.ancestry_samples": "gs://YOUR_BUCKET/metadata/ancestry_samples.tsv",
+  "TransLDRegions.chrom_sizes": "gs://YOUR_BUCKET/reference/GRCh38.fa.fai",
+  "TransLDRegions.genome_build": "GRCh38",
+  "TransLDRegions.pvalue_threshold": 1.0,
+  "TransLDRegions.docker_image": "ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions:sha-YOUR_COMMIT",
+  "TransLDRegions.default_modality": "splicing",
+  "TransLDRegions.maf_threshold": 0.01,
+  "TransLDRegions.r2_threshold": 0.1,
+  "TransLDRegions.initial_search_bp": 1000000,
+  "TransLDRegions.max_search_bp": 10000000,
+  "TransLDRegions.edge_bp": 100000,
+  "TransLDRegions.padding_bp": 100000,
+  "TransLDRegions.min_region_bp": 2000000
+}

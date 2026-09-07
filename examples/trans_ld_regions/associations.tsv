@@ -1,0 +1,3 @@
+variant_id	chrom	pos	phenotype_id	pval	modality	dataset_id	cell_type
+chr1_1000000_A_G	1	1000000	splice_event_1	1e-12	splicing	study_1	CD4
+chr1_1100000_C_T	1	1100000	splice_event_2	1e-11	splicing	study_1	CD4

@@ -1,0 +1,31 @@
+name: Validate Terra workflow
+on:
+  push:
+    paths: ['workflows/genotype/trans_ld_regions.wdl', 'tools/trans_ld_regions/scripts/**', 'tests/trans_ld_regions/**', 'examples/trans_ld_regions/**', '.github/workflows/trans-ld-regions-check.yml']
+  pull_request:
+    paths: ['workflows/genotype/trans_ld_regions.wdl', 'tools/trans_ld_regions/scripts/**', 'tests/trans_ld_regions/**', 'examples/trans_ld_regions/**', '.github/workflows/trans-ld-regions-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install WDL validator and file readers
+        run: python -m pip install miniwdl==1.15.0 pyarrow==19.0.1 zstandard==0.23.0
+      - name: Validate WDL and run unit regressions
+        run: |
+          set -euo pipefail
+          miniwdl check workflows/genotype/trans_ld_regions.wdl
+          python -m unittest discover -s tests/trans_ld_regions -v
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/womtool.jar" https://github.com/broadinstitute/cromwell/releases/download/87/womtool-87.jar
+          java -jar "$RUNNER_TEMP/womtool.jar" validate workflows/genotype/trans_ld_regions.wdl

@@ -31,6 +31,8 @@ prepare_QTL/
 - [Docker environment](docs/docker.md): Docker image location and included R package dependencies.
 - [Stage image releases](docs/image-release.md): Keep WDLs on `main` while testing and updating only the affected image digests; includes administrator setup and rollout limits.
 
+- [Trans-QTL LD regions](docs/trans-ld-regions.md): Ancestry-specific LD regions with a minimum width of 2 Mb.
+
 ## Main Workflows
 
 - [`workflows/expression/rnaseqc2_aggregate_batched.wdl`](workflows/expression/rnaseqc2_aggregate_batched.wdl): Aggregates individual RNA-SeQC GCT, metrics, and optional insert-size files in batches before a final cohort merge.
@@ -45,6 +47,8 @@ prepare_QTL/
 - [`workflows/genotype/prepare_VCF.wdl`](workflows/genotype/prepare_VCF.wdl): Prepares genotype data from an All of Us Hail MatrixTable.
 
 See the [workflow catalog](workflows/README.md) for public entry points, internal building blocks, and maintenance conventions.
+
+- [`workflows/genotype/trans_ld_regions.wdl`](workflows/genotype/trans_ld_regions.wdl): Defines conservative regions from trans associations and ancestry-specific PLINK LD.
 
 ## Common Options
 
