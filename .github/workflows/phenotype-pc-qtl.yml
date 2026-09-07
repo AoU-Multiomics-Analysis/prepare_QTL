@@ -1,0 +1,52 @@
+name: Check phenotype PC QTL workflow
+on:
+  push:
+    paths:
+      - 'workflows/phenotype_pc_qtl/**'
+      - 'tools/phenotype_pc_qtl/**'
+      - 'tests/phenotype_pc_qtl/**'
+      - '.github/workflows/phenotype-pc-qtl.yml'
+  pull_request:
+    paths:
+      - 'workflows/phenotype_pc_qtl/**'
+      - 'tools/phenotype_pc_qtl/**'
+      - 'tests/phenotype_pc_qtl/**'
+      - '.github/workflows/phenotype-pc-qtl.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install validator
+        run: python -m pip install miniwdl==1.15.0 PyYAML==6.0.2
+      - name: Validate WDL and run localization regression tests
+        run: |
+          set -euo pipefail
+          miniwdl check workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl
+          python -m unittest discover -s tests/phenotype_pc_qtl -v
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/womtool.jar" https://github.com/broadinstitute/cromwell/releases/download/87/womtool-87.jar
+          java -jar "$RUNNER_TEMP/womtool.jar" validate workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl
+  tensorqtl-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run synthetic CPU scan in the existing image
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint python3 \
+            -e OMP_NUM_THREADS=1 -e MKL_NUM_THREADS=1 \
+            -v "$GITHUB_WORKSPACE:/work:ro" -w /work \
+            gcr.io/broad-cga-francois-gtex/tensorqtl@sha256:f6efb9e592eb32c46cb75070be2769b34381d60cbb2709d2885771324abfe32a \
+            tests/phenotype_pc_qtl/smoke_tensorqtl.py

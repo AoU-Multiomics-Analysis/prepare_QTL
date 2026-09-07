@@ -48,3 +48,7 @@ Other existing `/tmp/` entrypoints are unchanged.
 
 No Terra run or local Docker build is part of this reorganization. Source tests
 and descriptor checks do not establish that the full workflow has run on Terra.
+
+## External phenotype PC scan
+
+`workflows/phenotype_pc_qtl/` is registered under `external_images_manual`, like the genotype workflows. It uses an existing pinned tensorQTL image and embeds its Python helpers in task commands. The editable helper sources are in `tools/phenotype_pc_qtl/`; they are not copied into a prepare_QTL image. This workflow stage needs no new image-release stage or Dockerfile. Dedicated CI checks helper synchronization, localization, and the existing image runtime.

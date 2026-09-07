@@ -14,6 +14,7 @@ implementation modules.
 | `proteomics/` | Olink normalization and protein-QTL preparation. |
 | `splicing/` | Splicing-QTL preparation. |
 | `methylation/` | Per-sample processing, cohort aggregation, connectivity analysis, annotation, and methylation-QTL outputs. |
+| `phenotype_pc_qtl/` | Genetic association scan of existing phenotype PCs using an external tensorQTL image. |
 | `genotype/` | VCF preparation, PLINK conversion, genotype PCs, allele frequencies, and dosage extraction. |
 
 ## Public entry points
@@ -30,6 +31,7 @@ implementation modules.
 | Methylation | `methylation/ProcessMethylationSample.wdl` | Per-sample Terra-table processing. |
 | Methylation | `methylation/AggregateMethylationCohort.wdl` | Cohort aggregation from one compact `CohortManifest`. |
 | Methylation | `methylation/merge_methylation.wdl` | Legacy source-BED manifest/shard entry point. |
+| Phenotype PC scan | `phenotype_pc_qtl/phenotype_pc_qtl.wdl` | Test phenotype PCs against genotypes while adjusting for remaining covariates. |
 | Genotypes | `genotype/prepare_VCF.wdl`, `genotype/convertVCF2Plink.wdl`, `genotype/calculateGenotypePCs.wdl`, `genotype/calculateAF.wdl`, `genotype/calculateGenotypeDosage.wdl` | Genotype preparation and derived outputs. |
 
 Every public entry point and the independently callable common helpers are

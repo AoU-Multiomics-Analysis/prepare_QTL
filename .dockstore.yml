@@ -55,3 +55,7 @@ workflows:
   - subclass: WDL 
     primaryDescriptorPath: /workflows/genotype/calculateAF.wdl
     name: calculateAF 
+
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl
+    name: phenotype_pc_qtl

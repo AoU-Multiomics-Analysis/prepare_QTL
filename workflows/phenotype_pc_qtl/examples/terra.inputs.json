@@ -1,0 +1,13 @@
+{
+  "PhenotypePCQTL.covariates": "gs://YOUR_BUCKET/combined_covariates.tsv",
+  "PhenotypePCQTL.phenotype_pc_ids": ["exprPC1", "exprPC2"],
+  "PhenotypePCQTL.plink_pgen": "gs://YOUR_BUCKET/genotypes.pgen",
+  "PhenotypePCQTL.plink_pvar": "gs://YOUR_BUCKET/genotypes.pvar",
+  "PhenotypePCQTL.plink_psam": "gs://YOUR_BUCKET/genotypes.psam",
+  "PhenotypePCQTL.placeholder_chromosome": "chrY",
+  "PhenotypePCQTL.maf_threshold": 0.05,
+  "PhenotypePCQTL.pval_threshold": 0.00001,
+  "PhenotypePCQTL.num_threads": 4,
+  "PhenotypePCQTL.memory_gb": 64,
+  "PhenotypePCQTL.disk_gb": 100
+}
