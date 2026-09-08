@@ -67,8 +67,8 @@ task ProcessProportions {
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mapping_args=()
-    if ~{if defined(cell_type_mapping) then "true" else "false"}; then
-      mapping_path='~{if defined(cell_type_mapping) then sub(select_first([cell_type_mapping]), "'", "'\"'\"'") else ""}'
+    mapping_path='~{if defined(cell_type_mapping) then sub(select_first([cell_type_mapping]), "'", "'\"'\"'") else ""}'
+    if [[ -n "$mapping_path" ]]; then
       test -r "$mapping_path" || { echo "Mapping localization error"; exit 1; }
       mapping_args=(--cell-type-mapping "$mapping_path")
     fi
