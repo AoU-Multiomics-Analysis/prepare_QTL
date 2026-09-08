@@ -27,8 +27,7 @@ class StageTestSelection(unittest.TestCase):
         plan = self.select(['cell_fit'], ['scripts/cell_type_specific_expression/fit/fit_tca.R'])
         self.assertEqual(plan['stages'], ['cell_fit'])
         self.assertFalse(plan['integration'])
-        self.assertEqual(plan['cell_tests']['cell_fit'],
-                         ['test-fit-cli.R', 'test-tca-stage.R', 'test-clean-model.R'])
+        self.assertEqual(plan['cell_tests']['cell_fit'], ['test-fit-cli.R'])
 
     def test_plot_change_does_not_fit_tca(self):
         plan = self.select(['cell_export', 'cell_downstream'], ['scripts/cell_type_specific_expression/R/qc.R'])
