@@ -41,7 +41,7 @@ stages:
       - scripts/cell_type_specific_expression/R/workflow_validation.R
   cell_fit:
     image: cell_type
-    runtime_tests: [test-fit-cli.R]
+    runtime_tests: [test-fit-cli.R, test-tca-stage.R, test-clean-model.R]
     script_roots: ["scripts/cell_type_specific_expression/fit"]
     sources:
       - scripts/cell_type_specific_expression/fit_tca.R

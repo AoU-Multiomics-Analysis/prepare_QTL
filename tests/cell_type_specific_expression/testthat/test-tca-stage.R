@@ -201,6 +201,20 @@ testthat::test_that("one model fits all genes without refitting weights", {
 
   testthat::expect_identical(result$model$W, data$W)
   testthat::expect_equal(dim(result$model$mus_hat), c(20L, 3L))
+  cfg <- config::get(file = system.file("extdata", "config.yml", package = "TCA"), use_parent = FALSE)
+  testthat::expect_true(all(result$model$mus_hat >= min(data$X) + cfg$mu_epsilon - 1e-7))
+  testthat::expect_true(all(result$model$mus_hat <= max(data$X) - cfg$mu_epsilon + 1e-7))
+  source(file.path(script_root, "fit", "variance_preflight.R"), local = .GlobalEnv)
+  screened <- screen_tca_variances(data$X, data$W, log_file = tempfile())
+  testthat::expect_true(nrow(screened$X) > 0L)
   testthat::expect_true(is.finite(result$model$tau_hat))
   testthat::expect_identical(rownames(result$X), rownames(data$X))
+})
+
+testthat::test_that("TCA constrains means while retaining least-squares variance", {
+  inputs <- make_tca_inputs()
+  args <- build_tca_fit_arguments(inputs$X, inputs$W, NULL, 1L, 10L, tempfile(), FALSE)
+  testthat::expect_true(args$constrain_mu)
+  testthat::expect_false(args$vars.mle)
+  testthat::expect_false(args$refit_W)
 })

@@ -208,3 +208,11 @@ testthat::test_that("cleanup CLI saves a final model consumed by the real export
   testthat::expect_identical(restarted$coordinates, exported$coordinates)
   testthat::expect_equal(restarted$cpm, exported$cpm)
 })
+
+testthat::test_that("constrained models allow absent optional p-values but require parameters", {
+  model <- cleanup_fixture()
+  model[c("deltas_hat_pvals", "gammas_hat_pvals", "gammas_hat_pvals.joint")] <- list(NULL, NULL, NULL)
+  testthat::expect_no_error(clean_tca_model(model))
+  model$mus_hat <- NULL
+  testthat::expect_error(clean_tca_model(model))
+})

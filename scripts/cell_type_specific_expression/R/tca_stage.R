@@ -162,7 +162,7 @@ build_tca_fit_arguments <- function(
     C2 = C2,
     refit_W = FALSE,
     vars.mle = FALSE,
-    constrain_mu = FALSE,
+    constrain_mu = TRUE,
     parallel = parallel,
     num_cores = num_cores,
     max_iters = max_iters,
@@ -198,7 +198,7 @@ fit_tca_stage <- function(
       paste0(
         "stage=tca event=fit_start scale=cpm genes=%d samples=%d ",
         "groups=%d covariates=%d excluded_constant_genes=%d ",
-        "num_cores=%d parallel=%s max_iters=%d random_seed=%d tca_version=%s"
+        "num_cores=%d parallel=%s max_iters=%d random_seed=%d tca_version=%s constrain_mu=true vars_mle=false"
       ),
       nrow(X),
       ncol(X),
