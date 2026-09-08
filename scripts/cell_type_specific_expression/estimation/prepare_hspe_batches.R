@@ -5,6 +5,7 @@ source(file.path(dirname(dirname(normalizePath(script_path))), "bootstrap.R"))
 
 tryCatch({
   options <- optparse::parse_args(optparse::OptionParser(option_list = list(
+    optparse::make_option("--cell-type-mapping", dest = "cell_type_mapping", type = "character", default = NULL),
     optparse::make_option("--expression", type = "character"),
     optparse::make_option("--gtf", type = "character"),
     optparse::make_option("--lm22", type = "character"),
@@ -28,7 +29,8 @@ tryCatch({
   bulk <- make_hspe_expression(expression, annotation, options$log2_pseudocount)
   inputs <- prepare_hspe_inputs(bulk$log_expression, read_lm22_matrix(options$lm22),
     min_overlap = options$min_overlap, quantile_normalize = options$quantile_normalize,
-    log2_pseudocount = options$log2_pseudocount)
+    log2_pseudocount = options$log2_pseudocount,
+    cell_type_mapping = read_cell_type_mapping(options$cell_type_mapping))
   prepared <- prepare_hspe_batches(inputs, options$batch_size,
                                    options$marker_fraction, options$random_seed)
   prepared$shared$metadata$log2_pseudocount <- options$log2_pseudocount

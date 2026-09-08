@@ -8,6 +8,7 @@ utc_time <- function() format(Sys.time(), tz = "UTC", usetz = TRUE)
 
 run_proportion_stage <- function() {
   option_list <- list(
+    optparse::make_option("--cell-type-mapping", dest = "cell_type_mapping", type = "character", default = NULL),
     optparse::make_option(
       "--proportions",
       type = "character",
@@ -61,7 +62,8 @@ run_proportion_stage <- function() {
   result <- process_proportions(
     proportions = proportions,
     mean_threshold = options$mean_threshold,
-    zero_floor = options$zero_floor
+    zero_floor = options$zero_floor,
+    cell_type_mapping = read_cell_type_mapping(options$cell_type_mapping)
   )
   message(sprintf(
     "stage=proportions output_dimensions=samples:%d combined_groups:%d retained_groups:%d",

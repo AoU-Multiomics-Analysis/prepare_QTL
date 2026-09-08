@@ -9,6 +9,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     File expression
     File gtf
     File lm22
+    File? cell_type_mapping
     File? precomputed_tca_model
     File? precomputed_proportions
     File? deconvolution_covariates
@@ -70,6 +71,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       expression = expression,
       gtf = gtf,
       lm22 = lm22,
+        cell_type_mapping = cell_type_mapping,
       precomputed_tca_model = precomputed_tca_model,
       precomputed_proportions = precomputed_proportions,
       covariates = deconvolution_covariates,

@@ -2,6 +2,7 @@ version 1.0
 
 task PrepareHspeBatches {
   input {
+    File? cell_type_mapping
     File expression
     Float log2_pseudocount
     File gtf
@@ -28,7 +29,14 @@ task PrepareHspeBatches {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
+    mapping_args=()
+    if ~{if defined(cell_type_mapping) then "true" else "false"}; then
+      mapping_path='~{if defined(cell_type_mapping) then sub(select_first([cell_type_mapping]), "'", "'\"'\"'") else ""}'
+      test -r "$mapping_path" || { echo "Mapping localization error"; exit 1; }
+      mapping_args=(--cell-type-mapping "$mapping_path")
+    fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/prepare_hspe_batches.R \
+      "${mapping_args[@]}" \
       --expression '~{expression}' \
       --gtf '~{gtf}' \
       --lm22 '~{lm22}' \
