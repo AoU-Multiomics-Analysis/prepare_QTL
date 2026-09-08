@@ -10,10 +10,12 @@ import yaml
 
 try:
     from ci.script_stages import source_patterns, validate_script_roots
+    from ci.task_dependencies import validate_task_dependencies
 except ModuleNotFoundError as error:
     if error.name != 'ci':
         raise
     from script_stages import source_patterns, validate_script_roots
+    from task_dependencies import validate_task_dependencies
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -67,7 +69,6 @@ def validate_registry(config, root):
             if stage not in config['stages']:
                 errors.append(f'Unknown stage: {stage}')
     errors.extend(validate_script_roots(config))
-    from task_dependencies import validate_task_dependencies
     errors.extend(validate_task_dependencies(config, root))
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
     errors.extend('Unmapped source/workflow: ' + path for path in
