@@ -24,7 +24,7 @@ screen_tca_variances <- function(X, W, C2 = NULL, log_file) {
   if (is.null(C2)) C2 <- matrix(numeric(), n, 0L)
   W_norms <- rowSums(W^2)^0.5
   # Same first-update designs, bounds and column normalization as
-  # TCA:::tca.fit_means_vars with vars.mle=FALSE and constrain_mu=FALSE.
+  # TCA:::tca.fit_means_vars with vars.mle=FALSE and constrain_mu=TRUE.
   design <- cbind(W / t(pracma::repmat(W_norms, k, 1)),
                   if (ncol(C2)) C2 / t(pracma::repmat(W_norms, ncol(C2), 1)) else C2)
   variance_design <- cbind(W^2, rep(1, n))
@@ -37,10 +37,12 @@ screen_tca_variances <- function(X, W, C2 = NULL, log_file) {
       stop(sprintf("TCA preflight gene=%s phase=%s solver error: %s", gene, phase, conditionMessage(error)), call. = FALSE)
     })
   }
+  mean_lower <- c(rep(min(X) + cfg$mu_epsilon, k), rep(-cfg$lsqlincon_inf, ncol(C2)))
+  mean_upper <- c(rep(max(X) - cfg$mu_epsilon, k), rep(cfg$lsqlincon_inf, ncol(C2)))
   coefficients <- t(vapply(seq_len(nrow(X)), function(j) {
     gene <- rownames(X)[j]
     mean_coefficients <- solve_gene(gene, "mean", design, X[j, ] / W_norms,
-      lb = rep(-cfg$lsqlincon_inf, ncol(design)), ub = rep(cfg$lsqlincon_inf, ncol(design)))
+      lb = mean_lower, ub = mean_upper)
     if (any(!is.finite(mean_coefficients))) {
       stop(sprintf("TCA preflight gene=%s phase=mean solver returned non-finite coefficients", gene), call. = FALSE)
     }
