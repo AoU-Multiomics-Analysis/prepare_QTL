@@ -1,13 +1,13 @@
 version 1.0
 
-
 workflow MergeCovariates {
     input {
+        String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         File GenotypePCs
         String OutputPrefix
         String OutputSuffix = ""
         File MolecularPCs
-        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
         Int preemptible_attempts = 2
         Int max_retries = 2
     }
@@ -18,7 +18,7 @@ workflow MergeCovariates {
             OutputPrefix = OutputPrefix,
             OutputSuffix = OutputSuffix,
             MolecularPCs = MolecularPCs,
-            DockerImage = DockerImage,
+            DockerImage = mergecovariates__merge_covariatesr_image,
             preemptible_attempts = preemptible_attempts,
             max_retries = max_retries
     }
@@ -28,7 +28,6 @@ workflow MergeCovariates {
 
     }
 }
-
 
 task MergeCovariatesR {
     input {
@@ -41,7 +40,7 @@ task MergeCovariatesR {
         Int max_retries = 2
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         stage="merge_covariates"
         printf 'stage=%s start_time=%s dimensions=pending outputs=%s\n' \
@@ -67,7 +66,5 @@ task MergeCovariatesR {
         output {
             File QtlCovariates = "~{OutputPrefix}_QTL_covariates~{OutputSuffix}.tsv"
         }
-
-
 
 }

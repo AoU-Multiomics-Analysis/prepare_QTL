@@ -12,7 +12,7 @@ task PrepareHspeBatches {
     Int batch_size = 100
     Boolean quantile_normalize = false
     Int random_seed = 20260901
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     Int cpu = 4
     String memory = "32 GB"
     Int disk_gb = 100
@@ -22,7 +22,7 @@ task PrepareHspeBatches {
 
   String quantile_normalize_argument = if quantile_normalize then "--quantile-normalize" else ""
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="prepare_hspe_batches"
     log="$stage.log"
@@ -76,13 +76,13 @@ task RunHspeBatch {
   input {
     File prepared
     File batch
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     String memory = "4 GB"
     Int disk_gb = 10
     Int preemptible_attempts = 2
     Int max_retries = 2
   }
-  command <<<
+command <<<
     set -euo pipefail
     stage="run_hspe_batch"
     log="$stage.log"
@@ -115,14 +115,14 @@ task MergeHspeBatches {
     Array[File] batch_results
     File preparation_log
     Array[File] batch_logs
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     Int cpu = 2
     String memory = "16 GB"
     Int disk_gb = 50
     Int preemptible_attempts = 2
     Int max_retries = 2
   }
-  command <<<
+command <<<
     set -euo pipefail
     stage="merge_hspe_batches"
     log="run_hspe.log"

@@ -37,15 +37,15 @@ class ModelRestartSmokeTest(unittest.TestCase):
                 beds.append(str(bed))
             parameters = root / 'parameters.json'
             parameters.write_text(json.dumps({'proportion_mode': 'precomputed_model'}))
-            images = {'fit': 'fit-digest', 'export': 'export-digest', 'qtl': 'qtl-digest'}
-            baseline = {prefix + 'tca_model': 'model.rds', prefix + 'stage_images': images,
+            images = {'tca__fit_tca': 'fit-digest', 'tca__export_tca_beds': 'export-digest', 'prepare_eqtl__eqtl_prepare_expression': 'qtl-digest'}
+            baseline = {prefix + 'tca_model': 'model.rds', prefix + 'task_images': images,
                         prefix + 'cell_type_beds': beds, prefix + 'filtered_cell_type_beds': beds}
             result = {'CellTypeDeconvolution.' + name: None for name in (
                 'estimated_proportions', 'tca_model_unfiltered', 'fit_tca_log',
                 'proportions_lm22', 'proportions_combined', 'gene_type_filter_log')}
             result.update({'CellTypeDeconvolution.cell_type_beds': beds,
                            'CellTypeDeconvolution.filtered_cell_type_beds': beds,
-                           'CellTypeDeconvolution.stage_images': {k: v for k, v in images.items() if k != 'qtl'},
+                           'CellTypeDeconvolution.task_images': {k: v for k, v in images.items() if k != 'prepare_eqtl__eqtl_prepare_expression'},
                            'CellTypeDeconvolution.effective_parameters_file': str(parameters)})
             baseline_path, inputs_path = root / 'baseline.json', root / 'inputs.json'
             baseline_path.write_text(json.dumps(baseline))

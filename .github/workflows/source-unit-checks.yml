@@ -63,8 +63,8 @@ jobs:
           text = Path('workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl').read_text()
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               for key, name, repository in (
-                  ('cell', 'fit_docker_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression'),
-                  ('standard', 'qtl_docker_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl'),
+                  ('cell', 'tca__fit_tca_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression'),
+                  ('standard', 'prepare_eqtl__eqtl_prepare_expression_image', 'ghcr.io/aou-multiomics-analysis/prepare_qtl'),
               ):
                   value = literal_span(text, name)[2]
                   validate_image(value, repository)

@@ -4,8 +4,6 @@ import "../common/calculate_phenotypePCs.wdl" as ComputePCs
 import "../common/MergeCovariates.wdl" as CovariateMerge
 import "../common/ResidualizePhenotypes.wdl" as Residualize
 
-
-
 task eqtl_prepare_expression {
     input {
         File? CountGCT
@@ -15,7 +13,6 @@ task eqtl_prepare_expression {
         File SampleList
         String OutputPrefix
 
-
         Int memory
         Int disk_space
         Int num_threads
@@ -24,7 +21,7 @@ task eqtl_prepare_expression {
         Int max_retries = 2
 
         }
-    command {
+command {
         set -euo pipefail
         stage="eqtl_prepare_expression"
         printf 'stage=%s start_time=%s dimensions=pending outputs=%s\n' \
@@ -61,6 +58,10 @@ task eqtl_prepare_expression {
 
 workflow eQTLPrepareData {
     input {
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String prepare_eqtl__eqtl_prepare_expression_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String residualizephenotypes__residualize_phenotypes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String OutputPrefix
         File? CountGCT
         File? AnnotationGTF
@@ -73,7 +74,7 @@ workflow eQTLPrepareData {
         Int memory
         Int disk_space
         Int num_threads
-        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
         Int preemptible_attempts = 2
         Int max_retries = 2
 
@@ -84,7 +85,7 @@ workflow eQTLPrepareData {
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
-            DockerImage = DockerImage,
+            DockerImage = prepare_eqtl__eqtl_prepare_expression_image,
             preemptible_attempts = preemptible_attempts,
             max_retries = max_retries,
             CountGCT  = CountGCT,
@@ -96,26 +97,30 @@ workflow eQTLPrepareData {
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = eqtl_prepare_expression.IntExpressionBed,
             OutputPrefix = OutputPrefix + ".expression",
             OutputSuffix = ".INT",
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
-            DockerImage = DockerImage,
+
             preemptible_attempts = preemptible_attempts,
             max_retries = max_retries
     }
 
     call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = eqtl_prepare_expression.ScaledExpressionBed,
             OutputPrefix = OutputPrefix + ".expression",
             OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
-            DockerImage = DockerImage,
+
             preemptible_attempts = preemptible_attempts,
             max_retries = max_retries
     }
@@ -123,22 +128,26 @@ workflow eQTLPrepareData {
     if (defined(AdditionalCovariates)) {
         call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
             input:
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".expression",
                 OutputSuffix = ".INT",
-                DockerImage = DockerImage,
+
                 preemptible_attempts = preemptible_attempts,
                 max_retries = max_retries
         }
 
         call CovariateMerge.MergeCovariates as MergeScaledAdditionalCovariates {
             input:
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".expression",
                 OutputSuffix = ".scaled",
-                DockerImage = DockerImage,
+
                 preemptible_attempts = preemptible_attempts,
                 max_retries = max_retries
         }
@@ -153,7 +162,7 @@ workflow eQTLPrepareData {
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads,
-                DockerImage = DockerImage,
+                DockerImage = residualizephenotypes__residualize_phenotypes_image,
                 preemptible_attempts = preemptible_attempts,
                 max_retries = max_retries
         }
@@ -166,7 +175,7 @@ workflow eQTLPrepareData {
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads,
-                DockerImage = DockerImage,
+                DockerImage = residualizephenotypes__residualize_phenotypes_image,
                 preemptible_attempts = preemptible_attempts,
                 max_retries = max_retries
         }

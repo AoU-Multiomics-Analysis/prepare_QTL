@@ -11,17 +11,28 @@ import "tasks/filter_scatter.wdl" as filter_scatter_tasks
 
 workflow CellTypeDeconvolution {
   input {
-    File expression
+    String expression__filter_expression_genes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String filter_scatter__filter_cell_type_bed_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String filter_scatter__merge_filter_reports_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String gene_summary__summarize_cell_type_beds_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String hspe__merge_hspe_batches_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String hspe__prepare_hspe_batches_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String hspe__run_hspe_batch_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String proportions__process_proportions_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String proportions__validate_proportion_mode_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String qc__build_manifest_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String reference_filter__prepare_haemopedia_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+        String tca__clean_tca_model_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
+        String tca__export_tca_beds_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
+        String tca__fit_tca_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
+        File expression
     File gtf
     File lm22
     File? cell_type_mapping
     File? precomputed_tca_model
     File? precomputed_proportions
     File? covariates
-    String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
-    String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
-    String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
-    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+
     Int preemptible_attempts = 2
     Int max_retries = 2
     Float min_lm22_overlap = 0.80
@@ -68,7 +79,7 @@ workflow CellTypeDeconvolution {
         gtf = gtf,
         gene_type = gene_type,
         log2_pseudocount = log2_pseudocount,
-        docker_image = estimation_docker_image,
+        docker_image = expression__filter_expression_genes_image,
         cpu = hspe_cpu,
         memory = hspe_memory,
         disk_gb = hspe_disk_gb,
@@ -79,7 +90,7 @@ workflow CellTypeDeconvolution {
     call proportion_tasks.ValidateProportionMode {
       input:
         precomputed_proportions = precomputed_proportions,
-        docker_image = estimation_docker_image,
+        docker_image = proportions__validate_proportion_mode_image,
         preemptible_attempts = preemptible_attempts,
         max_retries = max_retries
     }
@@ -103,7 +114,7 @@ workflow CellTypeDeconvolution {
         batch_size = hspe_batch_size,
         quantile_normalize = hspe_quantile_normalize,
         random_seed = random_seed,
-        docker_image = estimation_docker_image,
+        docker_image = hspe__prepare_hspe_batches_image,
         cpu = hspe_cpu,
         memory = hspe_memory,
         disk_gb = hspe_disk_gb,
@@ -115,7 +126,7 @@ workflow CellTypeDeconvolution {
         input:
           prepared = PrepareHspeBatches.prepared,
           batch = batch,
-          docker_image = estimation_docker_image,
+          docker_image = hspe__run_hspe_batch_image,
           memory = hspe_batch_memory,
           disk_gb = hspe_batch_disk_gb,
           preemptible_attempts = preemptible_attempts,
@@ -128,7 +139,7 @@ workflow CellTypeDeconvolution {
         batch_results = RunHspeBatch.result,
         preparation_log = PrepareHspeBatches.log,
         batch_logs = RunHspeBatch.log,
-        docker_image = estimation_docker_image,
+        docker_image = hspe__merge_hspe_batches_image,
         cpu = proportions_cpu,
         memory = proportions_memory,
         disk_gb = proportions_disk_gb,
@@ -148,7 +159,7 @@ workflow CellTypeDeconvolution {
         proportions = proportions_for_processing,
         mean_threshold = group_mean_threshold,
         zero_floor = zero_floor,
-        docker_image = estimation_docker_image,
+        docker_image = proportions__process_proportions_image,
         cpu = proportions_cpu,
         memory = proportions_memory,
         disk_gb = proportions_disk_gb,
@@ -164,7 +175,7 @@ workflow CellTypeDeconvolution {
         max_iters = tca_max_iters,
         random_seed = random_seed,
         parallel = tca_parallel,
-        docker_image = fit_docker_image,
+        docker_image = tca__fit_tca_image,
         cpu = fit_cpu,
         memory = fit_memory,
         disk_gb = fit_disk_gb,
@@ -181,7 +192,7 @@ workflow CellTypeDeconvolution {
     input:
       unfiltered_model = select_first([precomputed_tca_model, FitTca.model]),
       reuse_model = defined(precomputed_tca_model),
-      docker_image = fit_docker_image,
+      docker_image = tca__clean_tca_model_image,
       preemptible_attempts = preemptible_attempts,
       max_retries = max_retries
   }
@@ -194,7 +205,7 @@ workflow CellTypeDeconvolution {
       covariates = fit_covariates,
       reuse_model = defined(precomputed_tca_model),
       parallel = tca_parallel,
-      docker_image = export_docker_image,
+      docker_image = tca__export_tca_beds_image,
       cpu = export_cpu,
       memory = export_memory,
       disk_gb = export_disk_gb,
@@ -206,7 +217,7 @@ workflow CellTypeDeconvolution {
     input:
       cell_type_beds = ExportTcaBeds.cell_type_beds,
       cell_type_bed_inventory = ExportTcaBeds.cell_type_bed_inventory,
-      docker_image = downstream_docker_image,
+      docker_image = gene_summary__summarize_cell_type_beds_image,
       memory = gene_summary_memory,
       disk_gb = export_disk_gb,
       preemptible_attempts = preemptible_attempts,
@@ -217,7 +228,7 @@ workflow CellTypeDeconvolution {
     call reference_filter_tasks.PrepareHaemopedia {
       input:
         counts = select_first([haemopedia_counts]),
-        docker_image = downstream_docker_image,
+        docker_image = reference_filter__prepare_haemopedia_image,
         memory = gene_summary_memory,
         disk_gb = export_disk_gb,
         preemptible_attempts = preemptible_attempts,
@@ -233,7 +244,7 @@ workflow CellTypeDeconvolution {
         reference_summary = PrepareHaemopedia.summary,
         min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
         residual_cutoff = reference_residual_cutoff,
-        docker_image = downstream_docker_image,
+        docker_image = filter_scatter__filter_cell_type_bed_image,
         memory = gene_summary_memory,
         disk_gb = export_disk_gb,
         preemptible_attempts = preemptible_attempts,
@@ -250,7 +261,7 @@ workflow CellTypeDeconvolution {
       samples = FilterCellTypeBed.sample_ids,
       logs = FilterCellTypeBed.log,
       post_residual = defined(reference_residual_cutoff),
-      docker_image = downstream_docker_image,
+      docker_image = filter_scatter__merge_filter_reports_image,
       memory = gene_summary_memory,
       disk_gb = 20,
       preemptible_attempts = preemptible_attempts,
@@ -283,8 +294,8 @@ workflow CellTypeDeconvolution {
       random_seed = random_seed,
       scale = "cpm",
       tca_version = tca_version,
-      container_image = downstream_docker_image,
-      docker_image = downstream_docker_image,
+      container_image = qc__build_manifest_image,
+      docker_image = qc__build_manifest_image,
       cpu = manifest_cpu,
       memory = manifest_memory,
       disk_gb = manifest_disk_gb,
@@ -293,11 +304,21 @@ workflow CellTypeDeconvolution {
   }
 
   output {
-    Map[String, String] stage_images = {
-      "estimation": estimation_docker_image,
-      "fit": fit_docker_image,
-      "export": export_docker_image,
-      "downstream": downstream_docker_image
+    Map[String, String] task_images = {
+      "expression__filter_expression_genes": expression__filter_expression_genes_image,
+      "filter_scatter__filter_cell_type_bed": filter_scatter__filter_cell_type_bed_image,
+      "filter_scatter__merge_filter_reports": filter_scatter__merge_filter_reports_image,
+      "gene_summary__summarize_cell_type_beds": gene_summary__summarize_cell_type_beds_image,
+      "hspe__merge_hspe_batches": hspe__merge_hspe_batches_image,
+      "hspe__prepare_hspe_batches": hspe__prepare_hspe_batches_image,
+      "hspe__run_hspe_batch": hspe__run_hspe_batch_image,
+      "proportions__process_proportions": proportions__process_proportions_image,
+      "proportions__validate_proportion_mode": proportions__validate_proportion_mode_image,
+      "qc__build_manifest": qc__build_manifest_image,
+      "reference_filter__prepare_haemopedia": reference_filter__prepare_haemopedia_image,
+      "tca__clean_tca_model": tca__clean_tca_model_image,
+      "tca__export_tca_beds": tca__export_tca_beds_image,
+      "tca__fit_tca": tca__fit_tca_image
     }
     File filtered_expression = export_expression
     File? gene_type_filter_report = FilterExpressionGenes.report

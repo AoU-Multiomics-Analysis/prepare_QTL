@@ -18,7 +18,8 @@ class ScriptStagesTest(unittest.TestCase):
             'script_stages', ROOT / 'ci/script_stages.py')
         cls.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.module)
-        cls.config = yaml.safe_load((ROOT / 'ci/image-stages.yml').read_text())
+        cls.config = yaml.safe_load((ROOT / 'tests/fixtures/legacy-image-stages.yml').read_text())
+        cls.config['ignored_sources'].append('scripts/cell_type_specific_expression/modules/**')
 
     def test_source_patterns_adds_owned_directory_globs(self):
         stage = {

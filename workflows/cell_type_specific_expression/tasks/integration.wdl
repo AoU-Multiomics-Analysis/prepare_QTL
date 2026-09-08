@@ -6,7 +6,7 @@ task PrepareScatterInputs {
     Array[File] cell_type_beds
     File? sample_list
     String output_prefix
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     Int cpu = 1
     String memory = "4 GB"
     Int disk_gb = 20
@@ -16,7 +16,7 @@ task PrepareScatterInputs {
 
   File output_prefix_file = write_lines([output_prefix])
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="prepare_scatter_inputs"
     log="$stage.log"
@@ -89,7 +89,7 @@ task BuildQtlManifest {
     String negative_summary
     String gene_comparison
     String filter_metrics
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     Int cpu = 1
     String memory = "4 GB"
     Int disk_gb = 20
@@ -100,7 +100,7 @@ task BuildQtlManifest {
   File source_inventory_path_file = write_lines([source_bed_inventory])
   File filtered_inventory_path_file = write_lines([filtered_bed_inventory])
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="build_qtl_manifest"
     log="$stage.log"

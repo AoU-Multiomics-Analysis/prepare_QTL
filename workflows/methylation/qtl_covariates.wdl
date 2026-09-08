@@ -6,35 +6,39 @@ import "../common/MergeCovariates.wdl" as CovariateMerge
 
 workflow PrepareMethylationQtlCovariates {
     input {
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         File IntMethylationBed
         File? AdditionalCovariates
         String OutputPrefix
         Int PcMemoryGB
         Int PcDiskGB
         Int NumThreads
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = IntMethylationBed,
             OutputPrefix = OutputPrefix + ".methylation",
             OutputSuffix = ".INT",
             memory = PcMemoryGB,
             disk_space = PcDiskGB,
-            num_threads = NumThreads,
-            DockerImage = methylation_docker_image
-    }
+            num_threads = NumThreads
+  }
 
     if (defined(AdditionalCovariates)) {
         call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
             input:
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".methylation",
-                OutputSuffix = ".INT",
-                DockerImage = methylation_docker_image
-        }
+                OutputSuffix = ".INT"
+  }
     }
 
     output {

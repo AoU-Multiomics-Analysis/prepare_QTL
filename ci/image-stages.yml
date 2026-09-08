@@ -1,167 +1,765 @@
-# Shared dependency policy for reports and the opt-in trusted release workflow.
 version: 1
 images:
   cell_type:
     dockerfile: envs/CellTypeSpecificExpression/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression
-    build_paths: ["scripts/cell_type_specific_expression/**", "envs/CellTypeSpecificExpression/**", ".dockerignore"]
-    environment_paths: ["envs/CellTypeSpecificExpression/**", ".dockerignore"]
+    build_paths:
+    - scripts/cell_type_specific_expression/**
+    - envs/CellTypeSpecificExpression/**
+    - .dockerignore
+    environment_paths:
+    - envs/CellTypeSpecificExpression/**
+    - .dockerignore
   standard:
     dockerfile: envs/PhenotypePCs/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl
-    build_paths: ["scripts/**", "envs/PhenotypePCs/**", ".dockerignore"]
-    environment_paths: ["envs/PhenotypePCs/**", ".dockerignore"]
+    build_paths:
+    - scripts/**
+    - envs/PhenotypePCs/**
+    - .dockerignore
+    environment_paths:
+    - envs/PhenotypePCs/**
+    - .dockerignore
   methylation_rust:
     dockerfile: envs/MethylationRust/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust
-    build_paths: ["rust/methylation_filter/**", "rust/methylation_merge/**", "envs/MethylationRust/**", ".dockerignore"]
-    environment_paths: ["envs/MethylationRust/**", ".dockerignore"]
+    build_paths:
+    - rust/methylation_filter/**
+    - rust/methylation_merge/**
+    - envs/MethylationRust/**
+    - .dockerignore
+    environment_paths:
+    - envs/MethylationRust/**
+    - .dockerignore
   rnaseqc:
     dockerfile: envs/RNASeQCAggregation/Dockerfile
     repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation
-    build_paths: ["scripts/expression/merge_rnaseqc.py", "scripts/expression/rnaseqc/**", "envs/RNASeQCAggregation/**", ".dockerignore"]
-    environment_paths: ["envs/RNASeQCAggregation/**", ".dockerignore"]
-
+    build_paths:
+    - scripts/expression/rnaseqc/**
+    - envs/RNASeQCAggregation/**
+    - .dockerignore
+    environment_paths:
+    - envs/RNASeQCAggregation/**
+    - .dockerignore
+  trans_ld:
+    dockerfile: tools/trans_ld_regions/Dockerfile
+    context: tools/trans_ld_regions
+    repository: ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions
+    build_paths:
+    - tools/trans_ld_regions/**
+    environment_paths:
+    - tools/trans_ld_regions/Dockerfile
+    - tools/trans_ld_regions/environment.yml
 stages:
-  # Legacy entrypoints remain mapped while Git reports their deletion during migration.
-  cell_estimation:
-    image: cell_type
-    runtime_tests: [test-hspe-batches.R]
-    script_roots: ["scripts/cell_type_specific_expression/estimation"]
+  prepare_sqtl__prepare_splice_data:
+    image: standard
+    task:
+      path: workflows/splicing/prepare_sQTL.wdl
+      name: PrepareSpliceData
+    test_group: splicing
     sources:
-      - scripts/cell_type_specific_expression/filter_expression_genes.R
-      - scripts/cell_type_specific_expression/validate_proportion_mode.R
-      - scripts/cell_type_specific_expression/process_proportions.R
-      - scripts/cell_type_specific_expression/prepare_hspe_batches.R
-      - scripts/cell_type_specific_expression/run_hspe_batch.R
-      - scripts/cell_type_specific_expression/run_hspe.R
-      - scripts/cell_type_specific_expression/merge_hspe_batches.R
-      - scripts/cell_type_specific_expression/R/hspe*.R
-      - scripts/cell_type_specific_expression/R/proportions.R
-      - scripts/cell_type_specific_expression/R/workflow_validation.R
-  cell_fit:
-    image: cell_type
-    runtime_tests: [test-fit-cli.R]
-    script_roots: ["scripts/cell_type_specific_expression/fit"]
+    - scripts/splicing/PrepareSpliceData.R
+  cohort_aggregation__prepare_methylation_cohort_manifest:
+    image: standard
+    task:
+      path: workflows/methylation/cohort_aggregation.wdl
+      name: PrepareMethylationCohortManifest
+    test_group: methylation
     sources:
-      - scripts/cell_type_specific_expression/fit_tca.R
-      - scripts/cell_type_specific_expression/clean_tca_model.R
-      - scripts/cell_type_specific_expression/R/tca_stage.R
-      - scripts/cell_type_specific_expression/R/model_cleanup.R
-      - scripts/cell_type_specific_expression/R/model_restart.R
-  cell_export:
-    image: cell_type
-    runtime_tests: [test-bed-outputs.R]
-    script_roots: ["scripts/cell_type_specific_expression/export"]
+    - scripts/methylation/PrepareMethylationCohortManifest.R
+  cohort_aggregation__build_methylation_cohort_samples:
+    image: standard
+    task:
+      path: workflows/methylation/cohort_aggregation.wdl
+      name: BuildMethylationCohortSamples
+    test_group: methylation
     sources:
-      - scripts/cell_type_specific_expression/export_tca_beds.R
-      - scripts/cell_type_specific_expression/R/bed_outputs.R
-      - scripts/cell_type_specific_expression/R/model_cleanup.R
-      - scripts/cell_type_specific_expression/R/model_restart.R
-      - scripts/cell_type_specific_expression/R/tca_stage.R
-      - scripts/cell_type_specific_expression/R/qc.R
-  cell_downstream:
-    image: cell_type
-    runtime_tests: [test-reference-filter.R]
-    script_roots: ["scripts/cell_type_specific_expression/downstream"]
-    sources:
-      - scripts/cell_type_specific_expression/summarize_cell_type_beds.R
-      - scripts/cell_type_specific_expression/prepare_haemopedia.R
-      - scripts/cell_type_specific_expression/filter_cell_type_beds.R
-      - scripts/cell_type_specific_expression/build_deconvolution_manifest.R
-      - scripts/cell_type_specific_expression/build_qtl_manifest.R
-      - scripts/cell_type_specific_expression/prepare_scatter_inputs.R
-      - scripts/cell_type_specific_expression/R/reference*.R
-      - scripts/cell_type_specific_expression/R/gene_summary.R
-      - scripts/cell_type_specific_expression/R/integration.R
-      - scripts/cell_type_specific_expression/R/qc.R
-      - scripts/cell_type_specific_expression/R/model_restart.R
-      - scripts/cell_type_specific_expression/R/bed_outputs.R
-      - scripts/cell_type_specific_expression/R/tca_stage.R
-  expression:
-    image: standard
-    sources: ["scripts/expression/PrepareExpression.R"]
-    script_roots: ["scripts/expression/prepare"]
-  common:
-    image: standard
-  proteomics:
-    image: standard
-    script_roots: ["scripts/proteomics"]
-  splicing:
-    image: standard
-    script_roots: ["scripts/splicing"]
-  methylation:
-    image: standard
-    script_roots: ["scripts/methylation"]
-  methylation_rust:
+    - scripts/methylation/BuildMethylationCohortSamples.R
+    - scripts/methylation/MethylationUtils.R
+  cohort_aggregation__merge_methylation_chromosome:
     image: methylation_rust
-    script_roots: ["rust/methylation_filter", "rust/methylation_merge"]
-    sources: ["rust/methylation_filter/**", "rust/methylation_merge/**"]
-  rnaseqc:
+    task:
+      path: workflows/methylation/cohort_aggregation.wdl
+      name: MergeMethylationChromosome
+    test_group: methylation_rust
+    sources:
+    - rust/methylation_merge/**
+  cohort_aggregation__aggregate_methylation_chromosomes:
+    image: standard
+    task:
+      path: workflows/methylation/cohort_aggregation.wdl
+      name: AggregateMethylationChromosomes
+    test_group: methylation
+    sources:
+    - scripts/methylation/AggregateMethylationChromosomes.R
+    - scripts/methylation/MethylationUtils.R
+  processmethylationsample__filter_methylation_sample:
+    image: methylation_rust
+    task:
+      path: workflows/methylation/ProcessMethylationSample.wdl
+      name: FilterMethylationSample
+    test_group: methylation_rust
+    sources:
+    - rust/methylation_filter/**
+  annotation__annotate_methylation_sites:
+    image: standard
+    task:
+      path: workflows/methylation/annotation.wdl
+      name: AnnotateMethylationSites
+    test_group: methylation
+    sources:
+    - scripts/methylation/AnnotateMethylationSites.R
+  merge_methylation__shard_methylation_manifest:
+    image: standard
+    task:
+      path: workflows/methylation/merge_methylation.wdl
+      name: ShardMethylationManifest
+    test_group: methylation
+    sources: []
+  merge_methylation__filter_methylation_shard:
+    image: standard
+    task:
+      path: workflows/methylation/merge_methylation.wdl
+      name: FilterMethylationShard
+    test_group: methylation
+    sources:
+    - scripts/methylation/FilterMethylationShard.R
+    - scripts/methylation/MethylationUtils.R
+  connectivity__build_methylation_correlation_covariates:
+    image: standard
+    task:
+      path: workflows/methylation/connectivity.wdl
+      name: BuildMethylationCorrelationCovariates
+    test_group: methylation
+    sources:
+    - scripts/methylation/BuildMethylationCorrelationCovariates.R
+  connectivity__analyze_methylation_cpg_correlation:
+    image: standard
+    task:
+      path: workflows/methylation/connectivity.wdl
+      name: AnalyzeMethylationCpGCorrelation
+    test_group: methylation
+    sources:
+    - scripts/methylation/AnalyzeMethylationCpGCorrelation.R
+  connectivity__finalize_methylation_connectivity:
+    image: standard
+    task:
+      path: workflows/methylation/connectivity.wdl
+      name: FinalizeMethylationConnectivity
+    test_group: methylation
+    sources:
+    - scripts/methylation/FinalizeMethylationConnectivity.R
+  aggregatemethylationcohortarrays__build_methylation_cohort_samples:
+    image: standard
+    task:
+      path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      name: BuildMethylationCohortSamples
+    test_group: methylation
+    sources:
+    - scripts/methylation/BuildMethylationCohortSamples.R
+    - scripts/methylation/MethylationUtils.R
+  aggregatemethylationcohortarrays__merge_methylation_chromosome:
+    image: standard
+    task:
+      path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      name: MergeMethylationChromosome
+    test_group: methylation
+    sources:
+    - scripts/methylation/MergeMethylationCohort.R
+    - scripts/methylation/MethylationUtils.R
+  aggregatemethylationcohortarrays__build_methylation_correlation_covariates:
+    image: standard
+    task:
+      path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      name: BuildMethylationCorrelationCovariates
+    test_group: methylation
+    sources:
+    - scripts/methylation/BuildMethylationCorrelationCovariates.R
+  aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation:
+    image: standard
+    task:
+      path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      name: AnalyzeMethylationCpGCorrelation
+    test_group: methylation
+    sources:
+    - scripts/methylation/AnalyzeMethylationCpGCorrelation.R
+  aggregatemethylationcohortarrays__aggregate_methylation_chromosomes:
+    image: standard
+    task:
+      path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      name: AggregateMethylationChromosomes
+    test_group: methylation
+    sources:
+    - scripts/methylation/AggregateMethylationChromosomes.R
+    - scripts/methylation/MethylationUtils.R
+  aggregatemethylationcohortarrays__finalize_methylation_connectivity:
+    image: standard
+    task:
+      path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      name: FinalizeMethylationConnectivity
+    test_group: methylation
+    sources:
+    - scripts/methylation/FinalizeMethylationConnectivity.R
+  aggregatemethylationcohortarrays__annotate_methylation_sites:
+    image: standard
+    task:
+      path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+      name: AnnotateMethylationSites
+    test_group: methylation
+    sources:
+    - scripts/methylation/AnnotateMethylationSites.R
+  prepare_mqtl__prepare_methylation_data:
+    image: standard
+    task:
+      path: workflows/methylation/prepare_mQTL.wdl
+      name: PrepareMethylationData
+    test_group: methylation
+    sources:
+    - scripts/methylation/PrepareMethylation.R
+  calculate_phenotypepcs__computep_cs:
+    image: standard
+    task:
+      path: workflows/common/calculate_phenotypePCs.wdl
+      name: ComputePCs
+    test_group: common
+    sources:
+    - scripts/common/PCOutputUtils.R
+    - scripts/common/calculate_PCs.R
+  mergecovariates__merge_covariatesr:
+    image: standard
+    task:
+      path: workflows/common/MergeCovariates.wdl
+      name: MergeCovariatesR
+    test_group: common
+    sources:
+    - scripts/common/MergeCovariates.R
+  residualizephenotypes__residualize_phenotypes:
+    image: standard
+    task:
+      path: workflows/common/ResidualizePhenotypes.wdl
+      name: ResidualizePhenotypes
+    test_group: common
+    sources:
+    - scripts/common/ResidualizePhenotypes.R
+  prepare_eqtl__eqtl_prepare_expression:
+    image: standard
+    task:
+      path: workflows/expression/prepare_eQTL.wdl
+      name: eqtl_prepare_expression
+    test_group: expression
+    sources:
+    - scripts/expression/prepare/PrepareExpression.R
+  rnaseqc2_aggregate_batched__validate_rnaseqc_manifests:
     image: rnaseqc
-    sources: ["scripts/expression/merge_rnaseqc.py"]
-    script_roots: ["scripts/expression/rnaseqc"]
-
-
-shared:
-  # Shared tools are explicit: new common files need a consumer review.
-  - sources:
-      - scripts/common/calculate_PCs.R
-      - scripts/common/PCOutputUtils.R
-      - scripts/common/MergeCovariates.R
-      - scripts/common/ResidualizePhenotypes.R
-    stages: [common, expression, proteomics, splicing, methylation]
-  - sources:
-      - scripts/cell_type_specific_expression/bootstrap.R
-      - scripts/cell_type_specific_expression/R/io.R
-      - scripts/cell_type_specific_expression/R/constants.R
-      - scripts/cell_type_specific_expression/R/expression.R
-      - scripts/cell_type_specific_expression/R/expression_bed.R
-      - scripts/cell_type_specific_expression/shared/**
-    stages: [cell_estimation, cell_fit, cell_export, cell_downstream]
-
-# Classify development tools explicitly; they are copied but not used by live tasks.
+    task:
+      path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+      name: validate_rnaseqc_manifests
+    test_group: rnaseqc
+    sources:
+    - scripts/expression/rnaseqc/merge_rnaseqc.py
+  rnaseqc2_aggregate_batched__aggregate_rnaseqc_batch:
+    image: rnaseqc
+    task:
+      path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+      name: aggregate_rnaseqc_batch
+    test_group: rnaseqc
+    sources:
+    - scripts/expression/rnaseqc/merge_rnaseqc.py
+  rnaseqc2_aggregate_batched__merge_rnaseqc_batches:
+    image: rnaseqc
+    task:
+      path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+      name: merge_rnaseqc_batches
+    test_group: rnaseqc
+    sources:
+    - scripts/expression/rnaseqc/merge_rnaseqc.py
+  prepare_pqtl__prepare_proteomic_data:
+    image: standard
+    task:
+      path: workflows/proteomics/prepare_pQTL.wdl
+      name: PrepareProteomicData
+    test_group: proteomics
+    sources:
+    - scripts/proteomics/PrepareProteomics.R
+  normalize_pqtl__normalize_proteomics:
+    image: standard
+    task:
+      path: workflows/proteomics/normalize_pQTL.wdl
+      name: NormalizeProteomics
+    test_group: proteomics
+    sources:
+    - scripts/proteomics/NormalizeProteomics.R
+  reference_filter__prepare_haemopedia:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/reference_filter.wdl
+      name: PrepareHaemopedia
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/reference_expression.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/prepare_haemopedia.R
+    - scripts/cell_type_specific_expression/modules/prepare_haemopedia.txt
+    runtime_tests: &id001
+    - test-reference-filter.R
+  reference_filter__filter_cell_type_beds:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/reference_filter.wdl
+      name: FilterCellTypeBeds
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/integration.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/reference_expression.R
+    - scripts/cell_type_specific_expression/R/reference_filter.R
+    - scripts/cell_type_specific_expression/R/reference_filter_io.R
+    - scripts/cell_type_specific_expression/R/reference_filter_plots.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/filter_bed_reports.R
+    - scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R
+    - scripts/cell_type_specific_expression/modules/filter_cell_type_beds.txt
+    runtime_tests: *id001
+  hspe__prepare_hspe_batches:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/hspe.wdl
+      name: PrepareHspeBatches
+    test_group: cell_estimation
+    sources:
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/hspe_batches.R
+    - scripts/cell_type_specific_expression/R/hspe_stage.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/proportions.R
+    - scripts/cell_type_specific_expression/R/reference_mapping.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/estimation/prepare_hspe_batches.R
+    - scripts/cell_type_specific_expression/modules/prepare_hspe_batches.txt
+    runtime_tests: &id002
+    - test-hspe-batches.R
+  hspe__run_hspe_batch:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/hspe.wdl
+      name: RunHspeBatch
+    test_group: cell_estimation
+    sources:
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/hspe_batches.R
+    - scripts/cell_type_specific_expression/R/hspe_stage.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/estimation/run_hspe_batch.R
+    - scripts/cell_type_specific_expression/modules/run_hspe_batch.txt
+    runtime_tests: *id002
+  hspe__merge_hspe_batches:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/hspe.wdl
+      name: MergeHspeBatches
+    test_group: cell_estimation
+    sources:
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/hspe_batches.R
+    - scripts/cell_type_specific_expression/R/hspe_stage.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/estimation/merge_hspe_batches.R
+    - scripts/cell_type_specific_expression/modules/merge_hspe_batches.txt
+    runtime_tests: *id002
+  qc__build_manifest:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/qc.wdl
+      name: BuildManifest
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/model_cleanup.R
+    - scripts/cell_type_specific_expression/R/model_restart.R
+    - scripts/cell_type_specific_expression/R/qc.R
+    - scripts/cell_type_specific_expression/R/tca_stage.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/build_deconvolution_manifest.R
+    - scripts/cell_type_specific_expression/modules/build_deconvolution_manifest.txt
+    runtime_tests: *id001
+  filter_scatter__filter_cell_type_bed:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/filter_scatter.wdl
+      name: FilterCellTypeBed
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/integration.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/reference_expression.R
+    - scripts/cell_type_specific_expression/R/reference_filter.R
+    - scripts/cell_type_specific_expression/R/reference_filter_io.R
+    - scripts/cell_type_specific_expression/R/reference_filter_plots.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/filter_bed_reports.R
+    - scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R
+    - scripts/cell_type_specific_expression/modules/filter_cell_type_beds.txt
+    runtime_tests: *id001
+  filter_scatter__merge_filter_reports:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/filter_scatter.wdl
+      name: MergeFilterReports
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/integration.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/reference_filter_plots.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/filter_bed_reports.R
+    - scripts/cell_type_specific_expression/downstream/merge_filter_reports.R
+    - scripts/cell_type_specific_expression/modules/merge_filter_reports.txt
+    runtime_tests: *id001
+  integration__prepare_scatter_inputs:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/integration.wdl
+      name: PrepareScatterInputs
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/integration.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/prepare_scatter_inputs.R
+    - scripts/cell_type_specific_expression/modules/prepare_scatter_inputs.txt
+    runtime_tests: *id001
+  integration__build_qtl_manifest:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/integration.wdl
+      name: BuildQtlManifest
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/integration.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/build_qtl_manifest.R
+    - scripts/cell_type_specific_expression/modules/build_qtl_manifest.txt
+    runtime_tests: *id001
+  tca__fit_tca:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/tca.wdl
+      name: FitTca
+    test_group: cell_fit
+    sources:
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/tca_stage.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/fit/fit_tca.R
+    - scripts/cell_type_specific_expression/fit/variance_preflight.R
+    - scripts/cell_type_specific_expression/modules/fit_tca.txt
+    runtime_tests: &id003
+    - test-fit-cli.R
+  tca__clean_tca_model:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/tca.wdl
+      name: CleanTcaModel
+    test_group: cell_fit
+    sources:
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/model_cleanup.R
+    - scripts/cell_type_specific_expression/R/model_restart.R
+    - scripts/cell_type_specific_expression/R/tca_stage.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/fit/clean_tca_model.R
+    - scripts/cell_type_specific_expression/fit/variance_preflight.R
+    - scripts/cell_type_specific_expression/modules/clean_tca_model.txt
+    runtime_tests: *id003
+  tca__export_tca_beds:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/tca.wdl
+      name: ExportTcaBeds
+    test_group: cell_export
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/model_cleanup.R
+    - scripts/cell_type_specific_expression/R/model_restart.R
+    - scripts/cell_type_specific_expression/R/qc.R
+    - scripts/cell_type_specific_expression/R/tca_stage.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/export/export_tca_beds.R
+    - scripts/cell_type_specific_expression/modules/export_tca_beds.txt
+    runtime_tests:
+    - test-bed-outputs.R
+  proportions__validate_proportion_mode:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/proportions.wdl
+      name: ValidateProportionMode
+    test_group: cell_estimation
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/estimation/validate_proportion_mode.R
+    - scripts/cell_type_specific_expression/modules/validate_proportion_mode.txt
+    runtime_tests: *id002
+  proportions__process_proportions:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/proportions.wdl
+      name: ProcessProportions
+    test_group: cell_estimation
+    sources:
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/proportions.R
+    - scripts/cell_type_specific_expression/R/reference_mapping.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/estimation/process_proportions.R
+    - scripts/cell_type_specific_expression/modules/process_proportions.txt
+    runtime_tests: *id002
+  gene_summary__summarize_cell_type_beds:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/gene_summary.wdl
+      name: SummarizeCellTypeBeds
+    test_group: cell_downstream
+    sources:
+    - scripts/cell_type_specific_expression/R/bed_outputs.R
+    - scripts/cell_type_specific_expression/R/constants.R
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/R/gene_summary.R
+    - scripts/cell_type_specific_expression/R/integration.R
+    - scripts/cell_type_specific_expression/R/io.R
+    - scripts/cell_type_specific_expression/R/workflow_validation.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/downstream/summarize_cell_type_beds.R
+    - scripts/cell_type_specific_expression/modules/summarize_cell_type_beds.txt
+    runtime_tests: *id001
+  expression__filter_expression_genes:
+    image: cell_type
+    task:
+      path: workflows/cell_type_specific_expression/tasks/expression.wdl
+      name: FilterExpressionGenes
+    test_group: cell_estimation
+    sources:
+    - scripts/cell_type_specific_expression/R/expression.R
+    - scripts/cell_type_specific_expression/R/expression_bed.R
+    - scripts/cell_type_specific_expression/bootstrap.R
+    - scripts/cell_type_specific_expression/estimation/filter_expression_genes.R
+    - scripts/cell_type_specific_expression/modules/filter_expression_genes.txt
+    runtime_tests: *id002
+  trans_ld_prepare:
+    image: trans_ld
+    task:
+      path: workflows/genotype/trans_ld_regions.wdl
+      name: PrepareInputs
+    test_group: trans_ld
+    module: trans_ld_regions.prepare
+    sources:
+    - tools/trans_ld_regions/scripts/trans_ld_regions/prepare.py
+    - tools/trans_ld_regions/scripts/trans_ld_regions/common.py
+    - tools/trans_ld_regions/scripts/trans_ld_regions/__init__.py
+  trans_ld_ancestry:
+    image: trans_ld
+    task:
+      path: workflows/genotype/trans_ld_regions.wdl
+      name: AncestryLD
+    test_group: trans_ld
+    module: trans_ld_regions.ld
+    sources:
+    - tools/trans_ld_regions/scripts/trans_ld_regions/ld.py
+    - tools/trans_ld_regions/scripts/trans_ld_regions/common.py
+    - tools/trans_ld_regions/scripts/trans_ld_regions/__init__.py
+  trans_ld_combine:
+    image: trans_ld
+    task:
+      path: workflows/genotype/trans_ld_regions.wdl
+      name: CombineRegions
+    test_group: trans_ld
+    module: trans_ld_regions.combine
+    sources:
+    - tools/trans_ld_regions/scripts/trans_ld_regions/combine.py
+    - tools/trans_ld_regions/scripts/trans_ld_regions/common.py
+    - tools/trans_ld_regions/scripts/trans_ld_regions/__init__.py
+shared: []
 ignored_sources:
-  - scripts/.lintr
-  - scripts/check_wdl_logging.py
-  - scripts/check_wdl_file_scope.py
-  - scripts/validate_dockstore.py
-  - scripts/cell_type_specific_expression/lint_r.R
-  - scripts/cell_type_specific_expression/generate_synthetic_fixture.R
-  - scripts/cell_type_specific_expression/tools/**
-
-# The standard image also copies direct R scripts from these directories to /tmp.
+- scripts/.lintr
+- scripts/check_wdl_logging.py
+- scripts/check_wdl_file_scope.py
+- scripts/validate_dockstore.py
+- scripts/cell_type_specific_expression/lint_r.R
+- scripts/cell_type_specific_expression/generate_synthetic_fixture.R
+- scripts/cell_type_specific_expression/tools/**
+- scripts/cell_type_specific_expression/estimation/run_hspe.R
+- scripts/cell_type_specific_expression/modules/run_hspe.txt
 runtime_aliases:
-  # Both source paths exist in the prerequisite; the staged copy is canonical.
   /tmp/PrepareExpression.R: scripts/expression/prepare/PrepareExpression.R
 legacy_runtime_roots:
-  - scripts/common
-  - scripts/expression
-  - scripts/expression/prepare
-  - scripts/methylation
-  - scripts/proteomics
-  - scripts/splicing
-
+- scripts/common
+- scripts/expression
+- scripts/expression/prepare
+- scripts/methylation
+- scripts/proteomics
+- scripts/splicing
 workflow_groups:
-  - paths: ["workflows/cell_type_specific_expression/**"]
-    stages: [cell_estimation, cell_fit, cell_export, cell_downstream, expression]
-  - paths: ["workflows/expression/prepare_eQTL.wdl"]
-    stages: [expression]
-  - paths: ["workflows/expression/rnaseqc2_aggregate_batched.wdl"]
-    stages: [rnaseqc]
-  - paths: ["workflows/common/**"]
-    stages: [common, expression, proteomics, splicing, methylation]
-  - paths: ["workflows/proteomics/**"]
-    stages: [proteomics]
-  - paths: ["workflows/splicing/**"]
-    stages: [splicing]
-  - paths: ["workflows/methylation/**"]
-    stages: [methylation, methylation_rust]
-  - paths: ["workflows/genotype/**"]
-    stages: []
-    policy: external_images_manual
-
-  # Inline helpers run in a pinned external tensorQTL image; no local image release.
-  - paths: ["workflows/phenotype_pc_qtl/**"]
-    stages: []
-    policy: external_images_manual
+- paths:
+  - workflows/cell_type_specific_expression/**
+  stages:
+  - prepare_eqtl__eqtl_prepare_expression
+  - reference_filter__prepare_haemopedia
+  - reference_filter__filter_cell_type_beds
+  - hspe__prepare_hspe_batches
+  - hspe__run_hspe_batch
+  - hspe__merge_hspe_batches
+  - qc__build_manifest
+  - filter_scatter__filter_cell_type_bed
+  - filter_scatter__merge_filter_reports
+  - integration__prepare_scatter_inputs
+  - integration__build_qtl_manifest
+  - tca__fit_tca
+  - tca__clean_tca_model
+  - tca__export_tca_beds
+  - proportions__validate_proportion_mode
+  - proportions__process_proportions
+  - gene_summary__summarize_cell_type_beds
+  - expression__filter_expression_genes
+- paths:
+  - workflows/expression/prepare_eQTL.wdl
+  stages:
+  - prepare_eqtl__eqtl_prepare_expression
+- paths:
+  - workflows/expression/rnaseqc2_aggregate_batched.wdl
+  stages:
+  - rnaseqc2_aggregate_batched__validate_rnaseqc_manifests
+  - rnaseqc2_aggregate_batched__aggregate_rnaseqc_batch
+  - rnaseqc2_aggregate_batched__merge_rnaseqc_batches
+- paths:
+  - workflows/common/**
+  stages:
+  - prepare_sqtl__prepare_splice_data
+  - cohort_aggregation__prepare_methylation_cohort_manifest
+  - cohort_aggregation__build_methylation_cohort_samples
+  - cohort_aggregation__aggregate_methylation_chromosomes
+  - annotation__annotate_methylation_sites
+  - merge_methylation__shard_methylation_manifest
+  - merge_methylation__filter_methylation_shard
+  - connectivity__build_methylation_correlation_covariates
+  - connectivity__analyze_methylation_cpg_correlation
+  - connectivity__finalize_methylation_connectivity
+  - aggregatemethylationcohortarrays__build_methylation_cohort_samples
+  - aggregatemethylationcohortarrays__merge_methylation_chromosome
+  - aggregatemethylationcohortarrays__build_methylation_correlation_covariates
+  - aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation
+  - aggregatemethylationcohortarrays__aggregate_methylation_chromosomes
+  - aggregatemethylationcohortarrays__finalize_methylation_connectivity
+  - aggregatemethylationcohortarrays__annotate_methylation_sites
+  - prepare_mqtl__prepare_methylation_data
+  - calculate_phenotypepcs__computep_cs
+  - mergecovariates__merge_covariatesr
+  - residualizephenotypes__residualize_phenotypes
+  - prepare_eqtl__eqtl_prepare_expression
+  - prepare_pqtl__prepare_proteomic_data
+  - normalize_pqtl__normalize_proteomics
+- paths:
+  - workflows/proteomics/**
+  stages:
+  - prepare_pqtl__prepare_proteomic_data
+  - normalize_pqtl__normalize_proteomics
+- paths:
+  - workflows/splicing/**
+  stages:
+  - prepare_sqtl__prepare_splice_data
+- paths:
+  - workflows/methylation/**
+  stages:
+  - cohort_aggregation__prepare_methylation_cohort_manifest
+  - cohort_aggregation__build_methylation_cohort_samples
+  - cohort_aggregation__merge_methylation_chromosome
+  - cohort_aggregation__aggregate_methylation_chromosomes
+  - processmethylationsample__filter_methylation_sample
+  - annotation__annotate_methylation_sites
+  - merge_methylation__shard_methylation_manifest
+  - merge_methylation__filter_methylation_shard
+  - connectivity__build_methylation_correlation_covariates
+  - connectivity__analyze_methylation_cpg_correlation
+  - connectivity__finalize_methylation_connectivity
+  - aggregatemethylationcohortarrays__build_methylation_cohort_samples
+  - aggregatemethylationcohortarrays__merge_methylation_chromosome
+  - aggregatemethylationcohortarrays__build_methylation_correlation_covariates
+  - aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation
+  - aggregatemethylationcohortarrays__aggregate_methylation_chromosomes
+  - aggregatemethylationcohortarrays__finalize_methylation_connectivity
+  - aggregatemethylationcohortarrays__annotate_methylation_sites
+  - prepare_mqtl__prepare_methylation_data
+- paths:
+  - workflows/genotype/calculateAF.wdl
+  - workflows/genotype/calculateGenotypePCs.wdl
+  - workflows/genotype/prepare_VCF.wdl
+  - workflows/genotype/calculateGenotypeDosage.wdl
+  - workflows/genotype/convertVCF2Plink.wdl
+  stages: []
+  policy: external_images_manual
+- paths:
+  - workflows/phenotype_pc_qtl/**
+  stages: []
+  policy: external_images_manual
+- paths:
+  - workflows/genotype/trans_ld_regions.wdl
+  stages:
+  - trans_ld_prepare
+  - trans_ld_ancestry
+  - trans_ld_combine

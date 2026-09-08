@@ -10,10 +10,10 @@ task BuildMethylationCohortSamples {
     input {
         Array[File] SampleQCFiles
         String OutputPrefix
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' SampleQCFiles} > sample_qc_files.list
         Rscript /tmp/BuildMethylationCohortSamples.R \
@@ -52,10 +52,10 @@ task MergeMethylationChromosome {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
         printf '%s\n' "~{CohortSampleQC}" > sample_qc_files.list
@@ -100,10 +100,10 @@ task BuildMethylationCorrelationCovariates {
         File PhenotypePCs
         File? AdditionalCovariates
         String OutputPrefix
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         Rscript /tmp/BuildMethylationCorrelationCovariates.R \
             --PhenotypePCs "~{PhenotypePCs}" \
@@ -132,10 +132,10 @@ task AnalyzeMethylationCpGCorrelation {
         Float MinAbsCorrelation
         Int MemoryGB
         Int DiskGB
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         Rscript /tmp/AnalyzeMethylationCpGCorrelation.R \
             --InputBed "~{IntMethylationBed}" \
             --Covariates "~{Covariates}" \
@@ -175,10 +175,10 @@ task AggregateMethylationChromosomes {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' FilteredCallsByChromosome} > filtered_calls_by_chromosome.list
         printf '%s\n' ~{sep=' ' SiteQCByChromosome} > site_qc_by_chromosome.list
@@ -276,10 +276,10 @@ task FinalizeMethylationConnectivity {
         Float ConnectivityZThreshold
         Int MemoryGB
         Int DiskGB
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' "~{PreConnectivityIntMethylationBed}" > int_beds_by_chromosome.list
         printf '%s\n' ~{sep=' ' RepresentativeCpGsByChromosome} > representative_cpgs_by_chromosome.list
@@ -323,10 +323,10 @@ task AnnotateMethylationSites {
         Int PromoterWindow
         Int MemoryGB
         Int DiskGB
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         Rscript /tmp/AnnotateMethylationSites.R \
             --SiteMetadata "~{SiteMetadata}" \
             --AnnotationGTF "~{AnnotationGTF}" \
@@ -350,6 +350,15 @@ task AnnotateMethylationSites {
 
 workflow AggregateMethylationCohort {
     input {
+        String aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__build_methylation_cohort_samples_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__build_methylation_correlation_covariates_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__finalize_methylation_connectivity_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__merge_methylation_chromosome_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         Array[File] AllCallsAutosome01
         Array[File] AllCallsAutosome02
         Array[File] AllCallsAutosome03
@@ -400,14 +409,14 @@ workflow AggregateMethylationCohort {
         Int CorrelationDiskGB = 250
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
     }
 
     call BuildMethylationCohortSamples {
         input:
             SampleQCFiles = SampleQCFiles,
             OutputPrefix = OutputPrefix,
-            docker_image = methylation_docker_image
+            docker_image = aggregatemethylationcohortarrays__build_methylation_cohort_samples_image
     }
 
     Array[String] AutosomeNames = [
@@ -453,7 +462,7 @@ workflow AggregateMethylationCohort {
                 MemoryGB = MergeMemoryGB,
                 DiskGB = MergeDiskGB,
                 NumThreads = NumThreads,
-                docker_image = methylation_docker_image
+                docker_image = aggregatemethylationcohortarrays__merge_methylation_chromosome_image
         }
     }
 
@@ -470,26 +479,27 @@ workflow AggregateMethylationCohort {
             MemoryGB = AggregateMemoryGB,
             DiskGB = AggregateDiskGB,
             NumThreads = NumThreads,
-            docker_image = methylation_docker_image
+            docker_image = aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image
     }
 
     call ComputePCs.PhenotypePCs as PreliminaryIntPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = AggregateMethylationChromosomes.PreConnectivityIntMethylationBed,
             OutputPrefix = OutputPrefix + ".methylation.pre_connectivity",
             OutputSuffix = ".INT",
             memory = MergeMemoryGB,
             disk_space = MergeDiskGB,
-            num_threads = NumThreads,
-            DockerImage = methylation_docker_image
-    }
+            num_threads = NumThreads
+  }
 
     call BuildMethylationCorrelationCovariates {
         input:
             PhenotypePCs = PreliminaryIntPhenotypePCs.OutPhenotypePCs,
             AdditionalCovariates = AdditionalCovariates,
             OutputPrefix = OutputPrefix,
-            docker_image = methylation_docker_image
+            docker_image = aggregatemethylationcohortarrays__build_methylation_correlation_covariates_image
     }
 
     scatter (autosome_index in range(length(AutosomeNames))) {
@@ -502,7 +512,7 @@ workflow AggregateMethylationCohort {
                 MinAbsCorrelation = CorrelationMinAbsCorrelation,
                 MemoryGB = CorrelationMemoryGB,
                 DiskGB = CorrelationDiskGB,
-                docker_image = methylation_docker_image
+                docker_image = aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image
         }
     }
 
@@ -517,7 +527,7 @@ workflow AggregateMethylationCohort {
             ConnectivityZThreshold = ConnectivityZThreshold,
             MemoryGB = AggregateMemoryGB,
             DiskGB = AggregateDiskGB,
-            docker_image = methylation_docker_image
+            docker_image = aggregatemethylationcohortarrays__finalize_methylation_connectivity_image
     }
 
     if (AnnotateSites) {
@@ -531,30 +541,32 @@ workflow AggregateMethylationCohort {
                 PromoterWindow = PromoterWindow,
                 MemoryGB = AnnotationMemoryGB,
                 DiskGB = AnnotationDiskGB,
-                docker_image = methylation_docker_image
+                docker_image = aggregatemethylationcohortarrays__annotate_methylation_sites_image
         }
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = FinalizeMethylationConnectivity.IntMethylationBed,
             OutputPrefix = OutputPrefix + ".methylation",
             OutputSuffix = ".INT",
             memory = MergeMemoryGB,
             disk_space = MergeDiskGB,
-            num_threads = NumThreads,
-            DockerImage = methylation_docker_image
-    }
+            num_threads = NumThreads
+  }
 
     if (defined(AdditionalCovariates)) {
         call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
             input:
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".methylation",
-                OutputSuffix = ".INT",
-                DockerImage = methylation_docker_image
-        }
+                OutputSuffix = ".INT"
+  }
     }
 
     output {

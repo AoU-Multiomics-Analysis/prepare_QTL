@@ -9,6 +9,16 @@ import "qtl_covariates.wdl" as QtlCovariates
 
 workflow AggregateMethylationCohort {
     input {
+        String annotation__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String cohort_aggregation__aggregate_methylation_chromosomes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String cohort_aggregation__build_methylation_cohort_samples_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String cohort_aggregation__merge_methylation_chromosome_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
+        String cohort_aggregation__prepare_methylation_cohort_manifest_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String connectivity__analyze_methylation_cpg_correlation_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String connectivity__build_methylation_correlation_covariates_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String connectivity__finalize_methylation_connectivity_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         File CohortManifest
         String OutputPrefix
         File? AdditionalCovariates
@@ -37,12 +47,17 @@ workflow AggregateMethylationCohort {
         Int CorrelationDiskGB = 250
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
-        String methylation_rust_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
+
     }
 
     call CohortAggregation.AggregateMethylationData as AggregateCohort {
         input:
+      annotation__annotate_methylation_sites_image = annotation__annotate_methylation_sites_image,
+      cohort_aggregation__aggregate_methylation_chromosomes_image = cohort_aggregation__aggregate_methylation_chromosomes_image,
+      cohort_aggregation__build_methylation_cohort_samples_image = cohort_aggregation__build_methylation_cohort_samples_image,
+      cohort_aggregation__merge_methylation_chromosome_image = cohort_aggregation__merge_methylation_chromosome_image,
+      cohort_aggregation__prepare_methylation_cohort_manifest_image = cohort_aggregation__prepare_methylation_cohort_manifest_image,
+
             CohortManifest = CohortManifest,
             OutputPrefix = OutputPrefix,
             MinSampleFraction = MinSampleFraction,
@@ -63,13 +78,16 @@ workflow AggregateMethylationCohort {
             AggregateDiskGB = AggregateDiskGB,
             AnnotationMemoryGB = AnnotationMemoryGB,
             AnnotationDiskGB = AnnotationDiskGB,
-            NumThreads = NumThreads,
-            methylation_docker_image = methylation_docker_image,
-            methylation_rust_docker_image = methylation_rust_docker_image
-    }
+            NumThreads = NumThreads
+  }
 
     call Connectivity.RefineMethylationConnectivity as RefineConnectivity {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+      connectivity__analyze_methylation_cpg_correlation_image = connectivity__analyze_methylation_cpg_correlation_image,
+      connectivity__build_methylation_correlation_covariates_image = connectivity__build_methylation_correlation_covariates_image,
+      connectivity__finalize_methylation_connectivity_image = connectivity__finalize_methylation_connectivity_image,
+
             IntMethylationBedsByChromosome = AggregateCohort.IntMethylationBedsByChromosome,
             ChromosomeOutputSuffixes = AggregateCohort.ChromosomeOutputSuffixes,
             PreConnectivityFilteredCalls = AggregateCohort.PreConnectivityFilteredCalls,
@@ -87,20 +105,21 @@ workflow AggregateMethylationCohort {
             CorrelationDiskGB = CorrelationDiskGB,
             ConnectivityZThreshold = ConnectivityZThreshold,
             ConnectivityMemoryGB = AggregateMemoryGB,
-            ConnectivityDiskGB = AggregateDiskGB,
-            methylation_docker_image = methylation_docker_image
-    }
+            ConnectivityDiskGB = AggregateDiskGB
+  }
 
     call QtlCovariates.PrepareMethylationQtlCovariates as PrepareQtlCovariates {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
             IntMethylationBed = RefineConnectivity.IntMethylationBed,
             AdditionalCovariates = AdditionalCovariates,
             OutputPrefix = OutputPrefix,
             PcMemoryGB = MergeMemoryGB,
             PcDiskGB = MergeDiskGB,
-            NumThreads = NumThreads,
-            methylation_docker_image = methylation_docker_image
-    }
+            NumThreads = NumThreads
+  }
 
     output {
         File FilteredCalls = RefineConnectivity.FilteredCalls

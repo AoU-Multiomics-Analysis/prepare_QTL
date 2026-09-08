@@ -33,7 +33,7 @@ class PinnedSmokeTest(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         self.assertTrue(hasattr(module, 'read_outputs'))
-        expected = {'PrepareCellTypeEqtlWorkflow.stage_images': {'fit': 'pinned-image'}}
+        expected = {'PrepareCellTypeEqtlWorkflow.task_images': {'fit': 'pinned-image'}}
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'outputs.json'
             output.write_text(json.dumps(expected))

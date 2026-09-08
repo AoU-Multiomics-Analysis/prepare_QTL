@@ -8,10 +8,10 @@ task ShardMethylationManifest {
     input {
         File SampleManifest
         Int SamplesPerShard
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
 
         # shellcheck disable=SC2016
@@ -66,10 +66,10 @@ task FilterMethylationShard {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
 
         if [ ~{NumThreads} -lt 1 ]; then
@@ -158,6 +158,17 @@ task FilterMethylationShard {
 
 workflow MergeMethylation {
     input {
+        String aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__build_methylation_cohort_samples_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__build_methylation_correlation_covariates_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__finalize_methylation_connectivity_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String aggregatemethylationcohortarrays__merge_methylation_chromosome_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String merge_methylation__filter_methylation_shard_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String merge_methylation__shard_methylation_manifest_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         File SampleManifest
         String OutputPrefix
         File? AdditionalCovariates
@@ -193,14 +204,14 @@ workflow MergeMethylation {
         Int CorrelationDiskGB = 250
         Float ConnectivityZThreshold = -3.0
         Int NumThreads = 1
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
     }
 
     call ShardMethylationManifest {
         input:
             SampleManifest = SampleManifest,
             SamplesPerShard = SamplesPerShard,
-            docker_image = methylation_docker_image
+            docker_image = merge_methylation__shard_methylation_manifest_image
     }
 
     scatter (shard_index in range(length(ShardMethylationManifest.ShardManifests))) {
@@ -218,7 +229,7 @@ workflow MergeMethylation {
                 MemoryGB = ShardMemoryGB,
                 DiskGB = ShardDiskGB,
                 NumThreads = ShardNumThreads,
-                docker_image = methylation_docker_image
+                docker_image = merge_methylation__filter_methylation_shard_image
         }
     }
 
@@ -226,6 +237,16 @@ workflow MergeMethylation {
 
     call CohortAggregation.AggregateMethylationCohort as CohortMerge {
         input:
+      aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image = aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image,
+      aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image = aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image,
+      aggregatemethylationcohortarrays__annotate_methylation_sites_image = aggregatemethylationcohortarrays__annotate_methylation_sites_image,
+      aggregatemethylationcohortarrays__build_methylation_cohort_samples_image = aggregatemethylationcohortarrays__build_methylation_cohort_samples_image,
+      aggregatemethylationcohortarrays__build_methylation_correlation_covariates_image = aggregatemethylationcohortarrays__build_methylation_correlation_covariates_image,
+      aggregatemethylationcohortarrays__finalize_methylation_connectivity_image = aggregatemethylationcohortarrays__finalize_methylation_connectivity_image,
+      aggregatemethylationcohortarrays__merge_methylation_chromosome_image = aggregatemethylationcohortarrays__merge_methylation_chromosome_image,
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
             AllCallsAutosome01 = AllCallShardsByAutosome[0],
             AllCallsAutosome02 = AllCallShardsByAutosome[1],
             AllCallsAutosome03 = AllCallShardsByAutosome[2],
@@ -274,9 +295,8 @@ workflow MergeMethylation {
             CorrelationMemoryGB = CorrelationMemoryGB,
             CorrelationDiskGB = CorrelationDiskGB,
             ConnectivityZThreshold = ConnectivityZThreshold,
-            NumThreads = NumThreads,
-            methylation_docker_image = methylation_docker_image
-    }
+            NumThreads = NumThreads
+  }
 
     output {
         File FilteredCalls = CohortMerge.FilteredCalls

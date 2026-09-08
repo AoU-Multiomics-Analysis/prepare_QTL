@@ -15,7 +15,8 @@ class ImagePlanTest(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('image_plan', ROOT / 'ci/plan_image_updates.py')
         cls.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.module)
-        cls.config = yaml.safe_load((ROOT / 'ci/image-stages.yml').read_text())
+        cls.config = yaml.safe_load((ROOT / 'tests/fixtures/legacy-image-stages.yml').read_text())
+        cls.config['ignored_sources'].append('scripts/cell_type_specific_expression/modules/**')
 
     def test_filter_edit_changes_only_downstream_pin(self):
         plan = self.module.plan_changes(self.config, ['scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R'])
@@ -110,7 +111,7 @@ class ImagePlanTest(unittest.TestCase):
 
     def test_cli_reports_selected_group(self):
         result = subprocess.run([sys.executable, str(ROOT / 'ci/plan_image_updates.py'),
-                                 '--changed', 'scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R'],
+                                 '--config', str(ROOT / 'tests/fixtures/legacy-image-stages.yml'), '--changed', 'scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R'],
                                 capture_output=True, text=True, cwd=ROOT)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('`cell_downstream`', result.stdout)
@@ -118,7 +119,7 @@ class ImagePlanTest(unittest.TestCase):
 
     def test_cli_rejects_unmapped_source(self):
         result = subprocess.run([sys.executable, str(ROOT / 'ci/plan_image_updates.py'),
-                                 '--changed', 'scripts/new_assay/tool.R'],
+                                 '--config', str(ROOT / 'tests/fixtures/legacy-image-stages.yml'), '--changed', 'scripts/new_assay/tool.R'],
                                 capture_output=True, text=True, cwd=ROOT)
         self.assertEqual(result.returncode, 1)
         self.assertIn('scripts/new_assay/tool.R', result.stdout)

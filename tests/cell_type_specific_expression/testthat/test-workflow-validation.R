@@ -390,18 +390,18 @@ testthat::test_that("end-to-end fixtures cover both proportion and pseudocount m
   prefix <- "PrepareCellTypeEqtlWorkflow."
   required_shared_inputs <- c(
     "expression", "gtf", "lm22", "SampleList", "AdditionalCovariates", "OutputPrefix",
-    "estimation_docker_image", "fit_docker_image", "export_docker_image",
-    "downstream_docker_image", "qtl_docker_image", "log2_pseudocount",
+    "hspe__run_hspe_batch_image", "tca__fit_tca_image", "tca__export_tca_beds_image",
+    "qc__build_manifest_image", "prepare_eqtl__eqtl_prepare_expression_image", "log2_pseudocount",
     "gene_type"
   )
   purrr::walk(list(hspe_inputs, precomputed_inputs), function(inputs) {
     testthat::expect_true(all(paste0(prefix, required_shared_inputs) %in% names(inputs)))
     testthat::expect_identical(
-      inputs[[paste0(prefix, "downstream_docker_image")]],
+      inputs[[paste0(prefix, "qc__build_manifest_image")]],
       "cell-type-specific-expression:test"
     )
     testthat::expect_identical(
-      inputs[[paste0(prefix, "qtl_docker_image")]],
+      inputs[[paste0(prefix, "prepare_eqtl__eqtl_prepare_expression_image")]],
       "prepare-qtl:test"
     )
     testthat::expect_false(any(grepl("residual", names(inputs), ignore.case = TRUE)))

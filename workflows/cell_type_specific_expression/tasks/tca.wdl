@@ -8,7 +8,7 @@ task FitTca {
     Int max_iters = 10
     Int random_seed = 20260901
     Boolean parallel = false
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
     Int cpu = 16
     String memory = "256 GB"
     Int disk_gb = 750
@@ -18,7 +18,7 @@ task FitTca {
 
   String parallel_argument = if parallel then "--parallel" else ""
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="fit_tca"
     log="$stage.log"
@@ -66,12 +66,12 @@ task CleanTcaModel {
   input {
     Boolean reuse_model = false
     File unfiltered_model
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
     Int preemptible_attempts = 0
     Int max_retries = 1
   }
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="clean_tca_model"
     log="$stage.log"
@@ -112,7 +112,7 @@ task ExportTcaBeds {
     File tca_weights
     File? covariates
     Boolean parallel = false
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
     Int cpu = 8
     String memory = "256 GB"
     Int disk_gb = 500
@@ -122,7 +122,7 @@ task ExportTcaBeds {
 
   String parallel_argument = if parallel then "--parallel" else ""
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="export_tca_beds"
     log="$stage.log"

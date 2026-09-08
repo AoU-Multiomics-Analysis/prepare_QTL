@@ -50,7 +50,7 @@ def plan_changes(config, changed_paths):
             if matches(path, rule['sources']):
                 classified = True
                 result['stages'].update(rule['stages'])
-        if path.startswith(('scripts/', 'rust/', 'envs/')) and not classified:
+        if path.startswith(('scripts/', 'rust/', 'envs/', 'tools/trans_ld_regions/scripts/')) and not classified:
             result['unmapped'].add(path)
     return {key: sorted(value) for key, value in result.items()}
 
@@ -67,6 +67,8 @@ def validate_registry(config, root):
             if stage not in config['stages']:
                 errors.append(f'Unknown stage: {stage}')
     errors.extend(validate_script_roots(config))
+    from task_dependencies import validate_task_dependencies
+    errors.extend(validate_task_dependencies(config, root))
     tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root).decode().split('\0')
     errors.extend('Unmapped source/workflow: ' + path for path in
                   plan_changes(config, tracked)['unmapped'])

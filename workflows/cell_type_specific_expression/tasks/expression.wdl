@@ -6,7 +6,7 @@ task FilterExpressionGenes {
     File gtf
     Array[String] gene_type
     Float log2_pseudocount
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     Int cpu = 4
     String memory = "32 GB"
     Int disk_gb = 100
@@ -14,7 +14,7 @@ task FilterExpressionGenes {
     Int max_retries = 2
   }
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="filter_expression_genes"
     log="$stage.log"

@@ -12,7 +12,7 @@ task ComputePCs{
         Int preemptible_attempts = 2
         Int max_retries = 2
     }
-    command <<<
+command <<<
         set -euo pipefail
         stage="compute_phenotype_pcs"
         printf 'stage=%s start_time=%s dimensions=pending outputs=%s\n' \
@@ -39,17 +39,16 @@ task ComputePCs{
     }
 }
 
-
-
 workflow PhenotypePCs {
     input {
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         File BedFile
         String OutputPrefix
         String OutputSuffix = ""
         Int memory
         Int disk_space
         Int num_threads
-        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
         Int preemptible_attempts = 2
         Int max_retries = 2
     }
@@ -61,7 +60,7 @@ workflow PhenotypePCs {
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
-            DockerImage = DockerImage,
+            DockerImage = calculate_phenotypepcs__computep_cs_image,
             preemptible_attempts = preemptible_attempts,
             max_retries = max_retries
     }

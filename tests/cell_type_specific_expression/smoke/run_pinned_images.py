@@ -75,7 +75,7 @@ def main():
     root = Path.cwd()
     doc = WDL.load(WORKFLOW)
     pins = {decl.name: decl.expr.eval(WDL.Env.Bindings(), WDL.StdLib.Base('1.0')).value
-            for decl in doc.workflow.inputs if decl.name.endswith('_docker_image')}
+            for decl in doc.workflow.inputs if decl.name.endswith('_image')}
     for image in set(pins.values()):
         ensure_pinned_image(image)
 
@@ -100,7 +100,7 @@ def main():
         input_path = Path(f'ci-runs/pinned-{mode}.inputs.json')
         input_path.write_text(json.dumps(inputs, indent=2))
         if mode == 'precomputed':
-            run_r(pins['downstream_docker_image'],
+            run_r(pins['qc__build_manifest_image'],
                   'tests/cell_type_specific_expression/generate_reference_fixture.R',
                   'tests/cell_type_specific_expression/fixtures/synthetic_expression.bed',
                   'ci-runs/reference-counts.tsv.gz')
@@ -116,16 +116,16 @@ def main():
                         '--dir', run_dir + '/.', '--verbose', '--no-color'], check=True)
         output_path = run_dir + '/outputs.json'
         outputs = read_outputs(output_path)
-        expected = {key.removesuffix('_docker_image'): value for key, value in pins.items()}
-        assertions = [('assert_deconvolution_outputs.R', pins['downstream_docker_image']),
-                      ('assert_qtl_outputs.R', pins['qtl_docker_image'])]
+        expected = {key.removesuffix('_image'): value for key, value in pins.items()}
+        assertions = [('assert_deconvolution_outputs.R', pins['qc__build_manifest_image']),
+                      ('assert_qtl_outputs.R', pins['prepare_eqtl__eqtl_prepare_expression_image'])]
         if workflow == DECONVOLUTION:
             outputs = {PREFIX + key.removeprefix(DECONV_PREFIX): value for key, value in outputs.items()}
             output_path = run_dir + '/assertion-outputs.json'
             Path(output_path).write_text(json.dumps(outputs, indent=2))
-            expected.pop('qtl')
+            expected = {k: v for k, v in expected.items() if k + '_image' in {d.name for d in WDL.load(DECONVOLUTION).workflow.inputs}}
             assertions = assertions[:1]
-        if outputs[PREFIX + 'stage_images'] != expected:
+        if outputs[PREFIX + 'task_images'] != expected:
             raise AssertionError('Workflow did not retain the selected stage images')
         for script, image in assertions:
             run_r(image, 'tests/cell_type_specific_expression/smoke/' + script,

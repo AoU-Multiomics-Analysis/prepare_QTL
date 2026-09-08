@@ -9,10 +9,10 @@ task NormalizeProteomics {
         Int memory
         Int disk_space
         Int num_threads
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         mkdir olink_data
         for olink_file in ~{sep=' ' OlinkData}; do
             ln -s "${olink_file}" olink_data/
@@ -40,6 +40,7 @@ task NormalizeProteomics {
 
 workflow NormalizeProteomicsData {
     input {
+        String normalize_pqtl__normalize_proteomics_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         Array[File] OlinkData
         String OutputPrefix
         String ReferencePlate = "000171002612_A1_01-17-2024_12-21-52"
@@ -47,7 +48,7 @@ workflow NormalizeProteomicsData {
         Int memory
         Int disk_space
         Int num_threads
-        String proteomics_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
     }
 
     call NormalizeProteomics {
@@ -58,7 +59,7 @@ workflow NormalizeProteomicsData {
             memory = memory,
             disk_space = disk_space,
             num_threads = num_threads,
-            docker_image = proteomics_docker_image
+            docker_image = normalize_pqtl__normalize_proteomics_image
     }
 
     output {

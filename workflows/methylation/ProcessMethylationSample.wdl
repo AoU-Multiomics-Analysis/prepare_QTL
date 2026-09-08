@@ -15,10 +15,10 @@ task FilterMethylationSample {
         String AutosomePrefix
         Int MemoryGB
         Int DiskGB
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
 
         if [[ ! "~{SampleID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
@@ -75,6 +75,7 @@ task FilterMethylationSample {
 
 workflow ProcessMethylationSample {
     input {
+        String processmethylationsample__filter_methylation_sample_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
         String SampleID
         File MethylationBed
         Float MinCoverage = 10.0
@@ -83,7 +84,7 @@ workflow ProcessMethylationSample {
         Float FenceK = 3.0
         Int MemoryGB = 64
         Int DiskGB = 250
-        String methylation_rust_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
+
     }
 
     call FilterMethylationSample {
@@ -97,7 +98,7 @@ workflow ProcessMethylationSample {
             AutosomePrefix = AutosomePrefix,
             MemoryGB = MemoryGB,
             DiskGB = DiskGB,
-            docker_image = methylation_rust_docker_image
+            docker_image = processmethylationsample__filter_methylation_sample_image
     }
 
     output {

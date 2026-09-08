@@ -121,10 +121,10 @@ def main(argv=None):
         assert all(Path(path).is_file() for path in result[PREFIX + name])
     if not args.deconvolution_only:
         assert Path(result[PREFIX + "cell_type_qtl_manifest"]).is_file()
-    expected_images = dict(baseline[PREFIX + 'stage_images'])
+    expected_images = dict(baseline[PREFIX + 'task_images'])
     if args.deconvolution_only:
-        expected_images.pop('qtl')
-    assert result[PREFIX + "stage_images"] == expected_images
+        expected_images = {k: v for k, v in expected_images.items() if k + '_image' in allowed}
+    assert result[PREFIX + "task_images"] == expected_images
     parameters = json.loads(
         Path(result[PREFIX + "effective_parameters_file"]).read_text()
     )
