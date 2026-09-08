@@ -59,7 +59,9 @@ class OptionalFileLocalizationTest(unittest.TestCase):
             self.assertIn("hspe_metadata_not_readable", result.stderr)
 
     def test_commands_pass_localized_optional_files_or_omit_the_argument(self):
-        cases = [("qc.wdl", "BuildManifest", "hspe_metadata", "--hspe-metadata"),
+        cases = [("hspe.wdl", "PrepareHspeBatches", "cell_type_mapping", "--cell-type-mapping"),
+                 ("proportions.wdl", "ProcessProportions", "cell_type_mapping", "--cell-type-mapping"),
+                 ("qc.wdl", "BuildManifest", "hspe_metadata", "--hspe-metadata"),
                  ("tca.wdl", "FitTca", "covariates", "--covariates"),
                  ("tca.wdl", "ExportTcaBeds", "covariates", "--covariates")]
         for source, task_name, name, flag in cases:
@@ -77,6 +79,8 @@ class OptionalFileLocalizationTest(unittest.TestCase):
 Rscript() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1:]))' "$@" > argv.json; }
 export -f Rscript
 mkdir -p outputs
+printf 'header\\nrow\\n' > outputs/hspe_markers.tsv
+printf 'header\\nrow\\n' > outputs/proportions_tca_weights.tsv
 printf 'header\\nrow\\n' > outputs/cell_type_bed_inventory.tsv
 '''
                     result = subprocess.run(["bash"], input=capture + command, text=True,

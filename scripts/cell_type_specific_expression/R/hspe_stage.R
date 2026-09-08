@@ -1,4 +1,4 @@
-validate_lm22 <- function(lm22_linear) {
+validate_lm22 <- function(lm22_linear, cell_type_mapping = NULL) {
   if (!is.matrix(lm22_linear) || !is.numeric(lm22_linear)) {
     stop("LM22 must be a numeric matrix", call. = FALSE)
   }
@@ -6,12 +6,13 @@ validate_lm22 <- function(lm22_linear) {
     stop("LM22 must contain at least one gene", call. = FALSE)
   }
 
-  required_cell_types <- lm22_cell_types()
+  required_cell_types <- if (is.null(cell_type_mapping)) lm22_cell_types() else cell_type_mapping$source
   observed_cell_types <- colnames(lm22_linear)
-  if (is.null(observed_cell_types) || length(observed_cell_types) != 22L ||
+  if (is.null(observed_cell_types) || length(observed_cell_types) != length(required_cell_types) ||
       anyDuplicated(observed_cell_types) > 0L ||
       !setequal(observed_cell_types, required_cell_types)) {
-    stop("LM22 must contain exactly the 22 standard LM22 columns", call. = FALSE)
+    stop(if (is.null(cell_type_mapping)) "LM22 must contain exactly the 22 standard LM22 columns" else
+      "Reference columns must match the supplied mapping", call. = FALSE)
   }
 
   gene_symbols <- rownames(lm22_linear)
@@ -35,9 +36,10 @@ validate_lm22 <- function(lm22_linear) {
   invisible(TRUE)
 }
 
-standardize_lm22 <- function(lm22_linear) {
-  validate_lm22(lm22_linear)
-  lm22_linear <- lm22_linear[, lm22_cell_types(), drop = FALSE]
+standardize_lm22 <- function(lm22_linear, cell_type_mapping = NULL) {
+  validate_lm22(lm22_linear, cell_type_mapping)
+  columns <- if (is.null(cell_type_mapping)) lm22_cell_types() else cell_type_mapping$source
+  lm22_linear <- lm22_linear[, columns, drop = FALSE]
   rownames(lm22_linear) <- trimws(rownames(lm22_linear))
   lm22_linear
 }
@@ -104,7 +106,8 @@ prepare_hspe_inputs <- function(
     lm22_linear,
     min_overlap = pipeline_defaults()$min_lm22_overlap,
     quantile_normalize = FALSE,
-    log2_pseudocount = 0) {
+    log2_pseudocount = 0,
+    cell_type_mapping = NULL) {
   if (!is.numeric(min_overlap) || length(min_overlap) != 1L ||
       !is.finite(min_overlap) || min_overlap <= 0 || min_overlap > 1) {
     stop("min_overlap must be a finite value in (0, 1]", call. = FALSE)
@@ -115,7 +118,7 @@ prepare_hspe_inputs <- function(
   }
 
   log2_pseudocount <- validate_log2_pseudocount(log2_pseudocount)
-  lm22_linear <- standardize_lm22(lm22_linear)
+  lm22_linear <- standardize_lm22(lm22_linear, cell_type_mapping)
   lm22_qc <- list(
     gene_count = nrow(lm22_linear),
     cell_type_count = ncol(lm22_linear),

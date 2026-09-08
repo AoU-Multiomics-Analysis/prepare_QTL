@@ -1,0 +1,10 @@
+source	target
+B	B cells
+CD4_T	CD4 T cells
+CD8_T	CD8 T cells
+Erythroid	Erythroid
+Monocyte_macrophage	Monocyte/myeloid
+Neutrophil	Neutrophils
+NK	NK cells
+Plasma	Plasma cells
+Platelet	Platelets

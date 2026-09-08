@@ -9,6 +9,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     File expression
     File gtf
     File lm22
+    File? cell_type_mapping
     File? precomputed_tca_model
     File? precomputed_proportions
     File? deconvolution_covariates
@@ -16,10 +17,10 @@ workflow PrepareCellTypeEqtlWorkflow {
     File AdditionalCovariates
     String OutputPrefix
 
-    String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
+    String estimation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     String fit_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:2c7234d7d5de56765de838541933c2242d680a3ce3c16aff68a0b3b1bb26ce10"
     String export_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e55cbf77cd5c89771ef05eaa806cb679474f8c8379f996697b796b7ec625842"
-    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:3f68dd8ee827b46e2e9d4524de57f784c8487c40e16516d752ec331f0c4dec16"
+    String downstream_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
     String qtl_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     Int preemptible_attempts = 2
     Int max_retries = 2
@@ -70,6 +71,7 @@ workflow PrepareCellTypeEqtlWorkflow {
       expression = expression,
       gtf = gtf,
       lm22 = lm22,
+        cell_type_mapping = cell_type_mapping,
       precomputed_tca_model = precomputed_tca_model,
       precomputed_proportions = precomputed_proportions,
       covariates = deconvolution_covariates,

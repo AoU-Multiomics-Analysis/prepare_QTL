@@ -47,6 +47,7 @@ task ValidateProportionMode {
 
 task ProcessProportions {
   input {
+    File? cell_type_mapping
     File proportions
     Float mean_threshold = 0.0001
     Float zero_floor = 0.000001
@@ -65,7 +66,14 @@ task ProcessProportions {
     status=0
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
+    mapping_args=()
+    mapping_path='~{if defined(cell_type_mapping) then sub(select_first([cell_type_mapping]), "'", "'\"'\"'") else ""}'
+    if [[ -n "$mapping_path" ]]; then
+      test -r "$mapping_path" || { echo "Mapping localization error"; exit 1; }
+      mapping_args=(--cell-type-mapping "$mapping_path")
+    fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/estimation/process_proportions.R \
+      "${mapping_args[@]}" \
       --proportions '~{proportions}' \
       --mean-threshold '~{mean_threshold}' \
       --zero-floor '~{zero_floor}' \

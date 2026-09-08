@@ -120,11 +120,13 @@ filter_and_adjust_groups <- function(
 process_proportions <- function(
     proportions,
     mean_threshold = pipeline_defaults()$group_mean_threshold,
-    zero_floor = pipeline_defaults()$zero_floor) {
-  validate_lm22_proportions(proportions)
+    zero_floor = pipeline_defaults()$zero_floor,
+    cell_type_mapping = NULL) {
+  if (is.null(cell_type_mapping)) validate_lm22_proportions(proportions)
   validate_group_parameters(mean_threshold, zero_floor)
 
-  combined <- combine_lm22_proportions(proportions)
+  combined <- if (is.null(cell_type_mapping)) combine_lm22_proportions(proportions) else
+    combine_mapped_proportions(proportions, cell_type_mapping)
   filtered <- filter_and_adjust_groups(combined, mean_threshold, zero_floor)
 
   list(
