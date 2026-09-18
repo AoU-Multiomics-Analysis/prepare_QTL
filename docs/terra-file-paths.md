@@ -95,6 +95,27 @@ Cloud URLs intentionally recorded in final manifests are metadata, not local
 filenames. Preserve those URLs as strings. This exception does not authorize
 passing them to local-only R readers.
 
+## QTL manifest inventory failure, 2026-09-09
+
+`PrepareCellTypeEqtlWorkflow.BuildQtlManifest` passed an upstream `gs://` inventory
+path to `read_tsv`. Both inventory inputs were declared as `File`, but task
+declarations used `write_lines([source_bed_inventory])` and
+`write_lines([filtered_bed_inventory])` before localization. Cromwell localized
+the generated text files without rewriting the cloud paths in their contents.
+
+The task now obtains both inventory paths during command rendering, with shell
+quoting, and passes them as named CLI arguments. It rejects unresolved cloud
+URIs and unreadable files before R starts. Output BED and report URLs remain
+String metadata because the manifest records these paths without opening them.
+The fix changes WDL only; the existing container can run it.
+
+The manifest regression test now evaluates task declarations with cloud File
+values before localizing inputs. The real R task reproduced the reported error
+before the fix. Tests also cover shell-special characters, both unreadable
+inventories, generated metadata file localization, and unchanged output URLs.
+These local checks do not replace a complete Terra run. This fix has not been
+tested on Terra.
+
 ## Why the old tests passed
 
 The regression helper localized incoming cloud Files, but its writer returned

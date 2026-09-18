@@ -1,5 +1,6 @@
 """Exercise the manifest task with upstream cloud File values, without cloud IO."""
 import csv
+import json
 import os
 import shutil
 import subprocess
@@ -8,6 +9,8 @@ import unittest
 from pathlib import Path
 
 import WDL
+
+from test_reference_filter_wdl import CloudGeneratedFileStdLib, render_after_localization
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {
@@ -27,11 +30,6 @@ COLUMNS = dict(zip(SOURCES, (
     "scaled_phenotype_pcs", "scaled_phenotype_pcs_all", "int_merged_covariates",
     "scaled_merged_covariates", "int_connectivity_outliers", "scaled_connectivity_outliers",
 )))
-
-
-class TaskStdLib(WDL.StdLib.Base):
-    def _virtualize_filename(self, filename):
-        return filename
 
 
 class QtlManifestWdlTest(unittest.TestCase):
@@ -110,6 +108,65 @@ class QtlManifestWdlTest(unittest.TestCase):
         for name, column in COLUMNS.items():
             self.assertEqual(env[name].json, expected[column])
 
+    def test_generated_metadata_files_remain_localizable_and_keep_cloud_urls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env, _ = self.task_inputs(directory)
+            stdlib = CloudGeneratedFileStdLib(directory)
+            for part in self.task.command.parts:
+                if not isinstance(part, WDL.Expr.Placeholder) or "write_json" not in str(part.expr):
+                    continue
+                with self.subTest(expression=str(part.expr)):
+                    generated = part.expr.eval(env, stdlib)
+                    self.assertIsInstance(generated, WDL.Value.File)
+                    localized = WDL.Value.rewrite_paths(generated,
+                        lambda value: stdlib.generated_paths[value.value])
+                    expected = part.expr.arguments[0].eval(env, stdlib).json
+                    self.assertEqual(json.loads(Path(localized.value).read_text()), expected)
+
+    def test_inventory_arguments_are_localized_before_shell_execution(self):
+        # Serializing File paths in task declarations loses localization inside
+        # the generated file. Exercise that boundary, not just local input paths.
+        with tempfile.TemporaryDirectory(prefix="qtl-manifest-localization-") as directory:
+            env, _ = self.task_inputs(directory)
+            expected = {}
+            for name in ("source_bed_inventory", "filtered_bed_inventory"):
+                path = Path(directory) / f"{name} donor's $literal `echo unsafe` $(touch unexpected_side_effect).tsv"
+                path.write_text(Path(env[name].value).read_text())
+                env = env.bind(name, WDL.Value.File(str(path)))
+                expected[name] = str(path)
+            command = render_after_localization(self.task, env, directory)
+            capture = '''Rscript() {
+              printf '%s\\0' "$@" > captured_args
+              printf 'entity:cell_type_id\\nmonocytes\\ncd4_t_cells\\n' > outputs/cell_type_qtl_manifest.tsv
+            }
+            '''
+            result = subprocess.run(["bash", "-c", capture + command], cwd=directory,
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            arguments = (Path(directory) / "captured_args").read_bytes().decode().split(chr(0))[:-1]
+            for name, flag in (("source_bed_inventory", "--source-inventory"),
+                               ("filtered_bed_inventory", "--filtered-inventory")):
+                self.assertEqual(arguments[arguments.index(flag) + 1], expected[name])
+            self.assertFalse((Path(directory) / "unexpected_side_effect").exists())
+
+    def test_unreadable_or_unlocalized_inventory_fails_before_r(self):
+        for name in ("source_bed_inventory", "filtered_bed_inventory"):
+            for kind in ("missing", "cloud"):
+                with self.subTest(input=name, kind=kind), tempfile.TemporaryDirectory() as directory:
+                    env, _ = self.task_inputs(directory)
+                    path = ("gs://test-bucket/not-localized.tsv" if kind == "cloud"
+                            else str(Path(directory) / "missing.tsv"))
+                    env = env.bind(name, WDL.Value.File(path))
+                    command = render_after_localization(self.task, env, directory)
+                    result = subprocess.run(["bash", "-c",
+                        'Rscript() { touch r_started; return 99; }\n' + command],
+                        cwd=directory, text=True, capture_output=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse((Path(directory) / "r_started").exists())
+                    diagnostic = "localization_error" if kind == "cloud" else "inventory_not_readable"
+                    self.assertIn(diagnostic, result.stdout + result.stderr)
+                    self.assertIn(name, result.stdout + result.stderr)
+
     @unittest.skipUnless(shutil.which("Rscript"), "Rscript is required to execute the task command")
     def test_rendered_task_writes_full_paths_and_ids_without_opening_cloud_files(self):
         # GitHub's WDL-only validation host need not have the R image's packages.
@@ -127,10 +184,7 @@ class QtlManifestWdlTest(unittest.TestCase):
             expected["int_bed"][0] = quoted_path
             env = env.bind("int_beds", WDL.Value.Array(
                 WDL.Type.String(), [WDL.Value.String(p) for p in expected["int_bed"]]))
-            stdlib = TaskStdLib("1.0", write_dir=directory)
-            for decl in self.task.postinputs:
-                env = env.bind(decl.name, decl.expr.eval(env, stdlib))
-            command = self.task.command.eval(env, stdlib).value
+            command = render_after_localization(self.task, env, directory)
             script = ROOT / "scripts/cell_type_specific_expression/downstream/build_qtl_manifest.R"
             # Rscript can encode spaces in --file before the script sees it.
             # A relative test-only link also matches the container's space-free path.
