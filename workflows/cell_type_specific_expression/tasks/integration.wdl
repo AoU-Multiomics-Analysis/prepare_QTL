@@ -6,7 +6,7 @@ task PrepareScatterInputs {
     Array[File] cell_type_beds
     File? sample_list
     String output_prefix
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
     Int cpu = 1
     String memory = "4 GB"
     Int disk_gb = 20
@@ -89,7 +89,7 @@ task BuildQtlManifest {
     String negative_summary
     String gene_comparison
     String filter_metrics
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
     Int cpu = 1
     String memory = "4 GB"
     Int disk_gb = 20
@@ -97,10 +97,7 @@ task BuildQtlManifest {
     Int max_retries = 1
   }
 
-  File source_inventory_path_file = write_lines([source_bed_inventory])
-  File filtered_inventory_path_file = write_lines([filtered_bed_inventory])
-
-command <<<
+  command <<<
     set -euo pipefail
     stage="build_qtl_manifest"
     log="$stage.log"
@@ -108,10 +105,26 @@ command <<<
     printf 'stage=%s start_time=%s\n' "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
     trap 'status=$?; printf "stage=%s error_status=%s time=%s\\n" "$stage" "$status" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"; exit "$status"' ERR
     mkdir -p outputs
-    IFS= read -r source_inventory_path < '~{source_inventory_path_file}'
-    IFS= read -r filtered_inventory_path < '~{filtered_inventory_path_file}'
-    # Task-scoped serialization preserves quoting and keeps file creation off
-    # the Terra workflow engine. These strings are upstream output URLs.
+    # Keep the inventories File-typed until command rendering. A path written
+    # into a task-declaration text file still contains its upstream cloud URI.
+    source_inventory_path='~{sub(source_bed_inventory, "'", "'\"'\"'")}'
+    filtered_inventory_path='~{sub(filtered_bed_inventory, "'", "'\"'\"'")}'
+    check_inventory() {
+      case "$2" in
+        gs://*|s3://*|http://*|https://*)
+          printf 'stage=%s status=failed message=localization_error input=%s path=%s\n' "$stage" "$1" "$2" >&2
+          return 1
+          ;;
+      esac
+      if [[ ! -f "$2" || ! -r "$2" ]]; then
+        printf 'stage=%s status=failed message=inventory_not_readable input=%s path=%s\n' "$stage" "$1" "$2" >&2
+        return 1
+      fi
+    }
+    check_inventory source_bed_inventory "$source_inventory_path"
+    check_inventory filtered_bed_inventory "$filtered_inventory_path"
+    # JSON values below are output metadata; their upstream URLs must remain
+    # unchanged. Only the two inventories are opened as local input files.
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/build_qtl_manifest.R \
       --cell-types '~{write_json(cell_types)}' \
       --cell-type-slugs '~{write_json(cell_type_slugs)}' \

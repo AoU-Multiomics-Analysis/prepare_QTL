@@ -27,7 +27,7 @@ task BuildManifest {
     String scale
     String tca_version = "1.2.1"
     String container_image
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:4e5770b68bc7b8aa3f414509b2a964f806bb10c87383eaca157cbb4d36da21dc"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
     Int cpu = 4
     String memory = "32 GB"
     Int disk_gb = 100

@@ -17,6 +17,10 @@ validate_tca_gene_parameters <- function(model) {
   }
   validate_matrix_identifiers(sigmas, "Model gene", "Model cell type")
   fields <- intersect(tca_gene_parameter_fields(), names(model))
+  # Constrained TCA can omit optional inferential p-value matrices.
+  fields <- fields[vapply(fields, function(field) {
+    field %in% required || !is.null(model[[field]])
+  }, logical(1))]
   for (field in fields) {
     value <- model[[field]]
     if (!is.matrix(value) || !is.numeric(value) ||

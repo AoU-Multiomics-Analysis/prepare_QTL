@@ -35,6 +35,9 @@ testthat::test_that("fit CLI writes a usable CPM model, excluded-gene report and
   testthat::expect_identical(rownames(model$mus_hat), rownames(X))
   testthat::expect_identical(model$expression_scale, "cpm")
   testthat::expect_false(model$tca_parallel)
+  cfg <- config::get(file = system.file("extdata", "config.yml", package = "TCA"), use_parent = FALSE)
+  testthat::expect_true(all(model$mus_hat >= min(X) + cfg$mu_epsilon - 1e-7))
+  testthat::expect_true(all(model$mus_hat <= max(X) - cfg$mu_epsilon + 1e-7))
   report <- readr::read_tsv(file.path(output, "tca_excluded_genes.tsv"), show_col_types = FALSE)
   testthat::expect_equal(nrow(report), 0L)
   testthat::expect_match(paste(readLines(file.path(output, "tca_model.log")), collapse = "\n"),
