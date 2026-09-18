@@ -2,9 +2,13 @@
 
 FitTca screens variable genes before the full TCA fit. It uses the same
 first-update least-squares calculation, covariates, bounds, and normalization
-as TCA 1.2.1 with `vars.mle=FALSE`, `refit_W=FALSE`, and `constrain_mu=FALSE`.
-Expression stays in linear CPM space. The estimator is not changed and negative
-estimates are not clamped.
+as TCA 1.2.1 with `vars.mle=FALSE`, `refit_W=FALSE`, and `constrain_mu=TRUE`.
+Expression stays in linear CPM space. Cell-type means are bounded by the global input minimum plus
+`mu_epsilon` and maximum minus `mu_epsilon`. Covariate coefficients retain
+the unrestricted solver bounds. Variance MLE remains off. This does not
+constrain every donor-level expression estimate; exported values are not clipped.
+Constrained TCA can omit optional p-value matrices, which cleanup accepts
+while still requiring all fitted parameter matrices.
 
 - A negative or non-finite variance coefficient excludes that gene from fitting.
   This also checks the gene's contribution to the shared noise variance.
@@ -35,9 +39,8 @@ this check does not establish convergence or validate downstream QTL results.
   `gene_filter` record. The unchanged export code uses that record to select
   genes from the source BED in model order. Model restart retains the record.
 
-Both implementation entrypoints and the new helper are in the fit script
-directory. Only the fit-stage image defaults need updating; model cleanup also
-uses that stage. There are no new WDL inputs or outputs and no new GitHub checks.
-Local checks cover flag classification, the reported numerical failure, solver
-errors, cleanup/export alignment, and existing regression tests. A complete
-Terra run and a 100-iteration fit have not been validated by these checks.
+The fit stage includes the preflight helper. Shared fit and cleanup helpers also
+require refreshed export and downstream images under the stage dependency policy.
+There are no new WDL inputs or outputs. Fit-stage runtime tests cover constrained
+mean bounds and cleanup with absent optional p-values. Local tests do not establish
+Terra compatibility; the complete workflow has not been tested on Terra with this change.
