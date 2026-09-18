@@ -8,7 +8,7 @@ task FitTca {
     Int max_iters = 10
     Int random_seed = 20260901
     Boolean parallel = false
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
     Int cpu = 16
     String memory = "256 GB"
     Int disk_gb = 750
@@ -66,7 +66,7 @@ task CleanTcaModel {
   input {
     Boolean reuse_model = false
     File unfiltered_model
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
     Int preemptible_attempts = 0
     Int max_retries = 1
   }
@@ -112,7 +112,7 @@ task ExportTcaBeds {
     File tca_weights
     File? covariates
     Boolean parallel = false
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
     Int cpu = 8
     String memory = "256 GB"
     Int disk_gb = 500
