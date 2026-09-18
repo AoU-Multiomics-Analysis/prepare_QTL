@@ -6,7 +6,7 @@ task validate_rnaseqc_manifests {
         String prefix
         Int batch_size
 
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
         Int memory_gb
         Int disk_space_gb
         Int num_preempt
@@ -16,7 +16,7 @@ task validate_rnaseqc_manifests {
     # Serialize the string without inserting its contents into shell source.
     File prefix_input_file = write_lines([prefix])
 
-    command <<<
+command <<<
         set -euo pipefail
 
         log() {
@@ -65,14 +65,14 @@ task aggregate_rnaseqc_batch {
         Boolean include_insert_sizes
         Boolean merge_exons
 
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
         Int memory_gb
         Int disk_space_gb
         Int num_threads
         Int num_preempt
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         export LC_ALL=C
 
@@ -183,13 +183,13 @@ task merge_rnaseqc_batches {
         Boolean include_insert_sizes
         Boolean merge_exons
 
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
         Int memory_gb
         Int disk_space_gb
         Int num_preempt
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         export LC_ALL=C
 
@@ -269,12 +269,15 @@ task merge_rnaseqc_batches {
 
 workflow rnaseqc2_aggregate_batched_workflow {
     input {
+        String rnaseqc2_aggregate_batched__aggregate_rnaseqc_batch_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
+        String rnaseqc2_aggregate_batched__merge_rnaseqc_batches_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
+        String rnaseqc2_aggregate_batched__validate_rnaseqc_manifests_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
         File sample_manifest
         String prefix
         Boolean merge_exons
 
         Int batch_size = 100
-        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-rnaseqc2-aggregation@sha256:cb725753b77ff558d5390966c0faea4ada431845f36239b00e9b3e2a012faa1f"
+
         Int validation_memory_gb = 1
         Int validation_disk_space_gb = 10
         Int batch_memory_gb = 4
@@ -290,7 +293,7 @@ workflow rnaseqc2_aggregate_batched_workflow {
             sample_manifest = sample_manifest,
             prefix = prefix,
             batch_size = batch_size,
-            docker_image = docker_image,
+            docker_image = rnaseqc2_aggregate_batched__validate_rnaseqc_manifests_image,
             memory_gb = validation_memory_gb,
             disk_space_gb = validation_disk_space_gb,
             num_preempt = num_preempt
@@ -305,7 +308,7 @@ workflow rnaseqc2_aggregate_batched_workflow {
                 batch_size = batch_size,
                 include_insert_sizes = validate_rnaseqc_manifests.include_insert_sizes,
                 merge_exons = merge_exons,
-                docker_image = docker_image,
+                docker_image = rnaseqc2_aggregate_batched__aggregate_rnaseqc_batch_image,
                 memory_gb = batch_memory_gb,
                 disk_space_gb = batch_disk_space_gb,
                 num_threads = num_threads,
@@ -323,7 +326,7 @@ workflow rnaseqc2_aggregate_batched_workflow {
             prefix_file = validate_rnaseqc_manifests.prefix_file,
             include_insert_sizes = validate_rnaseqc_manifests.include_insert_sizes,
             merge_exons = merge_exons,
-            docker_image = docker_image,
+            docker_image = rnaseqc2_aggregate_batched__merge_rnaseqc_batches_image,
             memory_gb = merge_memory_gb,
             disk_space_gb = merge_disk_space_gb,
             num_preempt = num_preempt

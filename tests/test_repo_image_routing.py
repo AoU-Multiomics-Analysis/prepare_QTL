@@ -1,6 +1,7 @@
 """Validate declared, immutable routing for repository-owned WDL images."""
 from pathlib import Path
 import os
+from fnmatch import fnmatchcase
 import re
 import sys
 import unittest
@@ -34,7 +35,9 @@ class RepositoryImageRoutingTest(unittest.TestCase):
         cls.documents = {}
         for path in sorted(WORKFLOWS.rglob("*.wdl")):
             relative = path.relative_to(ROOT).as_posix()
-            if relative.startswith("workflows/genotype/"):
+            if any(group.get('policy') == 'external_images_manual' and
+                   any(fnmatchcase(relative, pattern) for pattern in group['paths'])
+                   for group in cls.config['workflow_groups']):
                 continue
             cls.documents[relative] = WDL.load(str(path))
 

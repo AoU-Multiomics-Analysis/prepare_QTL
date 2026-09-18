@@ -1,84 +1,449 @@
-# Candidate pin targets only. No publishing or automatic commits are enabled.
 version: 1
 stages:
-  cell_estimation:
-    - path: workflows/cell_type_specific_expression/deconvolution.wdl
-      input: estimation_docker_image
-    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
-      input: estimation_docker_image
-  cell_fit:
-    - path: workflows/cell_type_specific_expression/deconvolution.wdl
-      input: fit_docker_image
-    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
-      input: fit_docker_image
-  cell_export:
-    - path: workflows/cell_type_specific_expression/deconvolution.wdl
-      input: export_docker_image
-    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
-      input: export_docker_image
-  cell_downstream:
-    - path: workflows/cell_type_specific_expression/deconvolution.wdl
-      input: downstream_docker_image
-    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
-      input: downstream_docker_image
-  expression:
-    - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
-      input: qtl_docker_image
-    - path: workflows/expression/prepare_eQTL.wdl
-      input: DockerImage
-    - path: workflows/expression/prepare_eQTL.wdl
-      scope: task
-      task: eqtl_prepare_expression
-      input: DockerImage
-  common:
-    - path: workflows/common/MergeCovariates.wdl
-      input: DockerImage
-    - path: workflows/common/MergeCovariates.wdl
-      scope: task
-      task: MergeCovariatesR
-      input: DockerImage
-    - path: workflows/common/ResidualizePhenotypes.wdl
-      scope: task
-      task: ResidualizePhenotypes
-      input: DockerImage
-    - path: workflows/common/calculate_phenotypePCs.wdl
-      input: DockerImage
-    - path: workflows/common/calculate_phenotypePCs.wdl
-      scope: task
-      task: ComputePCs
-      input: DockerImage
-  proteomics:
-    - path: workflows/proteomics/normalize_pQTL.wdl
-      input: proteomics_docker_image
-    - path: workflows/proteomics/prepare_pQTL.wdl
-      input: proteomics_docker_image
-  splicing:
-    - path: workflows/splicing/prepare_sQTL.wdl
-      input: splicing_docker_image
-  methylation:
-    - path: workflows/methylation/AggregateMethylationCohort.wdl
-      input: methylation_docker_image
-    - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
-      input: methylation_docker_image
-    - path: workflows/methylation/annotation.wdl
-      input: methylation_docker_image
-    - path: workflows/methylation/cohort_aggregation.wdl
-      input: methylation_docker_image
-    - path: workflows/methylation/connectivity.wdl
-      input: methylation_docker_image
-    - path: workflows/methylation/merge_methylation.wdl
-      input: methylation_docker_image
-    - path: workflows/methylation/prepare_mQTL.wdl
-      input: methylation_docker_image
-    - path: workflows/methylation/qtl_covariates.wdl
-      input: methylation_docker_image
-  methylation_rust:
-    - path: workflows/methylation/AggregateMethylationCohort.wdl
-      input: methylation_rust_docker_image
-    - path: workflows/methylation/ProcessMethylationSample.wdl
-      input: methylation_rust_docker_image
-    - path: workflows/methylation/cohort_aggregation.wdl
-      input: methylation_rust_docker_image
-  rnaseqc:
-    - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
-      input: docker_image
+  prepare_sqtl__prepare_splice_data:
+  - path: workflows/splicing/prepare_sQTL.wdl
+    scope: task
+    task: PrepareSpliceData
+    input: docker_image
+  - path: workflows/splicing/prepare_sQTL.wdl
+    input: prepare_sqtl__prepare_splice_data_image
+  cohort_aggregation__prepare_methylation_cohort_manifest:
+  - path: workflows/methylation/cohort_aggregation.wdl
+    scope: task
+    task: PrepareMethylationCohortManifest
+    input: docker_image
+  - path: workflows/methylation/cohort_aggregation.wdl
+    input: cohort_aggregation__prepare_methylation_cohort_manifest_image
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: cohort_aggregation__prepare_methylation_cohort_manifest_image
+  cohort_aggregation__build_methylation_cohort_samples:
+  - path: workflows/methylation/cohort_aggregation.wdl
+    scope: task
+    task: BuildMethylationCohortSamples
+    input: docker_image
+  - path: workflows/methylation/cohort_aggregation.wdl
+    input: cohort_aggregation__build_methylation_cohort_samples_image
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: cohort_aggregation__build_methylation_cohort_samples_image
+  cohort_aggregation__merge_methylation_chromosome:
+  - path: workflows/methylation/cohort_aggregation.wdl
+    scope: task
+    task: MergeMethylationChromosome
+    input: docker_image
+  - path: workflows/methylation/cohort_aggregation.wdl
+    input: cohort_aggregation__merge_methylation_chromosome_image
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: cohort_aggregation__merge_methylation_chromosome_image
+  cohort_aggregation__aggregate_methylation_chromosomes:
+  - path: workflows/methylation/cohort_aggregation.wdl
+    scope: task
+    task: AggregateMethylationChromosomes
+    input: docker_image
+  - path: workflows/methylation/cohort_aggregation.wdl
+    input: cohort_aggregation__aggregate_methylation_chromosomes_image
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: cohort_aggregation__aggregate_methylation_chromosomes_image
+  processmethylationsample__filter_methylation_sample:
+  - path: workflows/methylation/ProcessMethylationSample.wdl
+    scope: task
+    task: FilterMethylationSample
+    input: docker_image
+  - path: workflows/methylation/ProcessMethylationSample.wdl
+    input: processmethylationsample__filter_methylation_sample_image
+  annotation__annotate_methylation_sites:
+  - path: workflows/methylation/cohort_aggregation.wdl
+    input: annotation__annotate_methylation_sites_image
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: annotation__annotate_methylation_sites_image
+  - path: workflows/methylation/annotation.wdl
+    scope: task
+    task: AnnotateMethylationSites
+    input: docker_image
+  - path: workflows/methylation/annotation.wdl
+    input: annotation__annotate_methylation_sites_image
+  merge_methylation__shard_methylation_manifest:
+  - path: workflows/methylation/merge_methylation.wdl
+    scope: task
+    task: ShardMethylationManifest
+    input: docker_image
+  - path: workflows/methylation/merge_methylation.wdl
+    input: merge_methylation__shard_methylation_manifest_image
+  merge_methylation__filter_methylation_shard:
+  - path: workflows/methylation/merge_methylation.wdl
+    scope: task
+    task: FilterMethylationShard
+    input: docker_image
+  - path: workflows/methylation/merge_methylation.wdl
+    input: merge_methylation__filter_methylation_shard_image
+  connectivity__build_methylation_correlation_covariates:
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: connectivity__build_methylation_correlation_covariates_image
+  - path: workflows/methylation/connectivity.wdl
+    scope: task
+    task: BuildMethylationCorrelationCovariates
+    input: docker_image
+  - path: workflows/methylation/connectivity.wdl
+    input: connectivity__build_methylation_correlation_covariates_image
+  connectivity__analyze_methylation_cpg_correlation:
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: connectivity__analyze_methylation_cpg_correlation_image
+  - path: workflows/methylation/connectivity.wdl
+    scope: task
+    task: AnalyzeMethylationCpGCorrelation
+    input: docker_image
+  - path: workflows/methylation/connectivity.wdl
+    input: connectivity__analyze_methylation_cpg_correlation_image
+  connectivity__finalize_methylation_connectivity:
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: connectivity__finalize_methylation_connectivity_image
+  - path: workflows/methylation/connectivity.wdl
+    scope: task
+    task: FinalizeMethylationConnectivity
+    input: docker_image
+  - path: workflows/methylation/connectivity.wdl
+    input: connectivity__finalize_methylation_connectivity_image
+  aggregatemethylationcohortarrays__build_methylation_cohort_samples:
+  - path: workflows/methylation/merge_methylation.wdl
+    input: aggregatemethylationcohortarrays__build_methylation_cohort_samples_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    scope: task
+    task: BuildMethylationCohortSamples
+    input: docker_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: aggregatemethylationcohortarrays__build_methylation_cohort_samples_image
+  aggregatemethylationcohortarrays__merge_methylation_chromosome:
+  - path: workflows/methylation/merge_methylation.wdl
+    input: aggregatemethylationcohortarrays__merge_methylation_chromosome_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    scope: task
+    task: MergeMethylationChromosome
+    input: docker_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: aggregatemethylationcohortarrays__merge_methylation_chromosome_image
+  aggregatemethylationcohortarrays__build_methylation_correlation_covariates:
+  - path: workflows/methylation/merge_methylation.wdl
+    input: aggregatemethylationcohortarrays__build_methylation_correlation_covariates_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    scope: task
+    task: BuildMethylationCorrelationCovariates
+    input: docker_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: aggregatemethylationcohortarrays__build_methylation_correlation_covariates_image
+  aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation:
+  - path: workflows/methylation/merge_methylation.wdl
+    input: aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    scope: task
+    task: AnalyzeMethylationCpGCorrelation
+    input: docker_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image
+  aggregatemethylationcohortarrays__aggregate_methylation_chromosomes:
+  - path: workflows/methylation/merge_methylation.wdl
+    input: aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    scope: task
+    task: AggregateMethylationChromosomes
+    input: docker_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image
+  aggregatemethylationcohortarrays__finalize_methylation_connectivity:
+  - path: workflows/methylation/merge_methylation.wdl
+    input: aggregatemethylationcohortarrays__finalize_methylation_connectivity_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    scope: task
+    task: FinalizeMethylationConnectivity
+    input: docker_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: aggregatemethylationcohortarrays__finalize_methylation_connectivity_image
+  aggregatemethylationcohortarrays__annotate_methylation_sites:
+  - path: workflows/methylation/merge_methylation.wdl
+    input: aggregatemethylationcohortarrays__annotate_methylation_sites_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    scope: task
+    task: AnnotateMethylationSites
+    input: docker_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: aggregatemethylationcohortarrays__annotate_methylation_sites_image
+  prepare_mqtl__prepare_methylation_data:
+  - path: workflows/methylation/prepare_mQTL.wdl
+    scope: task
+    task: PrepareMethylationData
+    input: docker_image
+  - path: workflows/methylation/prepare_mQTL.wdl
+    input: prepare_mqtl__prepare_methylation_data_image
+  calculate_phenotypepcs__computep_cs:
+  - path: workflows/splicing/prepare_sQTL.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/methylation/merge_methylation.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/methylation/connectivity.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/methylation/prepare_mQTL.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/methylation/qtl_covariates.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/common/calculate_phenotypePCs.wdl
+    scope: task
+    task: ComputePCs
+    input: DockerImage
+  - path: workflows/common/calculate_phenotypePCs.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/expression/prepare_eQTL.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/proteomics/prepare_pQTL.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: calculate_phenotypepcs__computep_cs_image
+  mergecovariates__merge_covariatesr:
+  - path: workflows/splicing/prepare_sQTL.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/methylation/AggregateMethylationCohort.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/methylation/merge_methylation.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/methylation/AggregateMethylationCohortArrays.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/methylation/prepare_mQTL.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/methylation/qtl_covariates.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/common/MergeCovariates.wdl
+    scope: task
+    task: MergeCovariatesR
+    input: DockerImage
+  - path: workflows/common/MergeCovariates.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/expression/prepare_eQTL.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/proteomics/prepare_pQTL.wdl
+    input: mergecovariates__merge_covariatesr_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: mergecovariates__merge_covariatesr_image
+  residualizephenotypes__residualize_phenotypes:
+  - path: workflows/splicing/prepare_sQTL.wdl
+    input: residualizephenotypes__residualize_phenotypes_image
+  - path: workflows/common/ResidualizePhenotypes.wdl
+    scope: task
+    task: ResidualizePhenotypes
+    input: DockerImage
+  - path: workflows/expression/prepare_eQTL.wdl
+    input: residualizephenotypes__residualize_phenotypes_image
+  - path: workflows/proteomics/prepare_pQTL.wdl
+    input: residualizephenotypes__residualize_phenotypes_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: residualizephenotypes__residualize_phenotypes_image
+  prepare_eqtl__eqtl_prepare_expression:
+  - path: workflows/expression/prepare_eQTL.wdl
+    scope: task
+    task: eqtl_prepare_expression
+    input: DockerImage
+  - path: workflows/expression/prepare_eQTL.wdl
+    input: prepare_eqtl__eqtl_prepare_expression_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: prepare_eqtl__eqtl_prepare_expression_image
+  rnaseqc2_aggregate_batched__validate_rnaseqc_manifests:
+  - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+    scope: task
+    task: validate_rnaseqc_manifests
+    input: docker_image
+  - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+    input: rnaseqc2_aggregate_batched__validate_rnaseqc_manifests_image
+  rnaseqc2_aggregate_batched__aggregate_rnaseqc_batch:
+  - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+    scope: task
+    task: aggregate_rnaseqc_batch
+    input: docker_image
+  - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+    input: rnaseqc2_aggregate_batched__aggregate_rnaseqc_batch_image
+  rnaseqc2_aggregate_batched__merge_rnaseqc_batches:
+  - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+    scope: task
+    task: merge_rnaseqc_batches
+    input: docker_image
+  - path: workflows/expression/rnaseqc2_aggregate_batched.wdl
+    input: rnaseqc2_aggregate_batched__merge_rnaseqc_batches_image
+  prepare_pqtl__prepare_proteomic_data:
+  - path: workflows/proteomics/prepare_pQTL.wdl
+    scope: task
+    task: PrepareProteomicData
+    input: docker_image
+  - path: workflows/proteomics/prepare_pQTL.wdl
+    input: prepare_pqtl__prepare_proteomic_data_image
+  normalize_pqtl__normalize_proteomics:
+  - path: workflows/proteomics/normalize_pQTL.wdl
+    scope: task
+    task: NormalizeProteomics
+    input: docker_image
+  - path: workflows/proteomics/normalize_pQTL.wdl
+    input: normalize_pqtl__normalize_proteomics_image
+  reference_filter__prepare_haemopedia:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: reference_filter__prepare_haemopedia_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: reference_filter__prepare_haemopedia_image
+  - path: workflows/cell_type_specific_expression/tasks/reference_filter.wdl
+    scope: task
+    task: PrepareHaemopedia
+    input: docker_image
+  reference_filter__filter_cell_type_beds:
+  - path: workflows/cell_type_specific_expression/tasks/reference_filter.wdl
+    scope: task
+    task: FilterCellTypeBeds
+    input: docker_image
+  hspe__prepare_hspe_batches:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: hspe__prepare_hspe_batches_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: hspe__prepare_hspe_batches_image
+  - path: workflows/cell_type_specific_expression/tasks/hspe.wdl
+    scope: task
+    task: PrepareHspeBatches
+    input: docker_image
+  hspe__run_hspe_batch:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: hspe__run_hspe_batch_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: hspe__run_hspe_batch_image
+  - path: workflows/cell_type_specific_expression/tasks/hspe.wdl
+    scope: task
+    task: RunHspeBatch
+    input: docker_image
+  hspe__merge_hspe_batches:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: hspe__merge_hspe_batches_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: hspe__merge_hspe_batches_image
+  - path: workflows/cell_type_specific_expression/tasks/hspe.wdl
+    scope: task
+    task: MergeHspeBatches
+    input: docker_image
+  qc__build_manifest:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: qc__build_manifest_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: qc__build_manifest_image
+  - path: workflows/cell_type_specific_expression/tasks/qc.wdl
+    scope: task
+    task: BuildManifest
+    input: docker_image
+  filter_scatter__filter_cell_type_bed:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: filter_scatter__filter_cell_type_bed_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: filter_scatter__filter_cell_type_bed_image
+  - path: workflows/cell_type_specific_expression/tasks/filter_scatter.wdl
+    scope: task
+    task: FilterCellTypeBed
+    input: docker_image
+  filter_scatter__merge_filter_reports:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: filter_scatter__merge_filter_reports_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: filter_scatter__merge_filter_reports_image
+  - path: workflows/cell_type_specific_expression/tasks/filter_scatter.wdl
+    scope: task
+    task: MergeFilterReports
+    input: docker_image
+  integration__prepare_scatter_inputs:
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: integration__prepare_scatter_inputs_image
+  - path: workflows/cell_type_specific_expression/tasks/integration.wdl
+    scope: task
+    task: PrepareScatterInputs
+    input: docker_image
+  integration__build_qtl_manifest:
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: integration__build_qtl_manifest_image
+  - path: workflows/cell_type_specific_expression/tasks/integration.wdl
+    scope: task
+    task: BuildQtlManifest
+    input: docker_image
+  tca__fit_tca:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: tca__fit_tca_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: tca__fit_tca_image
+  - path: workflows/cell_type_specific_expression/tasks/tca.wdl
+    scope: task
+    task: FitTca
+    input: docker_image
+  tca__clean_tca_model:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: tca__clean_tca_model_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: tca__clean_tca_model_image
+  - path: workflows/cell_type_specific_expression/tasks/tca.wdl
+    scope: task
+    task: CleanTcaModel
+    input: docker_image
+  tca__export_tca_beds:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: tca__export_tca_beds_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: tca__export_tca_beds_image
+  - path: workflows/cell_type_specific_expression/tasks/tca.wdl
+    scope: task
+    task: ExportTcaBeds
+    input: docker_image
+  proportions__validate_proportion_mode:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: proportions__validate_proportion_mode_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: proportions__validate_proportion_mode_image
+  - path: workflows/cell_type_specific_expression/tasks/proportions.wdl
+    scope: task
+    task: ValidateProportionMode
+    input: docker_image
+  proportions__process_proportions:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: proportions__process_proportions_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: proportions__process_proportions_image
+  - path: workflows/cell_type_specific_expression/tasks/proportions.wdl
+    scope: task
+    task: ProcessProportions
+    input: docker_image
+  gene_summary__summarize_cell_type_beds:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: gene_summary__summarize_cell_type_beds_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: gene_summary__summarize_cell_type_beds_image
+  - path: workflows/cell_type_specific_expression/tasks/gene_summary.wdl
+    scope: task
+    task: SummarizeCellTypeBeds
+    input: docker_image
+  expression__filter_expression_genes:
+  - path: workflows/cell_type_specific_expression/deconvolution.wdl
+    input: expression__filter_expression_genes_image
+  - path: workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
+    input: expression__filter_expression_genes_image
+  - path: workflows/cell_type_specific_expression/tasks/expression.wdl
+    scope: task
+    task: FilterExpressionGenes
+    input: docker_image
+  trans_ld_prepare:
+  - path: workflows/genotype/trans_ld_regions.wdl
+    scope: task
+    task: PrepareInputs
+    input: docker_image
+  - path: workflows/genotype/trans_ld_regions.wdl
+    input: trans_ld_prepare_image
+  trans_ld_ancestry:
+  - path: workflows/genotype/trans_ld_regions.wdl
+    scope: task
+    task: AncestryLD
+    input: docker_image
+  - path: workflows/genotype/trans_ld_regions.wdl
+    input: trans_ld_ancestry_image
+  trans_ld_combine:
+  - path: workflows/genotype/trans_ld_regions.wdl
+    scope: task
+    task: CombineRegions
+    input: docker_image
+  - path: workflows/genotype/trans_ld_regions.wdl
+    input: trans_ld_combine_image

@@ -110,20 +110,23 @@ class ProposalTests(unittest.TestCase):
         self.assertEqual(result['workflows/tasks.wdl'], text.replace('task Second { input { String image = "' + OLD,
                                                                    'task Second { input { String image = "' + NEW))
 
-    def test_real_repository_targets_update_only_downstream(self):
+    def test_real_repository_targets_update_only_one_task(self):
         config = yaml.safe_load((ROOT / 'ci/image-stages.yml').read_text())
         targets = yaml.safe_load((ROOT / 'ci/release-pins.yml').read_text())
         files = {item['path']: (ROOT / item['path']).read_text()
                  for locations in targets['stages'].values() for item in locations}
         candidate = config['images']['cell_type']['repository'] + '@sha256:' + 'c' * 64
-        result = self.module.propose(config, targets, {'stages': ['cell_downstream'], 'unmapped': []},
+        selected = 'gene_summary__summarize_cell_type_beds'
+        result = self.module.propose(config, targets, {'stages': [selected], 'unmapped': []},
                                      files, {'cell_type': candidate})
-        self.assertEqual(len(result), 2)
-        for path, updated in result.items():
-            for name in ('estimation_docker_image', 'fit_docker_image', 'export_docker_image'):
-                self.assertEqual(self.module.literal_span(updated, name)[2],
-                                 self.module.literal_span(files[path], name)[2])
-            self.assertEqual(self.module.literal_span(updated, 'downstream_docker_image')[2], candidate)
+        for task, locations in targets['stages'].items():
+            for loc in locations:
+                path = loc['path']
+                value = self.module.literal_span(result.get(path, files[path]), loc['input'],
+                                                 loc.get('scope', 'workflow'), loc.get('task'))[2]
+                old = self.module.literal_span(files[path], loc['input'],
+                                               loc.get('scope', 'workflow'), loc.get('task'))[2]
+                self.assertEqual(value, candidate if task == selected else old)
 
 
 class ProposalCliTests(unittest.TestCase):

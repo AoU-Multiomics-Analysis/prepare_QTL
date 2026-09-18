@@ -507,7 +507,7 @@ require_true(
   "The deconvolution manifest parameters are incorrect"
 )
 require_true(
-  identical(manifest$container_image, input_value("downstream_docker_image")),
+  identical(manifest$container_image, input_value("qc__build_manifest_image")),
   "The manifest did not record its downstream image"
 )
 require_true(

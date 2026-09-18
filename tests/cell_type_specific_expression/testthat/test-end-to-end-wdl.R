@@ -81,12 +81,12 @@ testthat::test_that("end-to-end WDL imports and calls the reusable workflows", {
   )
   testthat::expect_match(
     text,
-    "estimation_docker_image = estimation_docker_image",
+    "hspe__run_hspe_batch_image = hspe__run_hspe_batch_image",
     fixed = TRUE
   )
   testthat::expect_match(
     text,
-    "docker_image = downstream_docker_image",
+    "docker_image = integration__build_qtl_manifest_image",
     fixed = TRUE
   )
 })
@@ -115,7 +115,7 @@ testthat::test_that("end-to-end WDL requires QTL covariates and scatters by alig
     },
     "AdditionalCovariates = AdditionalCovariates",
     "ResidualizeNormalizedInputs = false",
-    "DockerImage = qtl_docker_image",
+    "prepare_eqtl__eqtl_prepare_expression_image = prepare_eqtl__eqtl_prepare_expression_image",
     "preemptible_attempts = preemptible_attempts",
     "max_retries = max_retries",
     "memory = eqtl_memory",

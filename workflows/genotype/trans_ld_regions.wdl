@@ -16,7 +16,9 @@ workflow TransLDRegions {
         File chrom_sizes
         String genome_build
         Float pvalue_threshold
-        String docker_image
+        String trans_ld_prepare_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions@sha256:523c975d2b616b2b2f894e9ee04313174708c8dce84c82cd671c1f8a2064d280"
+        String trans_ld_ancestry_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions@sha256:523c975d2b616b2b2f894e9ee04313174708c8dce84c82cd671c1f8a2064d280"
+        String trans_ld_combine_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions@sha256:523c975d2b616b2b2f894e9ee04313174708c8dce84c82cd671c1f8a2064d280"
         String variant_column = "variant_id"
         String phenotype_column = "phenotype_id"
         String pvalue_column = "pval"
@@ -63,7 +65,7 @@ workflow TransLDRegions {
             dataset_column = dataset_column,
             cell_type_column = cell_type_column,
             default_modality = default_modality,
-            docker_image = docker_image,
+            docker_image = trans_ld_prepare_image,
             memory_gb = preparation_memory_gb,
             disk_gb = preparation_disk_gb,
             preemptible_attempts = preemptible_attempts
@@ -89,7 +91,7 @@ workflow TransLDRegions {
                     threads = threads,
                     memory_gb = ld_memory_gb,
                     disk_gb = ld_disk_gb,
-                    docker_image = docker_image,
+                    docker_image = trans_ld_ancestry_image,
                     preemptible_attempts = preemptible_attempts
             }
         }
@@ -103,7 +105,7 @@ workflow TransLDRegions {
             padding_bp = padding_bp,
             fallback_bp = fallback_bp,
             min_region_bp = min_region_bp,
-            docker_image = docker_image,
+            docker_image = trans_ld_combine_image,
             memory_gb = merge_memory_gb,
             disk_gb = merge_disk_gb,
             preemptible_attempts = preemptible_attempts
@@ -130,7 +132,9 @@ workflow TransLDRegions {
         association_files: "TSV, TSV.gz or Parquet. Use selected trans associations; pvalue_threshold only filters rows and does not calculate significance."
         ancestry_samples: "TSV with header IID and ancestry; unique IID, one group per participant."
         chrom_sizes: "Two-column chromosome/length file or FASTA .fai, for the specified genome build."
-        docker_image: "Published image built from this bundle, preferably specified by digest."
+        trans_ld_prepare_image: "Pinned image for input preparation."
+        trans_ld_ancestry_image: "Pinned image for ancestry LD."
+        trans_ld_combine_image: "Pinned image for region combination."
         maf_threshold: "Strict lower bound on within-group minor allele frequency. No MAC cutoff."
         min_region_bp: "Minimum final interval width before overlap merging; default 2 Mb total."
         max_search_bp: "Maximum LD search distance per side. Search-limit hits are retained and flagged."
@@ -145,7 +149,7 @@ task PrepareInputs {
         Array[String] chromosome_names
         String genome_build
         Float pvalue_threshold
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions@sha256:523c975d2b616b2b2f894e9ee04313174708c8dce84c82cd671c1f8a2064d280"
         String variant_column = "variant_id"
         String phenotype_column = "phenotype_id"
         String pvalue_column = "pval"
@@ -159,7 +163,7 @@ task PrepareInputs {
         Int disk_gb = 50
         Int preemptible_attempts = 1
     }
-    command <<<
+command <<<
         set -euo pipefail
         echo '[prepare] Starting association and ancestry validation'
         python3 -m trans_ld_regions.prepare \
@@ -207,7 +211,7 @@ task AncestryLD {
         String ancestry_group
         File associations
         File chrom_sizes
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions@sha256:523c975d2b616b2b2f894e9ee04313174708c8dce84c82cd671c1f8a2064d280"
         Float maf_threshold = 0.01
         Float r2_threshold = 0.1
         Int initial_search_bp = 1000000
@@ -218,7 +222,7 @@ task AncestryLD {
         Int disk_gb = 100
         Int preemptible_attempts = 1
     }
-    command <<<
+command <<<
         set -euo pipefail
         echo '[ld] Starting ancestry-specific LD analysis'
         python3 -m trans_ld_regions.ld \
@@ -258,7 +262,7 @@ task CombineRegions {
         Array[File] interval_files
         File chrom_sizes
         String genome_build
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-trans-ld-regions@sha256:523c975d2b616b2b2f894e9ee04313174708c8dce84c82cd671c1f8a2064d280"
         Int padding_bp = 100000
         Int fallback_bp = 1000000
         Int min_region_bp = 2000000
@@ -266,7 +270,7 @@ task CombineRegions {
         Int disk_gb = 50
         Int preemptible_attempts = 1
     }
-    command <<<
+command <<<
         set -euo pipefail
         echo '[merge] Combining ancestry boundaries and enforcing minimum width'
         python3 -m trans_ld_regions.combine \

@@ -7,10 +7,10 @@ import "annotation.wdl" as Annotation
 task PrepareMethylationCohortManifest {
     input {
         File CohortManifest
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         Rscript /tmp/PrepareMethylationCohortManifest.R \
             --CohortManifest "~{CohortManifest}" \
             --OutputDir manifest_lists
@@ -53,10 +53,10 @@ task BuildMethylationCohortSamples {
     input {
         Array[File] SampleQCFiles
         String OutputPrefix
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' SampleQCFiles} > sample_qc_files.list
         Rscript /tmp/BuildMethylationCohortSamples.R \
@@ -95,10 +95,10 @@ task MergeMethylationChromosome {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' AllCallShards} > all_call_shards.list
         coverage_correlation_arg=""
@@ -136,7 +136,6 @@ task MergeMethylationChromosome {
     }
 }
 
-
 task AggregateMethylationChromosomes {
     input {
         Array[File] FilteredCallsByChromosome
@@ -150,10 +149,10 @@ task AggregateMethylationChromosomes {
         Int MemoryGB
         Int DiskGB
         Int NumThreads
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' ~{sep=' ' FilteredCallsByChromosome} > filtered_calls_by_chromosome.list
         printf '%s\n' ~{sep=' ' SiteQCByChromosome} > site_qc_by_chromosome.list
@@ -272,9 +271,13 @@ task AggregateMethylationChromosomes {
     }
 }
 
-
 workflow AggregateMethylationData {
     input {
+        String annotation__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String cohort_aggregation__aggregate_methylation_chromosomes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String cohort_aggregation__build_methylation_cohort_samples_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String cohort_aggregation__merge_methylation_chromosome_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
+        String cohort_aggregation__prepare_methylation_cohort_manifest_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         File CohortManifest
         String OutputPrefix
         Float MinSampleFraction
@@ -296,14 +299,13 @@ workflow AggregateMethylationData {
         Int AnnotationMemoryGB
         Int AnnotationDiskGB
         Int NumThreads
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
-        String methylation_rust_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-methylation-rust@sha256:16f631c34e0ce265d686335b91c18948607127178d95e7829070c97cd207d6ad"
+
     }
 
     call PrepareMethylationCohortManifest {
         input:
             CohortManifest = CohortManifest,
-            docker_image = methylation_docker_image
+            docker_image = cohort_aggregation__prepare_methylation_cohort_manifest_image
     }
 
     Array[File] SampleQCFiles = read_lines(PrepareMethylationCohortManifest.SampleQCManifest)
@@ -325,7 +327,7 @@ workflow AggregateMethylationData {
         input:
             SampleQCFiles = SampleQCFiles,
             OutputPrefix = OutputPrefix,
-            docker_image = methylation_docker_image
+            docker_image = cohort_aggregation__build_methylation_cohort_samples_image
     }
 
     Array[String] AutosomeNames = [
@@ -363,7 +365,7 @@ workflow AggregateMethylationData {
                 MemoryGB = MergeMemoryGB,
                 DiskGB = MergeDiskGB,
                 NumThreads = NumThreads,
-                docker_image = methylation_rust_docker_image
+                docker_image = cohort_aggregation__merge_methylation_chromosome_image
         }
     }
 
@@ -380,12 +382,14 @@ workflow AggregateMethylationData {
             MemoryGB = AggregateMemoryGB,
             DiskGB = AggregateDiskGB,
             NumThreads = NumThreads,
-            docker_image = methylation_docker_image
+            docker_image = cohort_aggregation__aggregate_methylation_chromosomes_image
     }
 
     if (AnnotateSites) {
         call Annotation.AnnotateMethylationCohortSites as AnnotateSitesTask {
             input:
+      annotation__annotate_methylation_sites_image = annotation__annotate_methylation_sites_image,
+
                 PassingSiteMetadata = AggregateMethylationChromosomes.PassingSiteMetadata,
                 AnnotationGTF = AnnotationGTF,
                 CCREAnnotations = CCREAnnotations,
@@ -393,9 +397,8 @@ workflow AggregateMethylationData {
                 OutputPrefix = OutputPrefix,
                 PromoterWindow = PromoterWindow,
                 MemoryGB = AnnotationMemoryGB,
-                DiskGB = AnnotationDiskGB,
-                methylation_docker_image = methylation_docker_image
-        }
+                DiskGB = AnnotationDiskGB
+  }
     }
 
     output {

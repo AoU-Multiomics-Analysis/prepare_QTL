@@ -1,11 +1,6 @@
 name: Build and test region image
+# Task-level releases build and pin this image; this is a manual diagnostic gate.
 on:
-  push:
-    branches: [main]
-    paths: ['tools/trans_ld_regions/scripts/**']
-  pull_request:
-    branches: [main]
-    paths: ['tools/trans_ld_regions/scripts/**']
   workflow_dispatch:
 permissions:
   contents: read

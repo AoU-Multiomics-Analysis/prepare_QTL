@@ -95,7 +95,7 @@ def snapshot(repo, repository, number, output, expected_head=None):
         spec = config['images'][name]
         fingerprint = source_fingerprint(repo, pr['head']['sha'], spec['build_paths'])
         builds.append({'id': name, 'repository': spec['repository'], 'dockerfile': spec['dockerfile'],
-                       'fingerprint': fingerprint, 'tag': spec['repository'] + ':release-src-' + fingerprint})
+                       'context': spec.get('context', '.'), 'fingerprint': fingerprint, 'tag': spec['repository'] + ':release-src-' + fingerprint})
     result = {'version': 1, 'repository': repository, 'pr': pr, 'plan': plan, 'builds': builds}
     save(output, result)
     if os.environ.get('GITHUB_OUTPUT'):
@@ -134,7 +134,7 @@ def build(source, spec, head, output):
                         '--file', str(source / spec['dockerfile']), '--tag', spec['tag'], '--push',
                         '--label', 'org.prepare-qtl.source-fingerprint=' + spec['fingerprint'],
                         '--label', 'org.opencontainers.image.revision=' + head,
-                        '--metadata-file', str(metadata), str(source)], check=True)
+                        '--metadata-file', str(metadata), str(source / spec.get('context', '.'))], check=True)
         digest = json.loads(metadata.read_text())['containerimage.digest']
         reference = spec['repository'] + '@' + digest
         resolved, labels = registry_image(reference)

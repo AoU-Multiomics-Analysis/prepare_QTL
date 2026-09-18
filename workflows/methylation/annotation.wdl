@@ -12,10 +12,10 @@ task AnnotateMethylationSites {
         Int PromoterWindow
         Int MemoryGB
         Int DiskGB
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         Rscript /tmp/AnnotateMethylationSites.R \
             --PassingSiteMetadata "~{PassingSiteMetadata}" \
             --AnnotationGTF "~{AnnotationGTF}" \
@@ -38,6 +38,7 @@ task AnnotateMethylationSites {
 }
 workflow AnnotateMethylationCohortSites {
     input {
+        String annotation__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         File PassingSiteMetadata
         File AnnotationGTF
         File CCREAnnotations
@@ -46,7 +47,7 @@ workflow AnnotateMethylationCohortSites {
         Int PromoterWindow
         Int MemoryGB
         Int DiskGB
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
     }
 
     call AnnotateMethylationSites {
@@ -59,7 +60,7 @@ workflow AnnotateMethylationCohortSites {
             PromoterWindow = PromoterWindow,
             MemoryGB = MemoryGB,
             DiskGB = DiskGB,
-            docker_image = methylation_docker_image
+            docker_image = annotation__annotate_methylation_sites_image
     }
 
     output {

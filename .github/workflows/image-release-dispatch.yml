@@ -30,7 +30,7 @@ jobs:
               const {data: commit} = await github.rest.repos.getCommit({
                 ...context.repo, ref: context.payload.pull_request.head.sha
               });
-              const pin = /^\s*String\s+(\w+_docker_image)\s*=\s*"(ghcr\.io\/[^\s"@]+)@sha256:[0-9a-f]{64}"\s*$/;
+              const pin = /^\s*String\s+(\w+_image|DockerImage)\s*=\s*"(ghcr\.io\/[^\s"@]+)@sha256:[0-9a-f]{64}"\s*$/;
               const onlyPins = file => {
                 if (file.status !== 'modified' || !file.filename.startsWith('workflows/') ||
                     !file.filename.endsWith('.wdl') || !file.patch) return false;

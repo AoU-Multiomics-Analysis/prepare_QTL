@@ -14,20 +14,22 @@ from wdl_stage_routing import validate_routing
 
 SUPPORTED_STAGES = {'cell_estimation', 'cell_fit', 'cell_export', 'cell_downstream',
                     'expression', 'common', 'proteomics', 'splicing', 'methylation',
-                    'methylation_rust', 'rnaseqc'}
+                    'methylation_rust', 'rnaseqc', 'trans_ld'}
 
 
 def runtime_test_plan(config, stages, changed_paths, force_integration=False):
-    if stages - SUPPORTED_STAGES:
-        raise ValueError('No runtime gate for stages: ' + ', '.join(sorted(stages - SUPPORTED_STAGES)))
+    unknown = {stage for stage in stages if config['stages'].get(stage, {}).get('test_group', stage) not in SUPPORTED_STAGES}
+    if unknown:
+        raise ValueError('No runtime gate for stages: ' + ', '.join(sorted(unknown)))
     cell_tests = {}
     for stage in sorted(stages):
-        if stage.startswith('cell_'):
+        if config['stages'][stage].get('test_group', stage).startswith('cell_'):
             tests = config['stages'][stage].get('runtime_tests')
             if not tests or any(not isinstance(t, str) or '/' in t or not t.endswith('.R') for t in tests):
                 raise ValueError('Missing or invalid runtime tests for ' + stage)
             cell_tests[stage] = tests
-    relevant = bool(cell_tests or stages & {'expression', 'common'})
+    groups = {config['stages'][s].get('test_group', s) for s in stages}
+    relevant = bool(cell_tests or groups & {'expression', 'common'})
     # Deployments use stage tests. Cross-stage integration is a manual choice.
     reasons = ['manual_request'] if force_integration and relevant else []
     integration = relevant and force_integration
@@ -69,8 +71,9 @@ def main():
     print('stage=runtime_test_plan ' + json.dumps(test_plan, sort_keys=True), flush=True)
     (source / 'ci-runs').mkdir(exist_ok=True)
     (source / 'ci-runs/runtime-test-plan.json').write_text(json.dumps(test_plan, indent=2) + '\n')
-    if stages - SUPPORTED_STAGES:
-        raise ValueError('No runtime gate for stages: ' + ', '.join(sorted(stages - SUPPORTED_STAGES)))
+    unknown = {stage for stage in stages if config['stages'].get(stage, {}).get('test_group', stage) not in SUPPORTED_STAGES}
+    if unknown:
+        raise ValueError('No runtime gate for stages: ' + ', '.join(sorted(unknown)))
     for test in ('test_repo_image_routing.py', 'test_stage_image_inputs.py'):
         subprocess.run([sys.executable, str(trusted / 'tests' / test)], check=True,
                        env={**os.environ, 'RELEASE_SOURCE_ROOT': str(source)})
@@ -108,21 +111,29 @@ def main():
         subprocess.run([sys.executable, str(trusted / 'tests/cell_type_specific_expression/smoke/run_pinned_images.py'),
                         '--suite', args.suite or ('full' if args.all_stages else 'compact')],
                        cwd=source, check=True)
-    for image in sorted({images[s] for s in stages & {'expression', 'common'}}):
+    def group_images(*groups):
+        return sorted({images[s] for s in stages
+                       if config['stages'][s].get('test_group', s) in groups})
+
+    for image in group_images('expression', 'common'):
         for test in ('test_prepare_expression_log2_cpm.R', 'test_prepare_expression_sample_list.R'):
             run_r(image, 'tests/' + test,
                   environment={'PREPARE_EXPRESSION_SCRIPT': '/tmp/PrepareExpression.R'})
-    if 'methylation' in stages:
-        run_r(images['methylation'], 'tests/test_prepare_methylation.R',
+    for image in group_images('methylation'):
+        run_r(image, 'tests/test_prepare_methylation.R',
               environment={'PREPARE_METHYLATION_SCRIPT': '/tmp/PrepareMethylation.R'})
-    for stage in stages & {'proteomics', 'splicing'}:
-        run_r(images[stage], 'tests/release/test_bundled_r.R', stage)
-    if 'rnaseqc' in stages:
+    for group in ('proteomics', 'splicing'):
+        for image in group_images(group):
+            run_r(image, 'tests/release/test_bundled_r.R', group)
+    for image in group_images('rnaseqc'):
         subprocess.run([sys.executable, str(trusted / 'tests/rnaseqc2_aggregation/smoke_container.py'),
-                        '--image', images['rnaseqc'], '--source-root', str(source)], cwd=source, check=True)
-    if 'methylation_rust' in stages:
+                        '--image', image, '--source-root', str(source)], cwd=source, check=True)
+    for image in group_images('methylation_rust'):
         subprocess.run([sys.executable, str(trusted / 'tests/release/test_rust_image.py'),
-                        '--image', images['methylation_rust']], cwd=source, check=True)
+                        '--image', image], cwd=source, check=True)
+    for image in group_images('trans_ld'):
+        subprocess.run([sys.executable, str(trusted / 'tests/trans_ld_regions/smoke_wdl_container.py'), image],
+                       cwd=source, check=True)
     print('All selected image checks passed:', ', '.join(sorted(stages)))
 
 

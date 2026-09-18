@@ -3,7 +3,7 @@ version 1.0
 task PrepareHaemopedia {
   input {
     File counts
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
     Int cpu = 1
     String memory = "8 GB"
     Int disk_gb = 500
@@ -11,7 +11,7 @@ task PrepareHaemopedia {
     Int max_retries = 2
   }
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="prepare_haemopedia"
     log="$stage.log"
@@ -53,7 +53,7 @@ task FilterCellTypeBeds {
     File? reference_summary
     Float min_mean_log2_cpm1 = 0.01
     Float? residual_cutoff
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
     Int cpu = 1
     String memory = "8 GB"
     Int disk_gb = 500
@@ -61,7 +61,7 @@ task FilterCellTypeBeds {
     Int max_retries = 2
   }
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="filter_cell_type_beds"
     log="$stage.log"

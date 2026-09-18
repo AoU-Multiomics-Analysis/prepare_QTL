@@ -57,9 +57,9 @@ class CiPathTests(unittest.TestCase):
                 with self.subTest(event=event, path=path):
                     self.assertEqual(self.heavy_jobs(path, event), expected if event == 'pull_request' else set())
 
-    def test_trans_ld_image_builds_only_for_its_contained_scripts(self):
+    def test_trans_ld_legacy_build_is_manual_task_release_owns_updates(self):
         for event in ('push', 'pull_request'):
-            self.assertEqual(self.heavy_jobs('tools/trans_ld_regions/scripts/trans_ld_regions/ld.py', event), {'trans_ld_image'})
+            self.assertEqual(self.heavy_jobs('tools/trans_ld_regions/scripts/trans_ld_regions/ld.py', event), set())
             for path in ('workflows/genotype/trans_ld_regions.wdl', 'tests/trans_ld_regions/test_ld.py', 'tools/trans_ld_regions/Dockerfile', 'tools/trans_ld_regions/environment.yml'):
                 self.assertEqual(self.heavy_jobs(path, event), set())
 

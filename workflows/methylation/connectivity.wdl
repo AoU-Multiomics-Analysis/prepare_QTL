@@ -8,10 +8,10 @@ task BuildMethylationCorrelationCovariates {
         File PhenotypePCs
         File? AdditionalCovariates
         String OutputPrefix
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         Rscript /tmp/BuildMethylationCorrelationCovariates.R \
             --PhenotypePCs "~{PhenotypePCs}" \
@@ -40,10 +40,10 @@ task AnalyzeMethylationCpGCorrelation {
         Float MinAbsCorrelation
         Int MemoryGB
         Int DiskGB
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         Rscript /tmp/AnalyzeMethylationCpGCorrelation.R \
             --InputBed "~{IntMethylationBed}" \
             --Covariates "~{Covariates}" \
@@ -70,7 +70,6 @@ task AnalyzeMethylationCpGCorrelation {
     }
 }
 
-
 task FinalizeMethylationConnectivity {
     input {
         Array[File] RepresentativeCpGsByChromosome
@@ -82,10 +81,10 @@ task FinalizeMethylationConnectivity {
         Float ConnectivityZThreshold
         Int MemoryGB
         Int DiskGB
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
 
-    command <<<
+command <<<
         set -euo pipefail
         printf '%s\n' "~{PreConnectivityIntMethylationBed}" > int_beds_by_chromosome.list
         printf '%s\n' ~{sep=' ' RepresentativeCpGsByChromosome} > representative_cpgs_by_chromosome.list
@@ -119,9 +118,12 @@ task FinalizeMethylationConnectivity {
     }
 }
 
-
 workflow RefineMethylationConnectivity {
     input {
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String connectivity__analyze_methylation_cpg_correlation_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String connectivity__build_methylation_correlation_covariates_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String connectivity__finalize_methylation_connectivity_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         Array[File] IntMethylationBedsByChromosome
         Array[String] ChromosomeOutputSuffixes
         File PreConnectivityFilteredCalls
@@ -140,26 +142,27 @@ workflow RefineMethylationConnectivity {
         Float ConnectivityZThreshold = -3.0
         Int ConnectivityMemoryGB = 64
         Int ConnectivityDiskGB = 1000
-        String methylation_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
     }
 
     call ComputePCs.PhenotypePCs as PreliminaryIntPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = PreConnectivityIntMethylationBed,
             OutputPrefix = OutputPrefix + ".methylation.pre_connectivity",
             OutputSuffix = ".INT",
             memory = PcMemoryGB,
             disk_space = PcDiskGB,
-            num_threads = NumThreads,
-            DockerImage = methylation_docker_image
-    }
+            num_threads = NumThreads
+  }
 
     call BuildMethylationCorrelationCovariates {
         input:
             PhenotypePCs = PreliminaryIntPhenotypePCs.OutPhenotypePCs,
             AdditionalCovariates = AdditionalCovariates,
             OutputPrefix = OutputPrefix,
-            docker_image = methylation_docker_image
+            docker_image = connectivity__build_methylation_correlation_covariates_image
     }
 
     scatter (chromosome_index in range(length(IntMethylationBedsByChromosome))) {
@@ -172,7 +175,7 @@ workflow RefineMethylationConnectivity {
                 MinAbsCorrelation = CorrelationMinAbsCorrelation,
                 MemoryGB = CorrelationMemoryGB,
                 DiskGB = CorrelationDiskGB,
-                docker_image = methylation_docker_image
+                docker_image = connectivity__analyze_methylation_cpg_correlation_image
         }
     }
 
@@ -187,7 +190,7 @@ workflow RefineMethylationConnectivity {
             ConnectivityZThreshold = ConnectivityZThreshold,
             MemoryGB = ConnectivityMemoryGB,
             DiskGB = ConnectivityDiskGB,
-            docker_image = methylation_docker_image
+            docker_image = connectivity__finalize_methylation_connectivity_image
     }
 
     output {

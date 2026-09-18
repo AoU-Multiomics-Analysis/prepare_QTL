@@ -4,7 +4,7 @@ task SummarizeCellTypeBeds {
   input {
     Array[File] cell_type_beds
     File cell_type_bed_inventory
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
     Int cpu = 1
     String memory = "8 GB"
     Int disk_gb = 500
@@ -12,7 +12,7 @@ task SummarizeCellTypeBeds {
     Int max_retries = 2
   }
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="summarize_cell_type_beds"
     log="$stage.log"

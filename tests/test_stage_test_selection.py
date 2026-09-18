@@ -24,29 +24,29 @@ class StageTestSelection(unittest.TestCase):
         return runner.runtime_test_plan(self.config, set(stages), paths)
 
     def test_fit_only_does_not_run_estimation_or_qtl(self):
-        plan = self.select(['cell_fit'], ['scripts/cell_type_specific_expression/fit/fit_tca.R'])
-        self.assertEqual(plan['stages'], ['cell_fit'])
+        plan = self.select(['tca__fit_tca'], ['scripts/cell_type_specific_expression/fit/fit_tca.R'])
+        self.assertEqual(plan['stages'], ['tca__fit_tca'])
         self.assertFalse(plan['integration'])
-        self.assertEqual(plan['cell_tests']['cell_fit'], ['test-fit-cli.R'])
+        self.assertEqual(plan['cell_tests']['tca__fit_tca'], ['test-fit-cli.R'])
 
     def test_plot_change_does_not_fit_tca(self):
-        plan = self.select(['cell_export', 'cell_downstream'], ['scripts/cell_type_specific_expression/R/qc.R'])
+        plan = self.select(['tca__export_tca_beds', 'filter_scatter__filter_cell_type_bed'], ['scripts/cell_type_specific_expression/R/qc.R'])
         self.assertFalse(plan['integration'])
-        self.assertNotIn('cell_fit', plan['cell_tests'])
+        self.assertNotIn('tca__fit_tca', plan['cell_tests'])
 
     def test_real_source_mapping_selects_only_hspe_tests(self):
         paths = ['scripts/cell_type_specific_expression/R/hspe_stage.R']
         changes = plan_changes(self.config, paths)
         plan = self.select(changes['stages'], paths)
-        self.assertEqual(plan['stages'], ['cell_estimation'])
-        self.assertIn('test-hspe-batches.R', plan['cell_tests']['cell_estimation'])
+        self.assertEqual(plan['stages'], ['hspe__merge_hspe_batches', 'hspe__prepare_hspe_batches', 'hspe__run_hspe_batch'])
+        self.assertIn('test-hspe-batches.R', plan['cell_tests']['hspe__run_hspe_batch'])
         self.assertFalse(plan['integration'])
 
     def test_only_manual_override_enables_integration(self):
         self.assertTrue(hasattr(runner, 'runtime_test_plan'))
-        self.assertTrue(runner.runtime_test_plan(self.config, {'cell_fit'},
+        self.assertTrue(runner.runtime_test_plan(self.config, {'tca__fit_tca'},
             ['scripts/cell_type_specific_expression/fit/fit_tca.R'], True)['integration'])
-        self.assertFalse(self.select(['cell_fit'], [])['integration'])
+        self.assertFalse(self.select(['tca__fit_tca'], [])['integration'])
 
     def test_all_registered_stage_tests_exist_and_exemptions_are_exact_existing_files(self):
         self.assertTrue(hasattr(runner, 'runtime_test_plan'))
@@ -62,33 +62,33 @@ class StageTestSelection(unittest.TestCase):
                      'envs/CellTypeSpecificExpression/environment.yml',
                      'workflows/cell_type_specific_expression/tasks/tca.wdl']:
             with self.subTest(path=path):
-                self.assertFalse(self.select(['cell_export'], [path])['integration'])
+                self.assertFalse(self.select(['tca__export_tca_beds'], [path])['integration'])
 
     def test_wdl_changes_do_not_select_unaffected_runtime_stages(self):
-        record = {'plan': {'stages': ['cell_fit'], 'wdl_checks': [
+        record = {'plan': {'stages': ['tca__fit_tca'], 'wdl_checks': [
             'workflows/cell_type_specific_expression/deconvolution.wdl']}}
-        self.assertEqual(runner.selected_stages(record, self.config), {'cell_fit'})
+        self.assertEqual(runner.selected_stages(record, self.config), {'tca__fit_tca'})
 
     def test_non_cell_images_do_not_start_cell_pipeline(self):
-        self.assertFalse(self.select(['rnaseqc'], ['envs/RNASeQCAggregation/Dockerfile'])['integration'])
+        self.assertFalse(self.select(['rnaseqc2_aggregate_batched__aggregate_rnaseqc_batch'], ['envs/RNASeQCAggregation/Dockerfile'])['integration'])
 
     def test_missing_stage_gate_fails_closed(self):
         self.assertTrue(hasattr(runner, 'runtime_test_plan'))
         config = copy.deepcopy(self.config)
-        config['stages']['cell_fit'].pop('runtime_tests', None)
+        config['stages']['tca__fit_tca'].pop('runtime_tests', None)
         with self.assertRaisesRegex(ValueError, 'runtime tests'):
-            runner.runtime_test_plan(config, {'cell_fit'}, [])
+            runner.runtime_test_plan(config, {'tca__fit_tca'}, [])
 
     def test_release_execution_uses_selected_image_without_launching_workflow(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'source'
             source.mkdir()
-            for name in ('workflows', 'scripts', 'ci'):
+            for name in ('workflows', 'scripts', 'ci', 'rust', 'tools'):
                 shutil.copytree(ROOT / name, source / name)
             runner.subprocess.run(['git', 'init', str(source)], check=True, capture_output=True)
             runner.subprocess.run(['git', '-C', str(source), 'add', '.'], check=True, capture_output=True)
             record = Path(directory) / 'release.json'
-            record.write_text(json.dumps({'plan': {'stages': ['cell_fit'], 'wdl_checks': []},
+            record.write_text(json.dumps({'plan': {'stages': ['tca__fit_tca'], 'wdl_checks': []},
                 'pr': {'base': {'sha': 'a' * 40}, 'head': {'sha': 'b' * 40}}}))
             # Docker and runner processes are external boundaries. Keep plan
             # construction, WDL routing, pin parsing and artifact writing real.

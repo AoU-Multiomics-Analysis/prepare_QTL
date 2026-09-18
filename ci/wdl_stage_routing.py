@@ -127,6 +127,10 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
     """
     label = f'{_relative(task, source_root)} task {task.name}'
     contract = INLINE_EXTERNAL_TASK_CONTRACTS.get((_relative(task, source_root), task.name))
+    module_contract = next((item.get('module') for item in config['stages'].values()
+                            if item.get('task') == {'path': _relative(task, source_root), 'name': task.name}), None)
+    if module_contract:
+        contract = ('trans_ld', 'python3', '-m')
     placeholders = {f'{_PLACEHOLDER}{i}__': str(part)
                     for i, part in enumerate(task.command.parts) if not isinstance(part, str)}
 
@@ -151,6 +155,10 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
     except ValueError as error:
         raise ValueError(f'{label}: unsupported command; add a reviewed contract: {error}') from error
     consumers = []
+    contract_consumers = {name for name, item in config.get('stages', {}).items()
+                          if item.get('task') == {'path': _relative(task, source_root), 'name': task.name}}
+    if not contract_consumers and contract:
+        contract_consumers = {contract[0]}
     matched_contract = False
     command_start = True
     command_index = 0
@@ -189,7 +197,7 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
                              'add a reviewed contract')
         if contract and token == contract[1] and contract[2] is None:
             matched_contract = True
-            consumers.append({contract[0]})
+            consumers.append(contract_consumers)
         if executable not in _INTERPRETERS:
             continue
         cursor = index + 1
@@ -212,8 +220,10 @@ def task_stages(task, config: dict, source_root: Path) -> set[str]:
                 break
         target = tokens[cursor] if cursor < len(tokens) else '<missing>'
         if contract and token == contract[1] and target == contract[2]:
+            if module_contract and tokens[cursor + 1:cursor + 2] != [module_contract]:
+                raise ValueError(f'{label}: Python module does not match registered task')
             matched_contract = True
-            consumers.append({contract[0]})
+            consumers.append(contract_consumers)
             continue
         if (not target.startswith('/') or any(mark in target for mark in
                 (_PLACEHOLDER, '$', '`', '*', '?', '[', '\n'))):
@@ -261,7 +271,8 @@ def validate_routing(source_root: Path, policy_root: Path) -> list[str]:
     config = yaml.safe_load((policy_root / 'ci/image-stages.yml').read_text())
     pins = yaml.safe_load((policy_root / 'ci/release-pins.yml').read_text())
     identities = {}
-    errors = []
+    from task_dependencies import validate_task_dependencies
+    errors = validate_task_dependencies(config, source_root)
     for stage, targets in pins['stages'].items():
         for target in targets:
             key = (target['path'], target.get('scope', 'workflow'),
@@ -303,6 +314,11 @@ def validate_routing(source_root: Path, policy_root: Path) -> list[str]:
             task_info[key] = None
             return None
         try:
+            if any(item.get('task') for item in config['stages'].values()):
+                registered = [name for name, item in config['stages'].items()
+                              if item.get('task') == {'path': key[0], 'name': key[1]}]
+                if len(registered) != 1:
+                    raise ValueError(f'task {task.name}: missing or duplicate task dependency record')
             allowed = task_stages(task, config, source_root)
             image_input = _runtime_input(task)
             declared_stage = identities.get((key[0], 'task', task.name, image_input))

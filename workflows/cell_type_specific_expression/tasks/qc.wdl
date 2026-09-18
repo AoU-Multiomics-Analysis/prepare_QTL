@@ -27,7 +27,7 @@ task BuildManifest {
     String scale
     String tca_version = "1.2.1"
     String container_image
-    String docker_image
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:db18c31030d2c0e82283c95d194e7108a9912297d9fe042db9b1132fecef891b"
     Int cpu = 4
     String memory = "32 GB"
     Int disk_gb = 100
@@ -35,7 +35,7 @@ task BuildManifest {
     Int max_retries = 2
   }
 
-  command <<<
+command <<<
     set -euo pipefail
     stage="build_manifest"
     log="$stage.log"

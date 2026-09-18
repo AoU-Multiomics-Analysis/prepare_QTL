@@ -3,9 +3,6 @@ import "../common/calculate_phenotypePCs.wdl" as ComputePCs
 import "../common/MergeCovariates.wdl" as CovariateMerge
 import "../common/ResidualizePhenotypes.wdl" as Residualize
 
-
-
-
 task PrepareProteomicData {
     input {
         File AnnotationGTF
@@ -16,9 +13,9 @@ task PrepareProteomicData {
         Int memory
         Int disk_space
         Int num_threads
-        String docker_image
+        String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
     }
-    command {
+command {
         Rscript /tmp/PrepareProteomics.R \
             --ProteomicData ${ProteomicData} \
             --AnnotationGTF ${AnnotationGTF} \
@@ -48,6 +45,10 @@ task PrepareProteomicData {
 
 workflow pQTLPrepareData {
     input {
+        String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String prepare_pqtl__prepare_proteomic_data_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String residualizephenotypes__residualize_phenotypes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         Int memory
         Int disk_space
         Int num_threads
@@ -57,7 +58,7 @@ workflow pQTLPrepareData {
         String OutputPrefix
         File? AdditionalCovariates
         Boolean ResidualizeNormalizedInputs = false
-        String proteomics_docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+
     }
     call PrepareProteomicData {
         input:
@@ -68,49 +69,53 @@ workflow pQTLPrepareData {
             SampleList = SampleList,
             OutputPrefix = OutputPrefix,
             ProteomicData = ProteomicData,
-            docker_image = proteomics_docker_image
+            docker_image = prepare_pqtl__prepare_proteomic_data_image
 
     }
 
     call ComputePCs.PhenotypePCs as IntPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = PrepareProteomicData.IntProteomicBed,
             OutputPrefix = OutputPrefix + ".protein",
             OutputSuffix = ".INT",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads,
-            DockerImage = proteomics_docker_image
-    }
+            num_threads = num_threads
+  }
 
     call ComputePCs.PhenotypePCs as ScaledPhenotypePCs {
         input:
+      calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
+
             BedFile = PrepareProteomicData.ScaledProteomicBed,
             OutputPrefix = OutputPrefix + ".protein",
             OutputSuffix = ".scaled",
             memory = memory,
             disk_space = disk_space,
-            num_threads = num_threads,
-            DockerImage = proteomics_docker_image
-    }
+            num_threads = num_threads
+  }
     if (defined(AdditionalCovariates)) {
         call CovariateMerge.MergeCovariates as MergeIntAdditionalCovariates {
             input:
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = IntPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".protein",
-                OutputSuffix = ".INT",
-                DockerImage = proteomics_docker_image
-        }
+                OutputSuffix = ".INT"
+  }
 
         call CovariateMerge.MergeCovariates as MergeScaledAdditionalCovariates {
             input:
+      mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
+
                 GenotypePCs = select_first([AdditionalCovariates]),
                 MolecularPCs = ScaledPhenotypePCs.OutPhenotypePCs,
                 OutputPrefix = OutputPrefix + ".protein",
-                OutputSuffix = ".scaled",
-                DockerImage = proteomics_docker_image
-        }
+                OutputSuffix = ".scaled"
+  }
     }
 
     if (ResidualizeNormalizedInputs) {
@@ -122,7 +127,7 @@ workflow pQTLPrepareData {
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads,
-                DockerImage = proteomics_docker_image
+                DockerImage = residualizephenotypes__residualize_phenotypes_image
         }
 
         call Residualize.ResidualizePhenotypes as ResidualizeScaledPhenotypes {
@@ -133,7 +138,7 @@ workflow pQTLPrepareData {
                 memory = memory,
                 disk_space = disk_space,
                 num_threads = num_threads,
-                DockerImage = proteomics_docker_image
+                DockerImage = residualizephenotypes__residualize_phenotypes_image
         }
     }
 

@@ -130,7 +130,7 @@ class ReleaseTestSelection(unittest.TestCase):
         from test_release_images import SUPPORTED_STAGES
         root = Path(__file__).resolve().parents[1]
         config = yaml.safe_load((root / 'ci/image-stages.yml').read_text())
-        self.assertEqual(set(config['stages']), SUPPORTED_STAGES)
+        self.assertEqual({v.get('test_group', k) for k, v in config['stages'].items()}, SUPPORTED_STAGES)
 
     def test_release_runner_rejects_candidate_policy_override(self):
         import test_release_images as release_tests
