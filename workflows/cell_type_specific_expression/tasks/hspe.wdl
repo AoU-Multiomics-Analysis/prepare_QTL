@@ -8,7 +8,7 @@ task PrepareHspeBatches {
     File gtf
     File lm22
     Float min_overlap = 0.80
-    Float marker_fraction = 0.10
+    Float marker_fraction = 1.0
     Int batch_size = 100
     Boolean quantile_normalize = false
     Int random_seed = 20260901

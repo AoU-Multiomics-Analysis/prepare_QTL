@@ -35,7 +35,7 @@ lm22_cell_types <- function() {
 pipeline_defaults <- function() {
   list(
     min_lm22_overlap = 0.80,
-    marker_fraction = 0.10,
+    marker_fraction = 1.0,
     group_mean_threshold = 0.0001,
     zero_floor = 1e-6
   )

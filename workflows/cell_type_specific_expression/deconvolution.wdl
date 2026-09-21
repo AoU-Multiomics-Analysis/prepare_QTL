@@ -36,7 +36,7 @@ workflow CellTypeDeconvolution {
     Int preemptible_attempts = 2
     Int max_retries = 2
     Float min_lm22_overlap = 0.80
-    Float hspe_marker_fraction = 0.10
+    Float hspe_marker_fraction = 1.0
     Boolean hspe_quantile_normalize = false
     Int hspe_batch_size = 100
     String hspe_batch_memory = "4 GB"

@@ -8,6 +8,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class HspeScatterTest(unittest.TestCase):
+    def test_all_marker_defaults_are_forwarded(self):
+        for filename in ("prepare_cell_type_eQTL.wdl", "deconvolution.wdl"):
+            doc = WDL.load(str(ROOT / "workflows/cell_type_specific_expression" / filename))
+            value = next(n for n in doc.workflow.inputs if n.name == "hspe_marker_fraction")
+            self.assertEqual(float(str(value.expr)), 1.0)
+        doc = WDL.load(str(ROOT / "workflows/cell_type_specific_expression/tasks/hspe.wdl"))
+        value = next(n for n in doc.tasks[0].inputs if n.name == "marker_fraction")
+        self.assertEqual(float(str(value.expr)), 1.0)
+
     def test_workers_receive_small_files_and_merge_precedes_group_filtering(self):
         doc = WDL.load(str(ROOT / "workflows/cell_type_specific_expression/deconvolution.wdl"))
         condition = next(n for n in doc.workflow.body if isinstance(n, WDL.Tree.Conditional)

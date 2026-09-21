@@ -490,7 +490,7 @@ require_true(
 )
 require_true(
   numeric_parameter("min_lm22_overlap") == 0.80 &&
-    numeric_parameter("hspe_marker_fraction") == 0.10 &&
+    numeric_parameter("hspe_marker_fraction") == 1.0 &&
     identical(parameters$hspe_marker_method, "ratio") &&
     identical(parameters$hspe_quantile_normalize, FALSE) &&
     numeric_parameter("group_mean_threshold") == mean_threshold &&
