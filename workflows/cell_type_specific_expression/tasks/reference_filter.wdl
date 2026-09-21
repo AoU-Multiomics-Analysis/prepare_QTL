@@ -3,7 +3,7 @@ version 1.0
 task PrepareHaemopedia {
   input {
     File counts
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
     Int cpu = 1
     String memory = "8 GB"
     Int disk_gb = 500
@@ -53,7 +53,7 @@ task FilterCellTypeBeds {
     File? reference_summary
     Float min_mean_log2_cpm1 = 0.01
     Float? residual_cutoff
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
     Int cpu = 1
     String memory = "8 GB"
     Int disk_gb = 500

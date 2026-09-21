@@ -112,7 +112,7 @@ task ExportTcaBeds {
     File tca_weights
     File? covariates
     Boolean parallel = false
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
     Int cpu = 8
     String memory = "256 GB"
     Int disk_gb = 500
