@@ -1,3 +1,22 @@
+# Fraction 1 retains every shared signature gene, including tied profiles.
+select_hspe_markers <- function(references, marker_fraction = 1) {
+  cell_types <- rownames(references)
+  if (marker_fraction == 1) {
+    owner <- max.col(t(references), ties.method = "first")
+    return(stats::setNames(lapply(seq_along(cell_types), function(i) {
+      which(owner == i)
+    }), cell_types))
+  }
+  pure <- stats::setNames(as.list(seq_along(cell_types)), cell_types)
+  ranked <- hspe::find_markers(Y = references, pure_samples = pure,
+                              marker_method = "ratio")$L
+  counts <- pmax(1L, as.integer(floor(marker_fraction * lengths(ranked))))
+  if (any(lengths(ranked) == 0L)) {
+    stop("Every cell type must have at least one selected marker", call. = FALSE)
+  }
+  purrr::map2(ranked, counts, ~ unname(.x[seq_len(.y)]))
+}
+
 validate_lm22 <- function(lm22_linear, cell_type_mapping = NULL) {
   if (!is.matrix(lm22_linear) || !is.numeric(lm22_linear)) {
     stop("LM22 must be a numeric matrix", call. = FALSE)
@@ -200,10 +219,15 @@ estimate_hspe <- function(
   random_seed <- as.integer(random_seed)
   hspe_version <- validate_hspe_version()
 
+  markers <- select_hspe_markers(inputs$references, marker_fraction)
+  if (any(lengths(markers) == 0L)) {
+    stop("Every cell type must have at least one selected marker", call. = FALSE)
+  }
   fit <- hspe::hspe(
     Y = inputs$Y,
     references = inputs$references,
-    n_markers = marker_fraction,
+    markers = markers,
+    n_markers = lengths(markers),
     marker_method = marker_method,
     seed = random_seed,
     sto = TRUE

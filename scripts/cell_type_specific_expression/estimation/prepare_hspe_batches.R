@@ -12,7 +12,7 @@ tryCatch({
     optparse::make_option("--output-dir", dest = "output_dir", type = "character"),
     optparse::make_option("--batch-size", dest = "batch_size", type = "integer", default = 100L),
     optparse::make_option("--random-seed", dest = "random_seed", type = "integer", default = 20260901L),
-    optparse::make_option("--marker-fraction", dest = "marker_fraction", type = "double", default = .1),
+    optparse::make_option("--marker-fraction", dest = "marker_fraction", type = "double", default = 1),
     optparse::make_option("--min-overlap", dest = "min_overlap", type = "double", default = .8),
     optparse::make_option("--log2-pseudocount", dest = "log2_pseudocount", type = "double", default = 0),
     optparse::make_option("--quantile-normalize", dest = "quantile_normalize",

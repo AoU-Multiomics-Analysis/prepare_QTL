@@ -115,7 +115,7 @@ testthat::test_that("batch commands write localized inputs and merged outputs", 
     batches <- purrr::map(paths, readRDS)
     testthat::expect_identical(purrr::map_int(batches, ~ nrow(.x$Y)), c(5L, 5L, 2L))
     testthat::expect_identical(colnames(batches[[1]]$Y), colnames(shared$references))
-    testthat::expect_true(ncol(batches[[1]]$Y) < shared$metadata$overlap_count)
+    testthat::expect_equal(ncol(batches[[1]]$Y), shared$metadata$overlap_count)
   }
   small <- prepare_hspe_batches(batch_test_inputs(), batch_size = 2, marker_fraction = .5)
   shared_path <- file.path(directory, "small shared.rds")
@@ -139,4 +139,21 @@ testthat::test_that("batch commands write localized inputs and merged outputs", 
   diagnostics <- readr::read_tsv(file.path(merged_dir, "hspe_sample_diagnostics.tsv"),
                                 show_col_types = FALSE)
   testthat::expect_identical(diagnostics$sample_id, rownames(p))
+})
+
+testthat::test_that("default preparation retains every supplied gene including ties", {
+  testthat::skip_if_not_installed("hspe")
+  inputs <- batch_test_inputs()
+  inputs$references <- cbind(inputs$references, Shared = rep(log2(50), 3))
+  inputs$Y <- cbind(inputs$Y, Shared = rep(log2(50), 3))
+  prepared <- prepare_hspe_batches(inputs, batch_size = 2)
+  explicit <- prepare_hspe_batches(inputs, batch_size = 2, marker_fraction = 1)
+  for (result in list(prepared, explicit)) {
+    testthat::expect_setequal(colnames(result$shared$references), colnames(inputs$references))
+    testthat::expect_equal(sum(lengths(result$shared$markers)), 7)
+    testthat::expect_false(anyDuplicated(result$shared$marker_table$gene_symbol) > 0)
+    testthat::expect_equal(result$shared$marker_table$cell_type[
+      result$shared$marker_table$gene_symbol == "Shared"], "type_C")
+    testthat::expect_equal(result$shared$metadata$marker_fraction, 1)
+  }
 })

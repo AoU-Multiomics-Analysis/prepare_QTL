@@ -359,7 +359,7 @@ a value.
 | `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for all tasks. |
 | `max_retries` | `Int` | `2` | Global retry value for all tasks. |
 | `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
-| `hspe_marker_fraction` | `Float` | `0.10` | hspe marker fraction in `(0, 1]`. |
+| `hspe_marker_fraction` | `Float` | `1.0` | Fraction in `(0, 1]`; `1.0` retains all supplied signature genes shared with bulk expression. |
 | `hspe_quantile_normalize` | `Boolean` | `false` | If `true`, quantile-normalize the joined LM22 and bulk profiles before hspe. |
 | `hspe_batch_size` | `Int` | `100` | Maximum samples per HSPE batch; must be positive. |
 | `hspe_batch_memory` | `String` | `"4 GB"` | Memory for each single-CPU HSPE worker. |
@@ -411,7 +411,7 @@ a value.
 | `preemptible_attempts` | `Int` | `2` | Global preemptible-attempt value for deconvolution and QTL tasks. |
 | `max_retries` | `Int` | `2` | Global retry value for deconvolution and QTL tasks. |
 | `min_lm22_overlap` | `Float` | `0.80` | Required LM22 gene-overlap fraction in `(0, 1]`. |
-| `hspe_marker_fraction` | `Float` | `0.10` | hspe marker fraction in `(0, 1]`. |
+| `hspe_marker_fraction` | `Float` | `1.0` | Fraction in `(0, 1]`; `1.0` retains all supplied signature genes shared with bulk expression. |
 | `hspe_quantile_normalize` | `Boolean` | `false` | If `true`, quantile-normalize the joined LM22 and bulk profiles before hspe. |
 | `hspe_batch_size` | `Int` | `100` | Maximum samples per HSPE batch; must be positive. |
 | `hspe_batch_memory` | `String` | `"4 GB"` | Memory for each single-CPU HSPE worker. |

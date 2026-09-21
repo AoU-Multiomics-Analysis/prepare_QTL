@@ -28,7 +28,7 @@
   "PrepareCellTypeEqtlWorkflow.preemptible_attempts": 0,
   "PrepareCellTypeEqtlWorkflow.max_retries": 0,
   "PrepareCellTypeEqtlWorkflow.min_lm22_overlap": 0.8,
-  "PrepareCellTypeEqtlWorkflow.hspe_marker_fraction": 0.1,
+  "PrepareCellTypeEqtlWorkflow.hspe_marker_fraction": 1.0,
   "PrepareCellTypeEqtlWorkflow.hspe_quantile_normalize": false,
   "PrepareCellTypeEqtlWorkflow.group_mean_threshold": 0.0001,
   "PrepareCellTypeEqtlWorkflow.zero_floor": 1e-06,

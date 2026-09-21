@@ -14,7 +14,7 @@ hspe_sample_seeds <- function(sample_ids, random_seed) {
 }
 
 prepare_hspe_batches <- function(inputs, batch_size = 100L,
-                                 marker_fraction = .1, random_seed = 20260901L) {
+                                 marker_fraction = 1, random_seed = 20260901L) {
   if (length(batch_size) != 1L || !is.numeric(batch_size) ||
       !is.finite(batch_size) || batch_size < 1 ||
       batch_size > .Machine$integer.max || batch_size != trunc(batch_size)) {
@@ -28,19 +28,11 @@ prepare_hspe_batches <- function(inputs, batch_size = 100L,
   validate_bulk_log(t(inputs$Y))
   assert_identical_ids(colnames(inputs$Y), colnames(inputs$references), "HSPE gene")
   cell_types <- rownames(inputs$references)
-  pure <- stats::setNames(as.list(seq_along(cell_types)), cell_types)
-  ranked <- hspe::find_markers(Y = inputs$references, pure_samples = pure,
-                              marker_method = "ratio")$L
-  if (any(lengths(ranked) == 0L)) {
+  selected <- select_hspe_markers(inputs$references, marker_fraction)
+  counts <- lengths(selected)
+  if (any(counts == 0L)) {
     stop("Every cell type must have at least one selected marker", call. = FALSE)
   }
-  # Match HSPE 0.1: fractions below one select a fraction; one selects one marker.
-  counts <- if (marker_fraction < 1) {
-    pmax(1L, as.integer(floor(marker_fraction * lengths(ranked))))
-  } else {
-    rep(1L, length(ranked))
-  }
-  selected <- purrr::map2(ranked, counts, ~ unname(.x[seq_len(.y)]))
   gene_indices <- unique(unlist(selected, use.names = FALSE))
   markers <- purrr::map(selected, ~ match(.x, gene_indices))
   marker_table <- purrr::imap_dfr(selected, function(indices, cell_type) {
@@ -58,6 +50,7 @@ prepare_hspe_batches <- function(inputs, batch_size = 100L,
     hspe_version = version, optimizer = "DEoptimR", random_seed = random_seed,
     seed_strategy = "sha256(base_seed:UTF8_sample_id), first 8 hex digits modulo 2147483646 plus 1",
     marker_method = "ratio", marker_fraction = marker_fraction,
+    marker_selection = if (marker_fraction == 1) "all_shared_signature_genes" else "ranked_fraction",
     marker_counts = as.list(stats::setNames(counts, cell_types)),
     overlap_count = inputs$overlap_count, overlap_fraction = inputs$overlap_fraction,
     quantile_normalize = inputs$quantile_normalize, sample_count = length(ids),

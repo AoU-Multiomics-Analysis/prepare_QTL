@@ -220,7 +220,7 @@ common_inputs <- list(
   "PrepareCellTypeEqtlWorkflow.preemptible_attempts" = 0L,
   "PrepareCellTypeEqtlWorkflow.max_retries" = 0L,
   "PrepareCellTypeEqtlWorkflow.min_lm22_overlap" = 0.80,
-  "PrepareCellTypeEqtlWorkflow.hspe_marker_fraction" = 0.10,
+  "PrepareCellTypeEqtlWorkflow.hspe_marker_fraction" = 1.0,
   "PrepareCellTypeEqtlWorkflow.hspe_quantile_normalize" = FALSE,
   "PrepareCellTypeEqtlWorkflow.group_mean_threshold" = 0.0001,
   "PrepareCellTypeEqtlWorkflow.zero_floor" = 0.000001,
