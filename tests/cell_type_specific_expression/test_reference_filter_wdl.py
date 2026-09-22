@@ -85,7 +85,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         self.assertIsInstance(inputs["tabula_sapiens_reference"].type, WDL.Type.File)
         self.assertFalse(inputs["tabula_sapiens_reference"].type.optional)
         self.assertEqual(str(inputs["reference_min_mean_log2_cpm1"].type), "Float")
-        self.assertEqual(str(inputs["reference_max_negative_fraction"].expr), "0.10")
+        self.assertEqual(float(str(inputs["reference_max_negative_fraction"].expr)), 0.10)
         self.assertIsInstance(inputs["reference_residual_cutoff"].type, WDL.Type.Float)
         self.assertTrue(inputs["reference_residual_cutoff"].type.optional)
 
