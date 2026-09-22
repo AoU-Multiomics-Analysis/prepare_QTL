@@ -80,11 +80,12 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                     yield from calls(node.body)
         return next(node for node in calls(document.workflow.body) if node.name == name)
 
-    def test_deconvolution_prepares_optional_reference_and_always_filters_beds(self):
+    def test_deconvolution_requires_corrected_reference_and_always_filters_beds(self):
         inputs = {decl.name: decl for decl in self.deconvolution.workflow.inputs}
-        self.assertIsInstance(inputs["haemopedia_counts"].type, WDL.Type.File)
-        self.assertTrue(inputs["haemopedia_counts"].type.optional)
+        self.assertIsInstance(inputs["tabula_sapiens_reference"].type, WDL.Type.File)
+        self.assertFalse(inputs["tabula_sapiens_reference"].type.optional)
         self.assertEqual(str(inputs["reference_min_mean_log2_cpm1"].type), "Float")
+        self.assertEqual(float(str(inputs["reference_max_negative_fraction"].expr)), 0.10)
         self.assertIsInstance(inputs["reference_residual_cutoff"].type, WDL.Type.Float)
         self.assertTrue(inputs["reference_residual_cutoff"].type.optional)
 
@@ -94,7 +95,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             if isinstance(block, WDL.Tree.Conditional)
             for node in block.body if isinstance(node, WDL.Tree.Call)
         }
-        self.assertIn(prepare.name, conditional_calls)
+        self.assertNotIn(prepare.name, conditional_calls)
         filter_call = self.workflow_call(self.deconvolution, "FilterCellTypeBeds")
         self.assertNotIn(filter_call.name, conditional_calls)
         if filter_call.callee.name == "MergeFilterReports":
@@ -118,8 +119,8 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             "filtered_cell_type_beds", "filtered_cell_type_bed_inventory",
             "negative_expression_summary", "reference_gene_comparison",
             "reference_filter_metrics", "reference_filter_plots", "reference_filter_log",
-            "haemopedia_reference_summary", "haemopedia_reference_samples",
-            "haemopedia_reference_metadata",
+            "tabula_sapiens_reference_summary", "tabula_sapiens_reference_samples",
+            "tabula_sapiens_reference_metadata",
         }
         self.assertTrue(required.issubset(outputs))
 
@@ -129,6 +130,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         self.assertEqual(str(scatter.inputs["cell_type_bed_inventory"]),
                          "CellTypeDeconvolution.filtered_cell_type_bed_inventory")
         eqtl = self.workflow_call(self.qtl, "PrepareCellTypeEqtl")
+        self.assertEqual(str(eqtl.inputs["SignedCpm"]), "true")
         if "sample_list" not in scatter.inputs:
             self.assertEqual(str(eqtl.inputs["SampleList"]), "SampleList")
             return
@@ -176,13 +178,13 @@ class ReferenceFilterWdlTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             counts = Path(directory) / "counts ' $(touch unexpected_side_effect) $literal.tsv"
             counts.touch()
-            env = WDL.Env.Bindings().bind("counts", WDL.Value.File(str(counts)))
+            env = WDL.Env.Bindings().bind("reference", WDL.Value.File(str(counts))).bind("gtf", WDL.Value.File(str(counts)))
             command = render_after_localization(task, env, directory)
             # Exercise the real command's path setup without needing R on the
             # WDL-only CI host. The integration tests below also run the R CLI.
             setup = command.split("Rscript ", 1)[0]
             result = subprocess.run(
-                ["bash", "-c", setup + '\nprintf "%s\\n" "$counts_path"'],
+                ["bash", "-c", setup + '\nprintf "%s\\n" "$reference_path"'],
                 cwd=directory, text=True, capture_output=True,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -206,7 +208,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                     "cell_type_beds", WDL.Value.Array(WDL.Type.File(), [WDL.Value.File(p) for p in beds])
                 ).bind(
                     "reference_summary", WDL.Value.File(reference) if reference else WDL.Value.Null()
-                ).bind("min_mean_log2_cpm1", WDL.Value.Float(0.01)).bind(
+                ).bind("max_negative_fraction", WDL.Value.Float(0.10)).bind("min_mean_log2_cpm1", WDL.Value.Float(0.01)).bind(
                     "residual_cutoff", WDL.Value.Float(3.5) if use_reference else WDL.Value.Null()
                 )
                 command = render_after_localization(task, env, directory)
@@ -222,6 +224,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
                 self.assertIn("--inventory", tokens)
                 self.assertEqual(tokens[tokens.index("--inventory") + 1], inventory)
                 self.assertEqual(float(tokens[tokens.index("--min-mean-log2-cpm1") + 1]), 0.01)
+                self.assertEqual(float(tokens[tokens.index("--max-negative-fraction") + 1]), 0.10)
                 bed_list = Path(directory) / tokens[tokens.index("--bed-list") + 1]
                 self.assertEqual(bed_list.read_text().splitlines(), beds)
                 if use_reference:
@@ -265,15 +268,11 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             work = Path(directory)
             (work / "pipeline").symlink_to(script_root / "downstream", target_is_directory=True)
             counts = work / "counts with apostrophe's $(touch unexpected_side_effect).tsv"
-            populations = [
-                "NveB", "MemB", "CD4T", "CD8T", "NK", "Mono",
-                "MonoNonClassical", "Neut", "Eo", "myDC", "myDC123", "pDC",
-            ]
-            counts.write_text("gene_id\t" + "\t".join(f"{x}.1" for x in populations) + "\n" +
-                              "ENSG000001\t" + "\t".join(["10"] * 12) + "\n" +
-                              "ENSG000002\t" + "\t".join(["20"] * 12) + "\n" +
-                              "ENSG000003\t" + "\t".join(["40"] * 12) + "\n")
-            prepare_env = WDL.Env.Bindings().bind("counts", WDL.Value.File(str(counts)))
+            counts.write_text("gene_symbol\tB\tCD4_T\nA\t10\t10\nB\t20\t20\nC\t40\t40\n")
+            gtf = work / "annotation.gtf"
+            gtf.write_text("".join(f'chr1\tx\tgene\t{i}\t{i+1}\t.\t+\t.\tgene_id "ENSG00000{i}"; gene_name "{symbol}"; gene_type "protein_coding";\n'
+                                   for i, symbol in enumerate("ABC", 1)))
+            prepare_env = WDL.Env.Bindings().bind("reference", WDL.Value.File(str(counts))).bind("gtf", WDL.Value.File(str(gtf)))
             prepare_command = render_after_localization(
                 tasks["PrepareHaemopedia"], prepare_env, directory
             ).replace("/cell_type_specific_expression/downstream/", "/cell_type_specific_expression/").replace(
@@ -312,7 +311,7 @@ class ReferenceFilterWdlTest(unittest.TestCase):
             ).bind(
                 "reference_summary", WDL.Value.File(str(reference_summary))
                 if use_reference else WDL.Value.Null()
-            ).bind("min_mean_log2_cpm1", WDL.Value.Float(0.01)).bind(
+            ).bind("max_negative_fraction", WDL.Value.Float(0.10)).bind("min_mean_log2_cpm1", WDL.Value.Float(0.01)).bind(
                 "residual_cutoff", WDL.Value.Null()
             )
             filter_command = render_after_localization(

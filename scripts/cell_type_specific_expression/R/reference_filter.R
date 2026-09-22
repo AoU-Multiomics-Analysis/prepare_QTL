@@ -1,4 +1,4 @@
-reference_supported_cell_types <- unique(unname(reference_population_map))
+reference_supported_cell_types <- unique(c(unname(reference_population_map), "Erythroid", "Plasma cells", "Platelets"))
 
 summarize_bed_values <- function(values) {
   if (!is.matrix(values) || !is.numeric(values) || any(!is.finite(values))) {
@@ -6,8 +6,7 @@ summarize_bed_values <- function(values) {
   }
   negative <- values < 0
   negative_count <- rowSums(negative)
-  logged <- suppressWarnings(log2(values + 1))
-  valid_log <- rowSums(negative) == 0L
+  logged <- sign(values) * log2(1 + abs(values))
   tibble::tibble(
     negative_count = as.integer(negative_count),
     negative_percentage = 100 * negative_count / ncol(values),
@@ -16,27 +15,34 @@ summarize_bed_values <- function(values) {
       if (negative_count[[i]] == 0L) NA_real_ else mean(values[i, negative[i, ]])
     }, numeric(1)),
     n_samples = ncol(values), nonnegative = negative_count == 0L,
-    mean_log2_cpm1 = ifelse(valid_log, rowMeans(logged), NA_real_),
+    mean_log2_cpm1 = rowMeans(logged),
     median_log2_cpm1 = vapply(seq_len(nrow(values)), function(i) {
-      if (valid_log[[i]]) stats::median(logged[i, ]) else NA_real_
+      stats::median(logged[i, ])
     }, numeric(1))
   )
 }
 
 apply_reference_rules <- function(bed_summary, cell_type, reference_summary,
-                                  threshold = 0.01) {
+                                  threshold = 0.01, max_negative_fraction = 0.10) {
   if (!is.numeric(threshold) || length(threshold) != 1L || !is.finite(threshold)) {
     stop("Expression threshold must be one finite number", call. = FALSE)
   }
+  if (length(max_negative_fraction) != 1L || !is.finite(max_negative_fraction) ||
+      max_negative_fraction < 0 || max_negative_fraction > 1) {
+    stop("Maximum negative fraction must be between 0 and 1", call. = FALSE)
+  }
   result <- bed_summary
+  result$negative_pass <- if ("negative_percentage" %in% names(result)) {
+    result$negative_percentage <= 100 * max_negative_fraction
+  } else result$nonnegative
   result$reference_gene_matched <- NA
   result$reference_mean_log2_cpm1 <- NA_real_
   result$low_deconvolution_expression <- FALSE
   result$low_reference_expression <- FALSE
   result$comparison_status <- "reference_not_provided"
-  result$retained <- result$nonnegative
+  result$retained <- result$negative_pass
   if (is.null(reference_summary)) return(result)
-  if (!(cell_type %in% reference_supported_cell_types)) {
+  if (!(cell_type %in% reference_supported_cell_types) && !(cell_type %in% reference_summary$cell_type)) {
     result$comparison_status <- "no_reference_cell_type"
     return(result)
   }
@@ -52,11 +58,11 @@ apply_reference_rules <- function(bed_summary, cell_type, reference_summary,
   result$reference_gene_matched <- matched
   result$reference_mean_log2_cpm1[matched] <- ref$mean_log2_cpm1[index[matched]]
   result$comparison_status <- ifelse(matched, "compared", "reference_gene_unmatched")
-  result$low_deconvolution_expression <- result$nonnegative &
+  result$low_deconvolution_expression <- result$negative_pass &
     result$mean_log2_cpm1 <= threshold
   result$low_reference_expression <- matched &
     result$reference_mean_log2_cpm1 <= threshold
-  result$retained <- result$nonnegative & matched &
+  result$retained <- result$negative_pass & matched &
     result$mean_log2_cpm1 > threshold & result$reference_mean_log2_cpm1 > threshold
   result
 }

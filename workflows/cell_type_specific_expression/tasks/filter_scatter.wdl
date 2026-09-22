@@ -6,8 +6,9 @@ task FilterCellTypeBed {
     File cell_type_bed
     File? reference_summary
     Float min_mean_log2_cpm1 = 0.01
+    Float max_negative_fraction = 0.10
     Float? residual_cutoff
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
     Int cpu = 1
     String memory = "8 GB"
     Int disk_gb = 500
@@ -34,6 +35,7 @@ command <<<
     fi
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R \
       --inventory "$inventory_path" --single-bed "$bed_path" \
+      --max-negative-fraction '~{max_negative_fraction}' \
       --min-mean-log2-cpm1 '~{min_mean_log2_cpm1}' "${optional_arguments[@]}" \
       --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=cell_types:1 outputs=filtered_bed,reports completion_time=%s\n' \
@@ -66,7 +68,7 @@ task MergeFilterReports {
     Array[File] samples
     Array[File] logs
     Boolean post_residual = false
-    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
+    String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
     Int cpu = 1
     String memory = "8 GB"
     Int disk_gb = 20

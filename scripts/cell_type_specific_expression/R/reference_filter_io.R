@@ -93,14 +93,15 @@ make_filter_metric <- function(metric, cell_type, slug, comparison_status,
 
 reference_comparison_status <- function(reference_summary, cell_type) {
   if (is.null(reference_summary)) return("reference_not_provided")
-  if (!(cell_type %in% reference_supported_cell_types)) return("no_reference_cell_type")
+  if (!(cell_type %in% reference_supported_cell_types) && !(cell_type %in% reference_summary$cell_type)) return("no_reference_cell_type")
   if (!any(reference_summary$cell_type == cell_type)) return("reference_cell_type_unavailable")
   "available"
 }
 
 validate_inventory_reference_lineages <- function(inventory, reference_summary) {
   if (is.null(reference_summary)) return(invisible(TRUE))
-  needed <- intersect(inventory$cell_group, reference_supported_cell_types)
+  needed <- if ("reference_type" %in% names(reference_summary)) inventory$cell_group else
+    intersect(inventory$cell_group, reference_supported_cell_types)
   missing <- setdiff(needed, unique(reference_summary$cell_type))
   if (length(missing) > 0L) {
     stop(sprintf(
@@ -113,7 +114,7 @@ validate_inventory_reference_lineages <- function(inventory, reference_summary) 
 
 filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_summary = NULL,
                                   min_mean_log2_cpm1 = 0.01, residual_cutoff = NULL,
-                                  chunk_size = 256L, make_plots = TRUE) {
+                                  chunk_size = 256L, make_plots = TRUE, max_negative_fraction = 0.10) {
   validate_scatter_inventory(inventory)
   chunk_size <- validate_tensor_positive_integer(chunk_size, "chunk_size")
   residual_cutoff <- validate_residual_cutoff(residual_cutoff)
@@ -151,7 +152,7 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
     if (is.null(cohort_samples)) cohort_samples <- scanned$samples
     assert_identical_ids(cohort_samples, scanned$samples, "BED sample")
     decision <- apply_reference_rules(scanned$summary, cell_type, reference_summary,
-                                      min_mean_log2_cpm1)
+                                      min_mean_log2_cpm1, max_negative_fraction)
     decision$cell_type <- cell_type
     decision$residual_excluded <- FALSE
     decision$fitted_value <- NA_real_
@@ -195,8 +196,8 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
     if (length(retained_ids) == 0L) {
       stop(sprintf(
         "Cell type '%s' has no retained genes (original=%d, negative=%d, reference_or_expression=%d, residual=%d)",
-        cell_type, nrow(decision), sum(!decision$nonnegative),
-        sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
+        cell_type, nrow(decision), sum(!decision$negative_pass),
+        sum(decision$negative_pass & !decision$retained & !decision$residual_excluded),
         sum(decision$residual_excluded)
       ), call. = FALSE)
     }
@@ -204,8 +205,8 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
     write_filtered_bed(bed_paths[[i]], output_paths[[i]], retained_ids, chunk_size)
     comparisons[[i]] <- decision
     metric_rows <- make_filter_metric(baseline, cell_type, slug, status,
-      nrow(decision), sum(!decision$nonnegative),
-      sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
+      nrow(decision), sum(!decision$negative_pass),
+      sum(decision$negative_pass & !decision$retained & !decision$residual_excluded),
       sum(decision$residual_excluded), sum(decision$retained),
       inventory$n_samples[[i]], reference_n_samples, "baseline")
     if (!is.null(residual_cutoff) && status == "available") {
@@ -223,11 +224,14 @@ filter_cell_type_beds <- function(inventory, bed_paths, output_dir, reference_su
       metric_rows <- dplyr::bind_rows(metric_rows,
         make_filter_metric(retained_metrics, cell_type, slug,
           if (retained_available) "available" else "insufficient_retained_genes_or_variation",
-          nrow(decision), sum(!decision$nonnegative),
-          sum(decision$nonnegative & !decision$retained & !decision$residual_excluded),
+          nrow(decision), sum(!decision$negative_pass),
+          sum(decision$negative_pass & !decision$retained & !decision$residual_excluded),
           sum(decision$residual_excluded), sum(decision$retained),
           inventory$n_samples[[i]], reference_n_samples, "retained"))
     }
+    metric_rows$max_negative_fraction <- max_negative_fraction
+    metric_rows$min_mean_log2_cpm1 <- min_mean_log2_cpm1
+    metric_rows$model_transform <- "sign(CPM) * log2(1 + abs(CPM))"
     metrics[[i]] <- metric_rows
     message(sprintf("stage=filter_cell_type_beds cell_type=%s retained=%d completion_time=%s",
                     cell_type, length(retained_ids), tensor_utc_time()))

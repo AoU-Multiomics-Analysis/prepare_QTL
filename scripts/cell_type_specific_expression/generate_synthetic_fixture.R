@@ -194,7 +194,11 @@ writeLines(gtf_lines, file.path(output_directory, "synthetic.gtf"))
 writeLines(cell_groups, file.path(output_directory, "expected_groups.txt"))
 
 fixture_root <- "tests/cell_type_specific_expression/fixtures"
+reference_profiles <- tibble::tibble(gene_symbol = unique(all_gene_names))
+for (label in cell_groups) reference_profiles[[label]] <- seq_len(nrow(reference_profiles)) + 1
+write_fixture_tsv(reference_profiles, file.path(output_directory, "synthetic_reference.tsv"))
 common_inputs <- list(
+  "PrepareCellTypeEqtlWorkflow.tabula_sapiens_reference" = file.path(fixture_root, "synthetic_reference.tsv"),
   "PrepareCellTypeEqtlWorkflow.gtf" = file.path(fixture_root, "synthetic.gtf"),
   "PrepareCellTypeEqtlWorkflow.SampleList" =
     file.path(fixture_root, "samples.tsv"),
@@ -272,7 +276,6 @@ precomputed_inputs <- append(
   list(
     "PrepareCellTypeEqtlWorkflow.expression" =
       file.path(fixture_root, "synthetic_expression_with_zero.bed"),
-    "PrepareCellTypeEqtlWorkflow.haemopedia_counts" = "ci-runs/reference-counts.tsv.gz",
     "PrepareCellTypeEqtlWorkflow.lm22" =
       file.path(fixture_root, "synthetic_signature.tsv"),
     "PrepareCellTypeEqtlWorkflow.precomputed_proportions" =

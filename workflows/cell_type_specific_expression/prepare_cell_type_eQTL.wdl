@@ -8,8 +8,8 @@ workflow PrepareCellTypeEqtlWorkflow {
   input {
     String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String expression__filter_expression_genes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
-        String filter_scatter__filter_cell_type_bed_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
-        String filter_scatter__merge_filter_reports_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
+        String filter_scatter__filter_cell_type_bed_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
+        String filter_scatter__merge_filter_reports_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
         String gene_summary__summarize_cell_type_beds_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String hspe__merge_hspe_batches_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String hspe__prepare_hspe_batches_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
@@ -17,11 +17,11 @@ workflow PrepareCellTypeEqtlWorkflow {
         String integration__build_qtl_manifest_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String integration__prepare_scatter_inputs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
-        String prepare_eqtl__eqtl_prepare_expression_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
+        String prepare_eqtl__eqtl_prepare_expression_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f79e1308eb885198ad855714a1a0a6d2d9a18a1da32adc954bca1099e5f74c4f"
         String proportions__process_proportions_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String proportions__validate_proportion_mode_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String qc__build_manifest_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
-        String reference_filter__prepare_haemopedia_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
+        String reference_filter__prepare_haemopedia_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
         String residualizephenotypes__residualize_phenotypes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String tca__clean_tca_model_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
         String tca__export_tca_beds_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
@@ -53,8 +53,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
     Array[String] gene_type = ["protein_coding", "lncRNA"]
-    File? haemopedia_counts
+    File tabula_sapiens_reference
     Float reference_min_mean_log2_cpm1 = 0.01
+    Float reference_max_negative_fraction = 0.10
     Float? reference_residual_cutoff
 
     Int hspe_cpu = 4
@@ -121,7 +122,8 @@ workflow PrepareCellTypeEqtlWorkflow {
       random_seed = random_seed,
       log2_pseudocount = log2_pseudocount,
       gene_type = gene_type,
-      haemopedia_counts = haemopedia_counts,
+      tabula_sapiens_reference = tabula_sapiens_reference,
+      reference_max_negative_fraction = reference_max_negative_fraction,
       reference_min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
       reference_residual_cutoff = reference_residual_cutoff,
       hspe_cpu = hspe_cpu,
@@ -173,6 +175,7 @@ workflow PrepareCellTypeEqtlWorkflow {
 
         OutputPrefix = PrepareScatterInputs.output_prefixes[index],
         CpmBed = select_first(matched_filtered_bed),
+        SignedCpm = true,
         SampleList = PrepareScatterInputs.cohort_samples,
         AdditionalCovariates = AdditionalCovariates,
         ResidualizeNormalizedInputs = false,
@@ -281,9 +284,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     File reference_filter_metrics = CellTypeDeconvolution.reference_filter_metrics
     Array[File] reference_filter_plots = CellTypeDeconvolution.reference_filter_plots
     File reference_filter_log = CellTypeDeconvolution.reference_filter_log
-    File? haemopedia_reference_summary = CellTypeDeconvolution.haemopedia_reference_summary
-    File? haemopedia_reference_samples = CellTypeDeconvolution.haemopedia_reference_samples
-    File? haemopedia_reference_metadata = CellTypeDeconvolution.haemopedia_reference_metadata
+    File? tabula_sapiens_reference_summary = CellTypeDeconvolution.tabula_sapiens_reference_summary
+    File? tabula_sapiens_reference_samples = CellTypeDeconvolution.tabula_sapiens_reference_samples
+    File? tabula_sapiens_reference_metadata = CellTypeDeconvolution.tabula_sapiens_reference_metadata
     File reconstruction_by_sample = CellTypeDeconvolution.reconstruction_by_sample
     File qc_summary = CellTypeDeconvolution.qc_summary
     File qc_plots = CellTypeDeconvolution.qc_plots

@@ -122,26 +122,26 @@ testthat::test_that("filter CLI preserves retained BED rows across chunks and pa
                              file.path(output, "beds", "b_cells.filtered.bed.gz"))
 })
 
-testthat::test_that("reference preparation CLI writes normalized provenance outputs", {
-  testthat::skip_if_not_installed("edgeR")
+testthat::test_that("corrected reference CLI writes provenance without normalization", {
   tmp <- tempfile("reference preparation ")
   dir.create(tmp)
-  counts_path <- file.path(tmp, "raw counts.tsv.gz")
-  counts <- tibble::tibble(gene_id = c("ENSG1.1", "ENSG2"),
-    NveB.1 = c(10L, 4L), NveB.2 = c(20L, 2L), MemB.1 = c(3L, 30L), CD4T.1 = c(5L, 8L))
-  readr::write_tsv(counts, counts_path)
-  output <- file.path(tmp, "reference output")
-  status <- system2("Rscript", c(shQuote(file.path(script_root, "downstream", "prepare_haemopedia.R")),
-                                  shQuote(counts_path), shQuote(output)))
+  reference <- file.path(tmp, "corrected.tsv")
+  gtf <- file.path(tmp, "annotation.gtf")
+  readr::write_tsv(tibble::tibble(gene_symbol = c("A", "B"), CD4_T = c(3, 15)), reference)
+  writeLines(c('chr1\tx\tgene\t1\t2\t.\t+\t.\tgene_id "ENSG1"; gene_name "A"; gene_type "protein_coding";',
+    'chr1\tx\tgene\t3\t4\t.\t+\t.\tgene_id "ENSG2"; gene_name "B"; gene_type "protein_coding";'), gtf)
+  output <- file.path(tmp, "output")
+  script <- file.path(script_root, "downstream", "prepare_haemopedia.R")
+  status <- system2("Rscript", shQuote(c(script, "--reference", reference, "--gtf", gtf, "--output-dir", output)))
   testthat::expect_equal(status, 0L)
   summary <- readr::read_tsv(file.path(output, "reference_summary.tsv.gz"), show_col_types = FALSE)
-  testthat::expect_identical(names(summary), c("gene_id", "cell_type", "n_samples",
-    "mean_log2_cpm1", "median_log2_cpm1"))
-  samples <- readr::read_tsv(file.path(output, "reference_samples.tsv"), show_col_types = FALSE)
-  testthat::expect_true(all(c("library_size", "norm_factor") %in% names(samples)))
+  testthat::expect_equal(summary$mean_log2_cpm1, c(2, 4))
   metadata <- jsonlite::read_json(file.path(output, "reference_metadata.json"), simplifyVector = TRUE)
-  testthat::expect_match(metadata$normalization, "full raw count matrix")
-  testthat::expect_equal(metadata$input$n_genes, 2L)
+  testthat::expect_match(metadata$normalization, "None")
+  failure <- suppressWarnings(system2("Rscript", shQuote(c(script, "--reference", "gs://bucket/reference.tsv",
+    "--gtf", gtf, "--output-dir", output)), stdout = TRUE, stderr = TRUE))
+  testthat::expect_equal(attr(failure, "status"), 1L)
+  testthat::expect_true(any(grepl("localization error", failure)))
 })
 
 testthat::test_that("filtered BED writing preserves the original text exactly", {
@@ -216,4 +216,28 @@ testthat::test_that("a supplied reference must contain each supported inventory 
     filter_cell_type_beds(cd4_inventory, bed, file.path(directory, "valid-subset"),
                           reference_summary = cd4_reference)
   )
+})
+
+testthat::test_that("ten percent negatives are retained with a signed-log mean", {
+  x <- rbind(c(-3, rep(3, 9)), c(-3, -2, rep(3, 8)))
+  s <- summarize_bed_values(x)
+  s$gene_id <- c("ENSG1", "ENSG2")
+  ref <- tibble::tibble(gene_id = s$gene_id, cell_type = "CD4 T cells", mean_log2_cpm1 = 2)
+  d <- apply_reference_rules(s, "CD4 T cells", ref)
+  testthat::expect_equal(d$retained, c(TRUE, FALSE))
+  testthat::expect_equal(s$mean_log2_cpm1[[1]], 1.6)
+  testthat::expect_error(apply_reference_rules(s, "CD4 T cells", ref, max_negative_fraction = 1.1), "fraction")
+  testthat::expect_false(any(apply_reference_rules(s, "CD4 T cells", ref, max_negative_fraction = 0)$retained))
+})
+
+testthat::test_that("corrected Tabula values are not renormalized and ambiguous symbols are excluded", {
+  p <- tibble::tibble(gene_symbol = c("A", "B", "C"), CD4_T = c(3, 15, 1), Platelet = c(7, 3, 0))
+  a <- tibble::tibble(gene_id = c("ENSG1.1", "ENSG2", "ENSG3", "ENSG4"), gene_name = c("A", "B", "C", "C"))
+  result <- prepare_tabula_reference(p, a)
+  testthat::expect_equal(result$excluded_symbols, "C")
+  testthat::expect_equal(dplyr::filter(result$summary, cell_type == "CD4 T cells")$mean_log2_cpm1, c(2, 4))
+  testthat::expect_setequal(result$summary$cell_type, c("CD4 T cells", "Platelets"))
+  testthat::expect_setequal(result$summary$gene_id, c("ENSG1", "ENSG2"))
+  p$CD4_T[1] <- -1
+  testthat::expect_error(prepare_tabula_reference(p, a), "nonnegative")
 })
