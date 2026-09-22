@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # BED inputs use linear CPM.
-# Expression thresholds use the mean of log2(CPM + 1) across samples.
+# Expression thresholds use mean sign(CPM) * log2(1 + abs(CPM)) across all BED samples.
 file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 script_path <- gsub("~+~", " ", sub("^--file=", "", file_arg[[1L]]), fixed = TRUE)
 source(file.path(dirname(dirname(normalizePath(script_path))), "bootstrap.R"))
@@ -14,6 +14,7 @@ tryCatch({
     optparse::make_option("--single-bed", dest = "single_bed", type = "character"),
     optparse::make_option("--reference-summary", dest = "reference_summary", type = "character"),
     optparse::make_option("--min-mean-log2-cpm1", dest = "min_mean_log2_cpm1", type = "double", default = 0.01),
+    optparse::make_option("--max-negative-fraction", dest = "max_negative_fraction", type = "double", default = 0.10),
     optparse::make_option("--residual-cutoff", dest = "residual_cutoff", type = "double"),
     optparse::make_option("--chunk-size", dest = "chunk_size", type = "integer", default = 256L),
     optparse::make_option("--output-dir", dest = "output_dir", type = "character")
@@ -40,7 +41,7 @@ tryCatch({
     readr::read_tsv(options$reference_summary, show_col_types = FALSE, progress = FALSE)
   message(sprintf("stage=filter_cell_type_beds start_time=%s", tensor_utc_time()))
   result <- filter_cell_type_beds(inventory, bed_paths, options$output_dir,
-    reference_summary = reference, min_mean_log2_cpm1 = options$min_mean_log2_cpm1,
+    reference_summary = reference, max_negative_fraction = options$max_negative_fraction, min_mean_log2_cpm1 = options$min_mean_log2_cpm1,
     residual_cutoff = options$residual_cutoff, chunk_size = options$chunk_size,
     make_plots = is.null(options$single_bed))
   writeLines(result$samples, file.path(options$output_dir, "sample_ids.txt"))

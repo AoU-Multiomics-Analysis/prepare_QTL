@@ -268,8 +268,8 @@ purrr::walk(seq_len(nrow(manifest)), function(index) {
   cpm <- tca_bed |>
     dplyr::select(dplyr::all_of(expected_samples)) |>
     as.matrix()
-  require_true(all(cpm >= 0), "CPM inputs must not contain negative TCA estimates")
-  logged <- log2(cpm + 1)
+  require_true(all(rowMeans(cpm < 0) <= 0.10), "Filtered CPM must pass the negative fraction limit")
+  logged <- sign(cpm) * log2(1 + abs(cpm))
   centered <- sweep(logged, 1L, rowMeans(logged), "-")
   deviations <- sqrt(rowSums(centered^2) / (ncol(centered) - 1L))
   expected <- sweep(centered, 1L, deviations, "/")
@@ -280,7 +280,7 @@ purrr::walk(seq_len(nrow(manifest)), function(index) {
   comparison <- all.equal(unname(observed), unname(expected[, kept_samples, drop = FALSE]),
                           tolerance = 1e-7)
   require_true(isTRUE(comparison), paste0(
-    "The QTL scaled BED must use log2(CPM + 1) before centering and scaling; ",
+    "The QTL scaled BED must use signed log2(1 + abs(CPM)) before centering and scaling; ",
     "cell_type=", slug, "; comparison=", paste(comparison, collapse = "; ")
   ))
 })
@@ -296,19 +296,20 @@ purrr::walk(c("negative_expression_summary", "reference_gene_comparison", "refer
 filter_metrics <- read_reference_filter_metrics(output_value("reference_filter_metrics"))
 mapped_reference_cell_types <- c(
   "B cells", "CD4 T cells", "CD8 T cells", "NK cells", "Monocyte/myeloid",
-  "Neutrophils", "Eosinophils", "Dendritic cells"
+  "Neutrophils", "Eosinophils", "Dendritic cells", "Mast cells", "Gamma-delta T cells",
+  "Erythroid", "Plasma cells", "Platelets"
 )
 validate_reference_filter_metrics(
   filter_metrics,
   expected_groups,
   mapped_reference_cell_types,
-  !is.null(inputs[[paste0(workflow_name, ".haemopedia_counts")]])
+  !is.null(inputs[[paste0(workflow_name, ".tabula_sapiens_reference")]])
 )
 plots <- output_value("reference_filter_plots")
 require_true(length(plots) > 0 && all(file.exists(plots)) && all(file.info(plots)$size > 0),
   "The filtering plots must be present")
-if (!is.null(inputs[[paste0(workflow_name, ".haemopedia_counts")]])) {
-  reference <- readr::read_tsv(output_value("haemopedia_reference_summary"), show_col_types = FALSE)
+if (!is.null(inputs[[paste0(workflow_name, ".tabula_sapiens_reference")]])) {
+  reference <- readr::read_tsv(output_value("tabula_sapiens_reference_summary"), show_col_types = FALSE)
   require_true(all(c("gene_id", "cell_type", "mean_log2_cpm1") %in% names(reference)) &&
     nrow(reference) > 0 && all(is.finite(reference$mean_log2_cpm1)),
     "The reference-enabled smoke run must produce finite mean log expression")

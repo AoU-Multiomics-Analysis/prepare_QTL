@@ -53,8 +53,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     Int random_seed = 20260901
     Float log2_pseudocount = 0.0
     Array[String] gene_type = ["protein_coding", "lncRNA"]
-    File? haemopedia_counts
+    File tabula_sapiens_reference
     Float reference_min_mean_log2_cpm1 = 0.01
+    Float reference_max_negative_fraction = 0.10
     Float? reference_residual_cutoff
 
     Int hspe_cpu = 4
@@ -121,7 +122,8 @@ workflow PrepareCellTypeEqtlWorkflow {
       random_seed = random_seed,
       log2_pseudocount = log2_pseudocount,
       gene_type = gene_type,
-      haemopedia_counts = haemopedia_counts,
+      tabula_sapiens_reference = tabula_sapiens_reference,
+      reference_max_negative_fraction = reference_max_negative_fraction,
       reference_min_mean_log2_cpm1 = reference_min_mean_log2_cpm1,
       reference_residual_cutoff = reference_residual_cutoff,
       hspe_cpu = hspe_cpu,
@@ -173,6 +175,7 @@ workflow PrepareCellTypeEqtlWorkflow {
 
         OutputPrefix = PrepareScatterInputs.output_prefixes[index],
         CpmBed = select_first(matched_filtered_bed),
+        SignedCpm = true,
         SampleList = PrepareScatterInputs.cohort_samples,
         AdditionalCovariates = AdditionalCovariates,
         ResidualizeNormalizedInputs = false,
@@ -281,9 +284,9 @@ workflow PrepareCellTypeEqtlWorkflow {
     File reference_filter_metrics = CellTypeDeconvolution.reference_filter_metrics
     Array[File] reference_filter_plots = CellTypeDeconvolution.reference_filter_plots
     File reference_filter_log = CellTypeDeconvolution.reference_filter_log
-    File? haemopedia_reference_summary = CellTypeDeconvolution.haemopedia_reference_summary
-    File? haemopedia_reference_samples = CellTypeDeconvolution.haemopedia_reference_samples
-    File? haemopedia_reference_metadata = CellTypeDeconvolution.haemopedia_reference_metadata
+    File? tabula_sapiens_reference_summary = CellTypeDeconvolution.tabula_sapiens_reference_summary
+    File? tabula_sapiens_reference_samples = CellTypeDeconvolution.tabula_sapiens_reference_samples
+    File? tabula_sapiens_reference_metadata = CellTypeDeconvolution.tabula_sapiens_reference_metadata
     File reconstruction_by_sample = CellTypeDeconvolution.reconstruction_by_sample
     File qc_summary = CellTypeDeconvolution.qc_summary
     File qc_plots = CellTypeDeconvolution.qc_plots

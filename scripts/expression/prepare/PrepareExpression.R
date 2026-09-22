@@ -1,7 +1,6 @@
 library(tidyverse)
 library(data.table)
 library(magrittr)
-library(biomaRt)
 library(optparse)
 library(data.table)
 library(rtracklayer)
@@ -66,12 +65,12 @@ TSS_locations <- gencode_GTF  %>%
 TSS_locations
 }
 
-transform_phenotype <- function(x, rank_normalize, log2_transform = FALSE){
+transform_phenotype <- function(x, rank_normalize, log2_transform = FALSE, signed_cpm = FALSE){
     if (rank_normalize) {
         return(RankNorm(x))
     }
     if (log2_transform) {
-        x <- log2(x + 1)
+        x <- if (signed_cpm) sign(x) * log2(1 + abs(x)) else log2(x + 1)
     }
     as.numeric(scale(x, center = TRUE, scale = TRUE))
 }
@@ -126,6 +125,7 @@ remove_connectivity_outliers <- function(phenotype_matrix, output_file, transfor
 option_list <- list(
     optparse::make_option(c("--CountGCT"), type="character", default=NULL,
                         help="Parquet or TSV of normalzied protein expression data", metavar = "type"),
+    optparse::make_option("--SignedCpm", action="store_true", default=FALSE, help="Retain signed deconvolution CPM; use signed log for scaled output"),
     optparse::make_option(c("--CpmBed"), type="character", default=NULL,
                         help="Coordinate-preserving BED of pre-normalized linear CPM values", metavar = "type"),
     optparse::make_option(c("--Log2CpmBed"), type="character", default=NULL,
@@ -145,6 +145,7 @@ opt <- optparse::parse_args(optparse::OptionParser(option_list=option_list))
 
 has_count_gct <- !is.null(opt$CountGCT) && nzchar(opt$CountGCT)
 has_cpm_bed <- !is.null(opt$CpmBed) && nzchar(opt$CpmBed)
+if (opt$SignedCpm && !has_cpm_bed) stop("--SignedCpm requires --CpmBed")
 has_log2_cpm_bed <- !is.null(opt$Log2CpmBed) && nzchar(opt$Log2CpmBed)
 
 if (sum(c(has_count_gct, has_cpm_bed, has_log2_cpm_bed)) != 1L) {
@@ -226,7 +227,7 @@ if (has_count_gct) {
     if (!all(vapply(DataCPM, is.numeric, logical(1))) || any(!is.finite(as.matrix(DataCPM)))) {
         stop(paste(bed_label, 'sample values must be finite numeric values'))
     }
-    if (has_cpm_bed && any(as.matrix(DataCPM) < 0)) {
+    if (has_cpm_bed && !opt$SignedCpm && any(as.matrix(DataCPM) < 0)) {
         negative_genes <- rownames(DataCPM)[rowSums(as.matrix(DataCPM) < 0) > 0]
         stop(paste0(
             'CPM BED contains negative values; linear CPM must be nonnegative. ',
@@ -256,19 +257,19 @@ if (has_count_gct) {
     message('Skipping count filtering, TMM normalization, CPM calculation, and GTF mapping')
 }
 
-write_expression_bed <- function(cpm_data, tss_positions, output_file, transform_label, rank_normalize = NULL, log2_transform = FALSE, remove_outliers = TRUE){
+write_expression_bed <- function(cpm_data, tss_positions, output_file, transform_label, rank_normalize = NULL, log2_transform = FALSE, remove_outliers = TRUE, signed_cpm = FALSE){
     message(paste0('Preparing ', transform_label, ' CPM BED'))
     if (is.null(rank_normalize)) {
         NormalizedCPMsMatrix <- cpm_data %>%
                         data.frame(check.names = FALSE)
     } else {
         if (log2_transform) {
-            message('Applying log2(CPM + 1) before centering and scaling')
+            message(if (signed_cpm) 'Applying sign(CPM) * log2(1 + abs(CPM)) before scaling' else 'Applying log2(CPM + 1) before centering and scaling')
         }
         NormalizedCPMsMatrix <- cpm_data %>%
                         t() %>%
                         data.frame(check.names = FALSE) %>%
-                        mutate(across(everything(),~transform_phenotype(., rank_normalize, log2_transform))) %>%
+                        mutate(across(everything(),~transform_phenotype(., rank_normalize, log2_transform, signed_cpm))) %>%
                         t() %>%
                         data.frame(check.names = FALSE)
     }
@@ -315,5 +316,5 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
 }
 
 write_expression_bed(DataCPM, PositionTSS, IntOutputFile, 'rank-normalized', TRUE)
-write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = !has_log2_cpm_bed)
+write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = !has_log2_cpm_bed, signed_cpm = opt$SignedCpm)
 write_expression_bed(DataCPM, PositionTSS, RawOutputFile, 'raw', remove_outliers = FALSE)

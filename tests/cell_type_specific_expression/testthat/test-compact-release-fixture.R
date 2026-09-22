@@ -22,7 +22,7 @@ testthat::test_that("manifest smoke validation accepts the configured compact th
       grepl('numeric_parameter("group_mean_threshold")', paste(deparse(expression), collapse = " "), fixed = TRUE)
   }, as.list(expressions))
   testthat::expect_length(checks, 1L)
-  parameters <- list(min_lm22_overlap = .8, hspe_marker_fraction = .1,
+  parameters <- list(min_lm22_overlap = .8, hspe_marker_fraction = 1.0,
     hspe_marker_method = "ratio", hspe_quantile_normalize = FALSE,
     group_mean_threshold = .12, zero_floor = 1e-6, tca_max_iters = 10,
     tca_parallel = FALSE, gene_type = c("protein_coding", "lncRNA"),

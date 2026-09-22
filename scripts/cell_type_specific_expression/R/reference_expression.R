@@ -99,3 +99,46 @@ read_reference_counts <- function(path) {
   dimnames(counts) <- list(ids, sample_names)
   counts
 }
+
+# This reference is already corrected linear CPM: do not normalize it again.
+prepare_tabula_reference <- function(profiles, annotation) {
+  aliases <- c(B = "B cells", CD4_T = "CD4 T cells", CD8_T = "CD8 T cells",
+    Erythroid = "Erythroid", Monocyte_macrophage = "Monocyte/myeloid",
+    Neutrophil = "Neutrophils", NK = "NK cells", Plasma = "Plasma cells",
+    Platelet = "Platelets")
+  if (names(profiles)[[1]] != "gene_symbol" || ncol(profiles) < 2L ||
+      anyNA(profiles$gene_symbol) || any(!nzchar(profiles$gene_symbol)) ||
+      anyDuplicated(profiles$gene_symbol) || anyDuplicated(names(profiles))) {
+    stop("Reference requires unique gene_symbol rows and cell-type columns", call. = FALSE)
+  }
+  columns <- names(profiles)[-1]
+  labels <- ifelse(columns %in% names(aliases), unname(aliases[columns]), columns)
+  if (any(!labels %in% c(unname(aliases), unname(reference_population_map), "Mast cells", "Gamma-delta T cells")) || anyDuplicated(labels)) {
+    stop("Unknown or duplicate Tabula Sapiens cell-type columns", call. = FALSE)
+  }
+  values <- profiles[-1]
+  if (!all(vapply(values, is.numeric, logical(1))) ||
+      any(!is.finite(as.matrix(values))) || any(as.matrix(values) < 0)) {
+    stop("Corrected reference values must be finite nonnegative linear CPM", call. = FALSE)
+  }
+  # Retain gene-level BED IDs. Exclude ambiguous symbols instead of duplicating a
+  # single reference profile across multiple independently estimated genes.
+  mapping <- annotation |>
+    dplyr::transmute(gene_id = reference_gene_key(.data$gene_id), gene_symbol = .data$gene_name) |>
+    dplyr::distinct() |>
+    dplyr::filter(!is.na(.data$gene_symbol), nzchar(.data$gene_symbol)) |>
+    dplyr::add_count(.data$gene_symbol, name = "symbol_n_ids") |>
+    dplyr::add_count(.data$gene_id, name = "id_n_symbols") |>
+    dplyr::filter(.data$symbol_n_ids == 1L, .data$id_n_symbols == 1L) |>
+    dplyr::select("gene_id", "gene_symbol")
+  names(profiles)[-1] <- labels
+  summary <- profiles |>
+    dplyr::inner_join(mapping, by = "gene_symbol") |>
+    tidyr::pivot_longer(dplyr::all_of(labels), names_to = "cell_type", values_to = "reference_cpm") |>
+    dplyr::mutate(mean_log2_cpm1 = log2(1 + .data$reference_cpm),
+      median_log2_cpm1 = .data$mean_log2_cpm1, n_samples = 1L,
+      reference_type = "ComBat_corrected_Tabula_Sapiens")
+  if (!nrow(summary)) stop("No unambiguous reference genes match the GTF", call. = FALSE)
+  list(summary = summary, samples = tibble::tibble(sample_id = columns, cell_type = labels),
+       excluded_symbols = setdiff(profiles$gene_symbol, summary$gene_symbol))
+}

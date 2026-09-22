@@ -2,7 +2,8 @@ version 1.0
 
 task PrepareHaemopedia {
   input {
-    File counts
+    File reference
+    File gtf
     String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
     Int cpu = 1
     String memory = "8 GB"
@@ -21,9 +22,10 @@ command <<<
     mkdir -p outputs
     export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
     # Resolve the File here, after localization; quote apostrophes for the shell.
-    counts_path='~{sub(counts, "'", "'\"'\"'")}'
+    reference_path='~{sub(reference, "'", "'\"'\"'")}'
+    gtf_path='~{sub(gtf, "'", "'\"'\"'")}'
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/prepare_haemopedia.R \
-      "$counts_path" outputs 2>&1 | tee -a "$log"
+      --reference "$reference_path" --gtf "$gtf_path" --output-dir outputs 2>&1 | tee -a "$log"
     printf 'stage=%s dimensions=reference_prepared outputs=%s completion_time=%s\n' "$stage" \
       'reference_summary.tsv.gz,reference_samples.tsv,reference_metadata.json' \
       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log"
@@ -52,6 +54,7 @@ task FilterCellTypeBeds {
     Array[File] cell_type_beds
     File? reference_summary
     Float min_mean_log2_cpm1 = 0.01
+    Float max_negative_fraction = 0.10
     Float? residual_cutoff
     String docker_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
     Int cpu = 1
@@ -86,6 +89,7 @@ command <<<
     Rscript /opt/prepare_qtl/scripts/cell_type_specific_expression/downstream/filter_cell_type_beds.R \
       --inventory "$inventory_path" \
       --bed-list bed_paths.txt \
+      --max-negative-fraction '~{max_negative_fraction}' \
       --min-mean-log2-cpm1 '~{min_mean_log2_cpm1}' \
       "${optional_arguments[@]}" \
       --output-dir outputs 2>&1 | tee -a "$log"

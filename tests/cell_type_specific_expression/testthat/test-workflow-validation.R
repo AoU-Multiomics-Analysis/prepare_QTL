@@ -100,6 +100,7 @@ run_fixture_generator <- function(output_directory) {
 }
 
 integrated_fixture_files <- c(
+  "synthetic_reference.tsv",
   "synthetic_expression.bed",
   "synthetic_expression_with_zero.bed",
   "synthetic.gtf",

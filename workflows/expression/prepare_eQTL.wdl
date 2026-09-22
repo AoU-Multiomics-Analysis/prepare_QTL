@@ -8,6 +8,7 @@ task eqtl_prepare_expression {
     input {
         File? CountGCT
         File? AnnotationGTF
+        Boolean SignedCpm = false
         File? CpmBed
         File? Log2CpmBed
         File SampleList
@@ -29,6 +30,7 @@ command {
         Rscript /tmp/PrepareExpression.R \
             ~{if defined(CountGCT) then "--CountGCT \"" + select_first([CountGCT]) + "\"" else ""} \
             ~{if defined(AnnotationGTF) then "--AnnotationGTF \"" + select_first([AnnotationGTF]) + "\"" else ""} \
+            ~{if SignedCpm then "--SignedCpm" else ""} \
             ~{if defined(CpmBed) then "--CpmBed '" + sub(select_first([CpmBed]), "'", "'\"'\"'") + "'" else ""} \
             ~{if defined(Log2CpmBed) then "--Log2CpmBed \"" + select_first([Log2CpmBed]) + "\"" else ""} \
             --SampleList "~{SampleList}" \
@@ -65,6 +67,7 @@ workflow eQTLPrepareData {
         String OutputPrefix
         File? CountGCT
         File? AnnotationGTF
+        Boolean SignedCpm = false
         File? CpmBed
         File? Log2CpmBed
         File SampleList
@@ -90,6 +93,7 @@ workflow eQTLPrepareData {
             max_retries = max_retries,
             CountGCT  = CountGCT,
             AnnotationGTF = AnnotationGTF,
+            SignedCpm = SignedCpm,
             CpmBed = CpmBed,
             Log2CpmBed = Log2CpmBed,
             SampleList = SampleList

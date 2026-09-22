@@ -29,7 +29,7 @@ save_negative_plots <- function(negative_summary, plot_dir) {
 
 save_reference_plots <- function(comparison, cell_type, slug, plot_dir, post = FALSE) {
   eligible <- dplyr::filter(comparison, .data$comparison_status == "compared",
-                            .data$nonnegative, !.data$low_deconvolution_expression,
+                            .data$negative_pass, !.data$low_deconvolution_expression,
                             !.data$low_reference_expression,
                             is.finite(.data$reference_mean_log2_cpm1))
   if (nrow(eligible) < 1L) return(invisible(character()))
@@ -40,7 +40,7 @@ save_reference_plots <- function(comparison, cell_type, slug, plot_dir, post = F
     ggplot2::geom_point(ggplot2::aes(colour = .data$residual_excluded), alpha = 0.7) +
     ggplot2::geom_smooth(method = "lm", formula = y ~ x, se = FALSE, colour = "black") +
     ggplot2::labs(x = "Reference mean log2(CPM + 1)",
-                  y = "Deconvolution mean log2(CPM + 1)", colour = "Residual excluded") +
+                  y = "Deconvolution mean signed log2(1 + |CPM|)", colour = "Residual excluded") +
     ggplot2::theme_minimal()
   scatter_path <- file.path(plot_dir, sprintf("%s.%s.scatter.pdf", slug, suffix))
   ggplot2::ggsave(scatter_path, scatter, width = 5.5, height = 5, units = "in")
