@@ -12,8 +12,8 @@ import "tasks/filter_scatter.wdl" as filter_scatter_tasks
 workflow CellTypeDeconvolution {
   input {
     String expression__filter_expression_genes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
-        String filter_scatter__filter_cell_type_bed_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
-        String filter_scatter__merge_filter_reports_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
+        String filter_scatter__filter_cell_type_bed_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
+        String filter_scatter__merge_filter_reports_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
         String gene_summary__summarize_cell_type_beds_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String hspe__merge_hspe_batches_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String hspe__prepare_hspe_batches_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
@@ -21,7 +21,7 @@ workflow CellTypeDeconvolution {
         String proportions__process_proportions_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String proportions__validate_proportion_mode_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String qc__build_manifest_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
-        String reference_filter__prepare_haemopedia_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
+        String reference_filter__prepare_haemopedia_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
         String tca__clean_tca_model_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
         String tca__export_tca_beds_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:9992b66747e62fe78f33eb644ab2cf54f55a40dbbc31d59a0a081f0241423b2d"
         String tca__fit_tca_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
