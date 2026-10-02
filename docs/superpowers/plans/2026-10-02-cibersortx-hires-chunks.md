@@ -52,4 +52,14 @@ Files: the HiRes WDL, existing HiRes tests and CI, examples, guide, workflow cat
 - [x] Extend GitHub pinned-image tests to include split/merge and an end-to-end synthetic multi-chunk case.
 - [x] Include the HiRes descriptor in Cromwell Womtool checks.
 - [x] Run MiniWDL, file-scope/logging checks, task tests, image-routing/CI-selection tests, and review the final diff.
-- [ ] Push a reviewable branch/PR to prepare_QTL and verify the relevant GitHub checks; do not submit Terra.
+- [x] Push a reviewable branch/PR to prepare_QTL and verify the relevant GitHub checks; do not submit Terra.
+
+## Verified result
+
+- PR: https://github.com/AoU-Multiomics-Analysis/prepare_QTL/pull/87.
+- All 26 local HiRes tests passed, including actual workflow-call expressions and simulated incoming/generated File localization.
+- GitHub HiRes run 36966950298 passed host and pinned-image synthetic tests.
+- GitHub descriptor run 36966950351 passed MiniWDL and Cromwell Womtool 87 checks.
+- Image-release report passed; no image build was selected.
+- Independent review found no remaining actionable issue.
+- The chunked workflow and native equivalence remain untested on Terra.
