@@ -23,6 +23,7 @@ implementation modules.
 | --- | --- | --- |
 | Expression | `expression/rnaseqc2_aggregate_batched.wdl` | Aggregate RNA-SeQC outputs from one sample manifest in batches, then stream the cohort merge. |
 | Cell-type expression | `cell_type_specific_expression/deconvolution.wdl` | Estimate proportions in log2 space and create cell-type-specific linear-CPM BED files with TCA. |
+| Cell-type expression | `cell_type_specific_expression/cibersortx_fractions.wdl` | Estimate relative fractions with optional S-mode correction and export compatible HiRes inputs. |
 | Cell-type expression | `cell_type_specific_expression/cibersortx_hires.wdl` | Estimate sample-level expression with CIBERSORTx HiRes from a mixture, signature, gene subset, and existing fractions. |
 | Cell-type expression | `cell_type_specific_expression/cibersortx_markers.wdl` | Derive a marker signature and reference profiles from a labeled single-cell matrix. |
 | Cell-type expression | `cell_type_specific_expression/prepare_cell_type_eQTL.wdl` | Deconvolve whole blood and prepare INT and scaled QTL inputs for each retained cell type. |
@@ -66,3 +67,5 @@ change. The workflow-validation action checks descriptor existence, uniqueness,
 and WDL parsing on every pull request and push to `main`.
 
 See the [trans-QTL LD region guide](../docs/trans-ld-regions.md) for inputs, region rules, image builds and validation status.
+
+See the [CIBERSORTx Fractions guide](../docs/cibersortx-fractions.md) for mixture and reference inputs, S-mode correction, and HiRes output mapping.

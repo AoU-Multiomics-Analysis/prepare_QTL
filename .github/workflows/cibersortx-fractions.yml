@@ -1,0 +1,59 @@
+name: CIBERSORTx Fractions checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - workflows/cell_type_specific_expression/cibersortx_fractions.wdl
+      - tests/cibersortx_fractions/**
+      - examples/cibersortx_fractions/**
+      - scripts/check_wdl_file_scope.py
+      - scripts/check_wdl_logging.py
+      - .github/workflows/cibersortx-fractions.yml
+  push:
+    branches: [main]
+    paths:
+      - workflows/cell_type_specific_expression/cibersortx_fractions.wdl
+      - tests/cibersortx_fractions/**
+      - examples/cibersortx_fractions/**
+      - scripts/check_wdl_file_scope.py
+      - scripts/check_wdl_logging.py
+      - .github/workflows/cibersortx-fractions.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pinned WDL checker
+        run: python -m pip install --disable-pip-version-check miniwdl==1.14.2
+      - name: Check WDL syntax and types
+        run: python -m WDL check workflows/cell_type_specific_expression/cibersortx_fractions.wdl
+      - name: Check workflow file creation and logging
+        run: |
+          set -euo pipefail
+          python scripts/check_wdl_file_scope.py workflows/cell_type_specific_expression/cibersortx_fractions.wdl
+          python scripts/check_wdl_logging.py workflows/cell_type_specific_expression/cibersortx_fractions.wdl
+      - name: Check localization, arguments, failures, and outputs
+        run: python -m unittest discover -s tests/cibersortx_fractions -v
+      - name: Test wrapper in the pinned image with synthetic outputs
+        run: |
+          set -euo pipefail
+          python tests/cibersortx_fractions/image_smoke.py 2>&1 | tee "$RUNNER_TEMP/cibersortx-fractions-smoke.log"
+      - name: Save smoke-test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibersortx-fractions-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/cibersortx-fractions-smoke.log
+          if-no-files-found: warn

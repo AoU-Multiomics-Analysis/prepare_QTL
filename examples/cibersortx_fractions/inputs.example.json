@@ -1,0 +1,12 @@
+{
+  "CIBERSORTxFractions.mixture": "gs://YOUR_BUCKET/cibersort_test_data/mixture_100_samples_linear_CPM.txt",
+  "CIBERSORTxFractions.signature": "gs://YOUR_BUCKET/cibersort_test_data/signature_matrix_cibersortx.txt",
+  "CIBERSORTxFractions.username": "YOUR_CIBERSORTX_EMAIL",
+  "CIBERSORTxFractions.token": "YOUR_CIBERSORTX_TOKEN",
+  "CIBERSORTxFractions.smode": false,
+  "CIBERSORTxFractions.quantile_normalization": false,
+  "CIBERSORTxFractions.permutations": 100,
+  "CIBERSORTxFractions.threads": 8,
+  "CIBERSORTxFractions.memory_gb": 16,
+  "CIBERSORTxFractions.disk_gb": 30
+}
