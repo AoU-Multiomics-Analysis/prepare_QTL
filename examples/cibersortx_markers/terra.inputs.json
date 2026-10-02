@@ -1,0 +1,15 @@
+{
+  "CIBERSORTxMarkers.reference": "gs://YOUR_BUCKET/cibersortx/tabula_sapiens_single_cell_reference_all.tsv",
+  "CIBERSORTxMarkers.username": "YOUR_CIBERSORTX_EMAIL",
+  "CIBERSORTxMarkers.token": "YOUR_CIBERSORTX_TOKEN",
+  "CIBERSORTxMarkers.replicates": 5,
+  "CIBERSORTxMarkers.sampling": 1.0,
+  "CIBERSORTxMarkers.fraction": 0.0,
+  "CIBERSORTxMarkers.min_genes": 300,
+  "CIBERSORTxMarkers.max_genes": 500,
+  "CIBERSORTxMarkers.q_value": 0.01,
+  "CIBERSORTxMarkers.max_condition_number": 999,
+  "CIBERSORTxMarkers.cpu": 4,
+  "CIBERSORTxMarkers.memory_gb": 32,
+  "CIBERSORTxMarkers.disk_gb": 100
+}

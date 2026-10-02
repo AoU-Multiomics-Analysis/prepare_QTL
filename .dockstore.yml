@@ -11,6 +11,9 @@ workflows:
     primaryDescriptorPath: /workflows/cell_type_specific_expression/cibersortx_hires.wdl
     name: cibersortx_hires
   - subclass: WDL
+    primaryDescriptorPath: /workflows/cell_type_specific_expression/cibersortx_markers.wdl
+    name: cibersortx_markers
+  - subclass: WDL
     primaryDescriptorPath: /workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
     name: prepare_cell_type_eQTL
   - subclass: WDL 
