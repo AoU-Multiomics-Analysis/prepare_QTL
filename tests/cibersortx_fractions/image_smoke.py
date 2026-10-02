@@ -6,6 +6,7 @@ No image is built and no credentials or scientific data are required.
 import argparse
 import importlib.util
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -72,7 +73,13 @@ def main():
                             '--mount', 'type=bind,src=%s,dst=/work' % base,
                             '--mount', 'type=bind,src=%s,dst=/src/CIBERSORTxFractions,readonly' % (base / 'native_fixture.py'),
                             '--workdir', '/work', '--entrypoint', '/bin/bash',
-                            IMAGE, '/work/command.sh'], check=True)
+                            IMAGE, '-c',
+                            # The image runs as root so it can stage /src paths.
+                            # Return fixture files to the host runner before
+                            # TemporaryDirectory removes them. Keep task errors.
+                            'task_status=0; /bin/bash /work/command.sh || task_status=$?; '
+                            'chown -R %d:%d /work || exit $?; exit "$task_status"' %
+                            (os.getuid(), os.getgid())], check=True)
             report = json.loads((base / 'output_validation.json').read_text())
             assert report['sample_count'] == 3 and report['cell_types'] == ['B', 'CD4_T']
             assert report['smode'] == smode
