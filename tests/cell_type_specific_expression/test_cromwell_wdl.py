@@ -1,4 +1,4 @@
-"""Parse both public cell-type workflows with Cromwell's WDL validator.
+"""Parse the public cell-type workflows with Cromwell's WDL validator.
 
 MiniWDL accepts some syntax that Cromwell rejects. CI supplies a pinned
 WOMTOOL_JAR; local runs may use the same jar and an optional WOMTOOL_JAVA path.
@@ -19,7 +19,7 @@ class CromwellWdlTest(unittest.TestCase):
         jar = Path(os.environ["WOMTOOL_JAR"]).resolve()
         self.assertTrue(jar.is_file(), f"Womtool jar does not exist: {jar}")
         java = os.environ.get("WOMTOOL_JAVA", "java")
-        for filename in ("deconvolution.wdl", "prepare_cell_type_eQTL.wdl"):
+        for filename in ("deconvolution.wdl", "prepare_cell_type_eQTL.wdl", "cibersortx_hires.wdl"):
             with self.subTest(workflow=filename):
                 result = subprocess.run(
                     [java, "-jar", str(jar), "validate",
