@@ -1,0 +1,23 @@
+{
+  "scientific_run": {
+    "R": "4.3.1",
+    "Bioconductor": "3.17",
+    "scDblFinder": "1.14.0",
+    "SingleR": "2.2.0",
+    "celldex": "1.10.1",
+    "SingleCellExperiment": "1.22.0",
+    "Matrix": "1.6-0",
+    "dplyr": "1.1.2",
+    "readr": "2.1.4",
+    "python": "3.14.6",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "scipy": "1.17.1",
+    "h5py": "3.16.0"
+  },
+  "controller": {
+    "python": "3.11.16",
+    "snakemake": "8.30.0"
+  },
+  "version_scope": "Observed direct package versions from the local runs, not a complete environment lock."
+}

@@ -1,0 +1,137 @@
+{
+  "description": "Source snapshots from completed local reference QC and the completed selection step of the marker run.",
+  "files": [
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/Snakefile",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/Snakefile",
+      "sha256": "ac2572a1aa4336883ffe194ba58532d5fefaa19c787c73ab102ac4664b892b62",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/scripts/cell_decisions.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/scripts/cell_decisions.py",
+      "sha256": "eb02a5c216e6812f77d955539027d39ed1f2a68931eadad0effd46a57c89e838",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/scripts/detect.R",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/scripts/detect.R",
+      "sha256": "ec039b07d9ecae88276aa7e3c69e506c6d6bbef1f41f253b630269ec21775c9e",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/scripts/plot.R",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/scripts/plot.R",
+      "sha256": "b789ea2a0b46c56e5a3a0050fcb5e3b8361e4acff9d53d38ef43ef0114319ad6",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/scripts/prepare.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/scripts/prepare.py",
+      "sha256": "40daef051c6b8aa8ddcd48362646832f684829114739c60c2934a87bfff27880",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/scripts/recreate_reference.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/scripts/recreate_reference.py",
+      "sha256": "e1cd0f5cd27d5ce9bd041046b4f358163f585332f62c3e3a7306586545d0c181",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/scripts/reference_filter.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/scripts/reference_filter.py",
+      "sha256": "a84c2cfb535a521c90089d4def1a762ea7f7878b97a036307da006a1cc64711d",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/scripts/summarize.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/scripts/summarize.py",
+      "sha256": "c84225be0651579c727a1ea974e78ef66c2268060dcfdfd49d1289785f051dd0",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/test_cell_decisions.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/test_cell_decisions.py",
+      "sha256": "2c5f166a7c927ea548372cb1af8f675921dcabb485ee6bc67d5965cd01992313",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/test_reference_filter.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/test_reference_filter.py",
+      "sha256": "6c673be5eece181fac130043fcc61593aa5d7466ad69b24633c9e5cf13ea65f1",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/run_all_01/workflow/README.md",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/README.md",
+      "sha256": "e3fc6f1af805a0aa4b9aaa28192918c2977a0e26db5fc7805bfbb71ccd73e141",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/singler_label_review_20261001/run_review_01/workflow/Snakefile",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler/Snakefile",
+      "sha256": "3d49febf327560f323db0a4ab73f151491c0c17d9f10c7b548b0365280e47726",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/singler_label_review_20261001/run_review_01/workflow/scripts/comparison.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler/scripts/comparison.py",
+      "sha256": "13b26bae96a70ed45fdea1f7600aff524cded7ec15a2df4dafac792b52d077eb",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/singler_label_review_20261001/run_review_01/workflow/scripts/review.R",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler/scripts/review.R",
+      "sha256": "ddb88e0497968422d9fe347e10c4377133b8c7d50908042773e3200a16d44788",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/singler_label_review_20261001/run_review_01/workflow/scripts/summarize.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler/scripts/summarize.py",
+      "sha256": "2d8597f4ef077aa7026508a09802bc9404ef99b66e04d1b070bd23aaab7aeb2f",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/singler_label_review_20261001/run_review_01/workflow/tests/test_comparison.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler/tests/test_comparison.py",
+      "sha256": "b4e37b7f56929523667a0b1f1ad261216bc3f4792a72422d87c5979d5b7e9220",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/singler_label_review_20261001/run_review_01/workflow/README.md",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler/README.md",
+      "sha256": "09ba9663b82fd0251f42111447d3991280c04d6d1f5fbe81017d418d9edc82b5",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/full_workflow_source/test_cell_decisions.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/test_cell_decisions.py",
+      "sha256": "2c5f166a7c927ea548372cb1af8f675921dcabb485ee6bc67d5965cd01992313",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/scdblfinder_reference_20261001/full_workflow_source/test_reference_filter.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/scdblfinder/test_reference_filter.py",
+      "sha256": "6c673be5eece181fac130043fcc61593aa5d7466ad69b24633c9e5cf13ea65f1",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/cibersortx_singler_filtered_markers_20261002/run_comparison_01/workflow/scripts/prepare.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler_filter/scripts/prepare.py",
+      "sha256": "ca212bec08f1e5b75d7889d75449f1a112c2be5f5815c22e9e4012887cb7f601",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/cibersortx_singler_filtered_markers_20261002/run_comparison_01/workflow/scripts/reference_filter.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler_filter/scripts/reference_filter.py",
+      "sha256": "a84c2cfb535a521c90089d4def1a762ea7f7878b97a036307da006a1cc64711d",
+      "scientific_code_unchanged": true
+    },
+    {
+      "source": "analysis/cibersortx_singler_filtered_markers_20261002/run_comparison_01/workflow/tests/test_rules.py",
+      "published": "workflows/cell_type_specific_expression/reference_qc/singler_filter/tests/test_rules.py",
+      "sha256": "918d497db97549edbee683faf01fd5531d757e73acf43f4ae1d3d734be1fd78a",
+      "scientific_code_unchanged": true
+    }
+  ]
+}

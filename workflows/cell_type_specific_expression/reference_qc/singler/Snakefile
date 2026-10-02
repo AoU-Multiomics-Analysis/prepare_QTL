@@ -1,0 +1,33 @@
+from pathlib import Path
+ROOT = str(Path(workflow.basedir))
+CAPTURES = config['captures']
+
+rule all:
+    input: 'summary/validation.json', 'summary/CLC_high_six_review.tsv', 'summary/retained_S100_51_review.tsv'
+
+rule review:
+    input:
+        selected=config['selected'], capture_plan=config['capture_plan'], feature_map=config['feature_map'],
+        monaco=config['reference_monaco'], hpca=config['reference_hpca'],
+        matrices=[str(Path(config['counts_dir']) / capture / 'counts.mtx.gz') for capture in CAPTURES],
+        cells=[str(Path(config['counts_dir']) / capture / 'cells.tsv') for capture in CAPTURES],
+        genes=[str(Path(config['counts_dir']) / capture / 'features.tsv') for capture in CAPTURES]
+    output:
+        calls='predictions/cell_predictions.tsv.gz', markers='predictions/raw_marker_counts.tsv.gz',
+        stats='predictions/capture_stats.tsv', session='predictions/session_info.txt',
+        rds=expand('predictions/{model}_predictions.rds', model=['Monaco_main','Monaco_fine','HPCA_main']),
+        scores=expand('predictions/{model}_scores.tsv.gz', model=['Monaco_main','Monaco_fine','HPCA_main'])
+    params:
+        script=ROOT+'/scripts/review.R', rscript=config['rscript'], library=config['r_library'], counts_dir=config['counts_dir']
+    threads: 4
+    log: 'logs/review.log'
+    shell:
+        'OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 {params.rscript:q} {params.script:q} --library {params.library:q} --counts-dir {params.counts_dir:q} --capture-plan {input.capture_plan:q} --selected {input.selected:q} --feature-map {input.feature_map:q} --monaco {input.monaco:q} --hpca {input.hpca:q} --out-dir predictions --threads {threads} > {log:q} 2>&1'
+
+rule summary:
+    input: predictions='predictions/cell_predictions.tsv.gz', markers='predictions/raw_marker_counts.tsv.gz', flagged=config['flagged'], clc=config['CLC_review']
+    output: 'summary/validation.json', 'summary/CLC_high_six_review.tsv', 'summary/retained_S100_51_review.tsv'
+    params: script=ROOT+'/scripts/summarize.py', python=config['python']
+    log: 'logs/summary.log'
+    shell:
+        '{params.python:q} {params.script:q} --predictions {input.predictions:q} --markers {input.markers:q} --flagged {input.flagged:q} --clc-review {input.clc:q} --out-dir summary > {log:q} 2>&1'
