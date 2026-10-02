@@ -1,0 +1,70 @@
+from pathlib import Path
+ROOT = str(Path(workflow.basedir))
+CAPTURES = config['captures']
+PYTHON = config['python']
+LIB = config['python_lib']
+RSCRIPT = config['rscript']
+RLIB = config['r_library']
+
+rule all:
+    input:
+        'summary/run_summary.json',
+        'reference/validation.json',
+        'reference/single_cell_reference_all_cells_relabelled_no_globins_bulk_detected_no_sex_chromosomes_no_doublets.tsv.gz',
+        'summary/predicted_doublets_by_cell_type.png'
+
+rule prepare:
+    input:
+        h5ad=config['h5ad'], selected=config['selected'], flagged=config['flagged'], capture_plan=config['capture_plan']
+    output:
+        captures='counts/captures.tsv',
+        matrices=expand('counts/{capture}/counts.mtx.gz', capture=CAPTURES),
+        cells=expand('counts/{capture}/cells.tsv', capture=CAPTURES),
+        genes=expand('counts/{capture}/features.tsv', capture=CAPTURES)
+    params:
+        script=ROOT+'/scripts/prepare.py', python=PYTHON, library=LIB
+    log: 'logs/prepare.log'
+    threads: 2
+    shell:
+        'PYTHONPATH={params.library:q} {params.python:q} {params.script:q} --h5ad {input.h5ad:q} --selected {input.selected:q} --flagged {input.flagged:q} --capture-plan {input.capture_plan:q} --out-dir counts > {log:q} 2>&1'
+
+rule doublets:
+    input:
+        matrix='counts/{capture}/counts.mtx.gz', cells='counts/{capture}/cells.tsv', genes='counts/{capture}/features.tsv'
+    output:
+        calls='calls/{capture}.tsv', session='calls/{capture}.session_info.txt', metadata='calls/{capture}.metadata.rds'
+    params:
+        script=ROOT+'/scripts/detect.R', rscript=RSCRIPT, library=RLIB,
+        capture_dir=lambda w: 'counts/'+w.capture,
+        seed=lambda w: config['capture_seeds'][w.capture]
+    log: 'logs/{capture}.log'
+    threads: 4
+    shell:
+        'OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 {params.rscript:q} {params.script:q} --library {params.library:q} --capture-dir {params.capture_dir:q} --seed {params.seed} --output {output.calls:q} --session-info {output.session:q} --metadata {output.metadata:q} > {log:q} 2>&1'
+
+rule summary:
+    input:
+        calls=expand('calls/{capture}.tsv', capture=CAPTURES), selected=config['selected'], flagged=config['flagged'], focused=config['focused']
+    output: summary='summary/run_summary.json', decisions='summary/reference_cell_decisions.tsv'
+    params:
+        script=ROOT+'/scripts/summarize.py', python=PYTHON, library=LIB
+    log: 'logs/summary.log'
+    shell:
+        'PYTHONPATH={params.library:q} {params.python:q} {params.script:q} --calls {input.calls:q} --selected {input.selected:q} --flagged {input.flagged:q} --focused {input.focused:q} --out-dir summary > {log:q} 2>&1'
+
+rule plot:
+    input: 'summary/run_summary.json'
+    output: 'summary/predicted_doublets_by_cell_type.png'
+    params: script=ROOT+'/scripts/plot.R', rscript=RSCRIPT
+    log: 'logs/plot.log'
+    shell: '{params.rscript:q} {params.script:q} summary > {log:q} 2>&1'
+
+rule recreate_reference:
+    input:
+        reference=config['reference'], decisions='summary/reference_cell_decisions.tsv', gene_validation=config['gene_validation']
+    output:
+        reference='reference/single_cell_reference_all_cells_relabelled_no_globins_bulk_detected_no_sex_chromosomes_no_doublets.tsv.gz', validation='reference/validation.json', selected='reference/selected_cells.tsv', removed='reference/excluded_predicted_doublets.tsv'
+    params: script=ROOT+'/scripts/recreate_reference.py', python=PYTHON, library=LIB
+    log: 'logs/recreate_reference.log'
+    shell:
+        'PYTHONPATH={params.library:q} {params.python:q} {params.script:q} --reference {input.reference:q} --decisions {input.decisions:q} --gene-validation {input.gene_validation:q} --out-dir reference > {log:q} 2>&1'
