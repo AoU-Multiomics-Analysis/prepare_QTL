@@ -35,6 +35,7 @@ prepare_QTL/
 
 ## Main Workflows
 
+- [`workflows/cell_type_specific_expression/cibersortx_hires.wdl`](workflows/cell_type_specific_expression/cibersortx_hires.wdl): Runs sample-level CIBERSORTx HiRes with existing cell fractions. See the [HiRes guide](docs/cibersortx-hires.md) for Terra inputs and test status.
 - [`workflows/expression/rnaseqc2_aggregate_batched.wdl`](workflows/expression/rnaseqc2_aggregate_batched.wdl): Aggregates individual RNA-SeQC GCT, metrics, and optional insert-size files in batches before a final cohort merge.
 - [`workflows/cell_type_specific_expression/deconvolution.wdl`](workflows/cell_type_specific_expression/deconvolution.wdl): Estimates or accepts LM22 proportions and uses TCA on linear CPM to create one BED for each retained major cell type.
 - [`workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl`](workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl): Runs deconvolution and prepares an independent set of INT and scaled QTL inputs for each retained cell type.

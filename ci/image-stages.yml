@@ -758,6 +758,10 @@ workflow_groups:
   stages: []
   policy: external_images_manual
 - paths:
+  - workflows/cell_type_specific_expression/cibersortx_hires.wdl
+  stages: []
+  policy: external_images_manual
+- paths:
   - workflows/genotype/trans_ld_regions.wdl
   stages:
   - trans_ld_prepare

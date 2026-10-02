@@ -8,6 +8,9 @@ workflows:
     primaryDescriptorPath: /workflows/cell_type_specific_expression/deconvolution.wdl
     name: cell_type_deconvolution
   - subclass: WDL
+    primaryDescriptorPath: /workflows/cell_type_specific_expression/cibersortx_hires.wdl
+    name: cibersortx_hires
+  - subclass: WDL
     primaryDescriptorPath: /workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl
     name: prepare_cell_type_eQTL
   - subclass: WDL 
