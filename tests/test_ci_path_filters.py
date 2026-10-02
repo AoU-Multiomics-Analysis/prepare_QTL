@@ -35,6 +35,7 @@ class CiPathTests(unittest.TestCase):
     def test_changed_files_select_only_relevant_builds(self):
         cases = {
             'workflows/cell_type_specific_expression/deconvolution.wdl': set(),
+            'workflows/cell_type_specific_expression/cibersortx_fractions.wdl': set(),
             'workflows/expression/rnaseqc2_aggregate_batched.wdl': set(),
             'docs/terra-file-paths.md': set(),
             'scripts/cell_type_specific_expression/estimation/run_hspe.R': set(),

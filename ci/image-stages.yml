@@ -759,6 +759,7 @@ workflow_groups:
   policy: external_images_manual
 - paths:
   - workflows/cell_type_specific_expression/cibersortx_hires.wdl
+  - workflows/cell_type_specific_expression/cibersortx_fractions.wdl
   - workflows/cell_type_specific_expression/cibersortx_markers.wdl
   stages: []
   policy: external_images_manual
