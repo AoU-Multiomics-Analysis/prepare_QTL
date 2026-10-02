@@ -5,6 +5,8 @@ paths. The authenticated calculation is replaced with a native-process fixture.
 These checks are not a Terra integration test or a scientific accuracy test.
 """
 import csv
+import gzip
+import hashlib
 import importlib.util
 import io
 import json
@@ -52,6 +54,8 @@ class FractionsTest(unittest.TestCase):
                           threads=8, memory_gb=16, disk_gb=30)
             if change:
                 change(inputs, localized)
+            original_bytes = {name: Path(value).read_bytes() for name, value in inputs.items()
+                              if name in contents and value is not None and "://" not in value}
             # Start with cloud File values. Rewrite only those values to model
             # localization. Strings and absent optional Files stay unchanged.
             cloud_inputs = dict(inputs)
@@ -60,7 +64,7 @@ class FractionsTest(unittest.TestCase):
                 declared = doc.workflow.available_inputs.resolve(name).type
                 self.assertIsInstance(declared, WDL.Type.File)
                 if name in inputs and inputs[name] is not None and "://" not in inputs[name]:
-                    cloud_uri = "gs://test-bucket/" + name + ".txt"
+                    cloud_uri = "gs://test-bucket/" + Path(inputs[name]).name
                     downloads[cloud_uri] = inputs[name]
                     cloud_inputs[name] = cloud_uri
             env = WDL.values_from_json(cloud_inputs, task.available_inputs)
@@ -85,12 +89,25 @@ class FractionsTest(unittest.TestCase):
             script.write_text(command.replace("/src", str(src)))
             proc = subprocess.run(["bash", str(script)], cwd=base, text=True,
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+            for name, content in original_bytes.items():
+                self.assertEqual(Path(inputs[name]).read_bytes(), content, name + " input was modified")
             args_file = base / "native_args.json"
             native_args = json.loads(args_file.read_text()) if args_file.exists() else None
             files = {str(file.relative_to(base)): file.read_text()
                      for file in base.rglob("*") if file.is_file()
                      and (file.suffix in (".txt", ".json", ".log"))
                      and "localized input's" not in file.parts}
+            if proc.returncode == 0:
+                report = json.loads(files["input_validation.json"])
+                for name, content in original_bytes.items():
+                    self.assertEqual(report["sha256"][name], hashlib.sha256(content).hexdigest())
+                # Evaluate the actual task output expression, then read the File
+                # a downstream task would receive after output collection.
+                output = next(decl for decl in task.outputs if decl.name == "mixture_for_hires")
+                self.assertIsInstance(output.type, WDL.Type.File)
+                value = output.expr.eval(env, stdlib).value
+                files["collected_mixture_for_hires"] = (base / value).read_text()
+                files["mixture_for_hires_path"] = value
             injected = bool(list(base.rglob("INJECTED")))
             return proc, native_args, runtime_cpu, injected, files
 
@@ -171,6 +188,81 @@ class FractionsTest(unittest.TestCase):
         shared = files["results/signature_shared_genes.txt"]
         self.assertIn("sig\t1\t2", shared)
         self.assertNotIn("not_in_mixture", shared)
+
+    @staticmethod
+    def compress_mixture(inputs, _):
+        path = Path(inputs["mixture"])
+        compressed = path.with_suffix(".tsv.gz")
+        compressed.write_bytes(gzip.compress(path.read_bytes()))
+        path.unlink()
+        inputs["mixture"] = str(compressed)
+
+    def test_gzip_mixture_reaches_native_and_hires_as_plain_text(self):
+        for smode in (False, True):
+            with self.subTest(smode=smode):
+                proc, native, _, _, files = self.run_task(self.compress_mixture, smode=smode)
+                self.assertEqual(proc.returncode, 0, proc.stdout)
+                self.assertEqual(native["args"]["--mixture"], "mixture.txt")
+                text = "GeneSymbol\ts1\ts2\ts3\nsig\t1\t2\t3\nZNF804A\t2\t3\t4\n"
+                self.assertEqual(files["inputs/mixture.txt"], text)
+                self.assertEqual(files["collected_mixture_for_hires"], text)
+                self.assertTrue(files["mixture_for_hires_path"].startswith("results/"))
+                report = json.loads(files["input_validation.json"])
+                self.assertEqual(report["mixture_compression"], "gzip")
+                self.assertEqual(report["uncompressed_mixture_sha256"], hashlib.sha256(text.encode()).hexdigest())
+
+    def test_gzip_detection_uses_contents_instead_of_extension(self):
+        def renamed(inputs, localized):
+            self.compress_mixture(inputs, localized)
+            path = Path(inputs["mixture"])
+            destination = path.with_suffix(".data")
+            path.rename(destination)
+            inputs["mixture"] = str(destination)
+        proc, _, _, _, files = self.run_task(renamed)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertEqual(json.loads(files["input_validation.json"])["mixture_compression"], "gzip")
+
+    def test_plain_mixture_with_gz_extension_stays_plain(self):
+        def renamed(inputs, _):
+            path = Path(inputs["mixture"])
+            destination = path.with_suffix(".gz")
+            path.rename(destination)
+            inputs["mixture"] = str(destination)
+        proc, _, _, _, files = self.run_task(renamed)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        report = json.loads(files["input_validation.json"])
+        self.assertEqual(report["mixture_compression"], "none")
+        self.assertEqual(report["sha256"]["mixture"], report["uncompressed_mixture_sha256"])
+
+    def test_damaged_gzip_fails_before_native_process(self):
+        for damage in ("truncated", "bad_crc", "bad_stream"):
+            with self.subTest(damage=damage):
+                def invalid(inputs, localized):
+                    self.compress_mixture(inputs, localized)
+                    path = Path(inputs["mixture"])
+                    data = bytearray(path.read_bytes())
+                    if damage == "truncated":
+                        data = data[:-8]
+                    elif damage == "bad_crc":
+                        data[-8] ^= 1
+                    else:
+                        data = b"\x1f\x8b" + b"invalid stream"
+                    path.write_bytes(data)
+                proc, native, _, _, _ = self.run_task(invalid)
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertIn("Input error: mixture gzip", proc.stdout)
+                self.assertIsNone(native)
+
+    def test_gzip_expression_is_validated_before_native_process(self):
+        for value in ("NaN", "-1"):
+            with self.subTest(value=value):
+                def invalid(inputs, localized):
+                    Path(inputs["mixture"]).write_text("GeneSymbol\ts1\ts2\nsig\t" + value + "\t2\n")
+                    self.compress_mixture(inputs, localized)
+                proc, native, _, _, _ = self.run_task(invalid)
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertIn("Input error", proc.stdout)
+                self.assertIsNone(native)
 
     def test_smode_requires_both_reference_files_before_native_process(self):
         for absent in ("refsample", "source_geps"):

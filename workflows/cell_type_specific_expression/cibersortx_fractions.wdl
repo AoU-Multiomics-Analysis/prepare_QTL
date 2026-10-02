@@ -78,7 +78,7 @@ task RunFractions {
       --qn ~{if quantile_normalization then "TRUE" else "FALSE"} \
       --permutations ~{permutations} --threads ~{threads} \
       --memory-gb ~{memory_gb} --disk-gb ~{disk_gb} <<'PY'
-    import argparse, csv, datetime, hashlib, json, math, os, shutil, subprocess, sys, threading
+    import argparse, csv, datetime, gzip, hashlib, json, math, os, shutil, subprocess, sys, tempfile, threading, zlib
     from pathlib import Path
 
     parser = argparse.ArgumentParser()
@@ -164,6 +164,21 @@ task RunFractions {
         value = getattr(args, name)
         if value is not None:
             paths[name] = readable(value, name)
+    supplied_paths = dict(paths)
+    with paths['mixture'].open('rb') as stream:
+        mixture_is_gzip = stream.read(2) == b'\x1f\x8b'
+    if mixture_is_gzip:
+        log('Decompress the localized gzip mixture to task disk.')
+        uncompressed = Path(tempfile.mkdtemp(prefix='uncompressed_mixture_', dir=str(root))) / 'mixture.txt'
+        try:
+            with gzip.open(str(paths['mixture']), 'rb') as source, uncompressed.open('wb') as destination:
+                shutil.copyfileobj(source, destination, length=1024 * 1024)
+        except (OSError, EOFError, zlib.error) as error:
+            message = 'Input error: mixture gzip could not be decompressed: ' + str(error)
+            log(message)
+            raise SystemExit(message)
+        paths['mixture'] = uncompressed
+        log('Mixture decompression completed; check the uncompressed matrix.')
     mh, mr, mixture_genes, _, mt = table(paths['mixture'], 'Input error')
     sh, sr, signature_genes, _, st = table(paths['signature'], 'Input error')
     samples, cells = mh[1:], sh[1:]
@@ -191,7 +206,11 @@ task RunFractions {
                     'mixture_gene_count': len(mixture_genes), 'signature_gene_count': len(signature_genes),
                     'shared_gene_count': len(mixture_genes & signature_genes), 'smode': smode,
                     'quantile_normalization': args.qn == 'TRUE', 'permutations': args.permutations,
-                    'sha256': {name: digest(path) for name, path in paths.items()}}
+                    'sha256': {name: digest(path) for name, path in supplied_paths.items()},
+                    'mixture_compression': 'gzip' if mixture_is_gzip else 'none',
+                    'mixture_bytes': supplied_paths['mixture'].stat().st_size,
+                    'uncompressed_mixture_bytes': paths['mixture'].stat().st_size,
+                    'uncompressed_mixture_sha256': digest(paths['mixture'])}
     (root / 'input_validation.json').write_text(json.dumps(input_report, indent=2) + '\n')
     log('dimensions=mixture_genes:%d,samples:%d,signature_genes:%d,cell_types:%d' %
         (len(mixture_genes), len(samples), len(signature_genes), len(cells)))
@@ -283,6 +302,9 @@ task RunFractions {
     if smode:
         shutil.copyfile(export_mixture, results / 'mixture_adjusted.txt')
         shutil.copyfile(export_signature, results / 'signature_adjusted.txt')
+    # Always collect plain text for the downstream HiRes task, including when
+    # the unadjusted input was compressed. The source input stays unchanged.
+    shutil.copyfile(export_mixture, results / 'mixture_for_hires.txt')
     output_report = {'sample_count': len(samples), 'samples': samples, 'cell_types': cells,
                      'fraction_table': fraction_path.name, 'fraction_row_sum_tolerance': 1e-4,
                      'signature_shared_genes': len(shared_rows),
@@ -300,7 +322,7 @@ task RunFractions {
   output {
     File fractions = "results/fractions.txt"
     File fractions_only = "results/fractions_only.txt"
-    File mixture_for_hires = if smode then "results/mixture_adjusted.txt" else mixture
+    File mixture_for_hires = "results/mixture_for_hires.txt"
     File signature_for_hires = "results/signature_shared_genes.txt"
     Array[File] adjusted_mixture = glob("results/mixture_adjusted.txt")
     Array[File] adjusted_signature = glob("results/signature_adjusted.txt")
