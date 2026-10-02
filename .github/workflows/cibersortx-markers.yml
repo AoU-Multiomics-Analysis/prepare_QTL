@@ -1,0 +1,68 @@
+name: CIBERSORTx marker checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - workflows/cell_type_specific_expression/cibersortx_markers.wdl
+      - tests/cibersortx_markers/**
+      - scripts/check_wdl_file_scope.py
+      - scripts/check_wdl_logging.py
+      - examples/cibersortx_markers/**
+      - .github/workflows/cibersortx-markers.yml
+  push:
+    branches: [main]
+    paths:
+      - workflows/cell_type_specific_expression/cibersortx_markers.wdl
+      - tests/cibersortx_markers/**
+      - scripts/check_wdl_file_scope.py
+      - scripts/check_wdl_logging.py
+      - examples/cibersortx_markers/**
+      - .github/workflows/cibersortx-markers.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate_and_smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install the WDL reader
+        run: python -m pip install --disable-pip-version-check miniwdl==1.15.0
+      - name: Check WDL and file localization
+        run: |
+          set -euo pipefail
+          miniwdl check workflows/cell_type_specific_expression/cibersortx_markers.wdl
+          python scripts/check_wdl_file_scope.py workflows/cell_type_specific_expression/cibersortx_markers.wdl
+          python scripts/check_wdl_logging.py workflows/cell_type_specific_expression/cibersortx_markers.wdl
+          python tests/cibersortx_markers/test_markers.py -v
+      - name: Test commands in the pinned image with synthetic calculations
+        run: |
+          set -euo pipefail
+          CIBERSORTX_TEST_IMAGE=$(python - <<'PY'
+          import WDL
+          task = WDL.load('workflows/cell_type_specific_expression/cibersortx_markers.wdl').tasks[0]
+          print(task.runtime['docker'].eval(WDL.Env.Bindings(), WDL.StdLib.Base('1.0')).value)
+          PY
+          )
+          export CIBERSORTX_TEST_IMAGE
+          docker pull "$CIBERSORTX_TEST_IMAGE"
+          # A synthetic executable replaces the authenticated native calculation.
+          # This checks command handling, not the native algorithm or biological results.
+          # No account token or image build is required.
+          python tests/cibersortx_markers/test_markers.py -v 2>&1 | tee "$RUNNER_TEMP/cibersortx-markers-smoke.log"
+      - name: Save smoke-test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibersortx-markers-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/cibersortx-markers-smoke.log
+          if-no-files-found: warn

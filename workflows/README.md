@@ -24,6 +24,7 @@ implementation modules.
 | Expression | `expression/rnaseqc2_aggregate_batched.wdl` | Aggregate RNA-SeQC outputs from one sample manifest in batches, then stream the cohort merge. |
 | Cell-type expression | `cell_type_specific_expression/deconvolution.wdl` | Estimate proportions in log2 space and create cell-type-specific linear-CPM BED files with TCA. |
 | Cell-type expression | `cell_type_specific_expression/cibersortx_hires.wdl` | Estimate sample-level expression with CIBERSORTx HiRes from a mixture, signature, gene subset, and existing fractions. |
+| Cell-type expression | `cell_type_specific_expression/cibersortx_markers.wdl` | Derive a marker signature and reference profiles from a labeled single-cell matrix. |
 | Cell-type expression | `cell_type_specific_expression/prepare_cell_type_eQTL.wdl` | Deconvolve whole blood and prepare INT and scaled QTL inputs for each retained cell type. |
 | Expression | `expression/prepare_eQTL.wdl` | Prepare expression QTL phenotypes. |
 | Proteomics | `proteomics/normalize_pQTL.wdl`, `proteomics/prepare_pQTL.wdl` | Normalize Olink data and prepare protein QTL phenotypes. |
@@ -42,6 +43,7 @@ See the [RNA-SeQC aggregation guide](../docs/rnaseqc2-aggregation.md) for the co
 See the [cell-type-specific expression guide](../docs/cell-type-specific-expression.md)
 for inputs, proportion modes, output arrays, and the manifest schema.
 See the [CIBERSORTx HiRes guide](../docs/cibersortx-hires.md) for Terra inputs, CPU settings, logs, and validation limits.
+See the [CIBERSORTx marker guide](../docs/cibersortx-markers.md) for single-cell reference inputs, marker settings, and validation limits.
 
 ## Internal methylation stages
 
