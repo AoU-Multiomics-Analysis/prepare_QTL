@@ -83,4 +83,4 @@ python -m unittest discover -s tests/cibersortx_fractions -v
 
 Use a Python environment with `miniwdl==1.14.2`. The static regression check rejects workflow-scope file writers in declarations, calls, outputs, scatters, and conditionals.
 
-`.github/workflows/cibersortx-fractions.yml` runs these checks and a wrapper smoke test in the pinned image. The smoke test verifies the image's Python runtime, fixed paths, and output collection with a synthetic executable in place of the authenticated calculation. It requires no user data or token and does not build an image. It has not yet run on GitHub Actions. It is not a complete Terra test or a test of scientific accuracy.
+`.github/workflows/cibersortx-fractions.yml` runs these checks and a wrapper smoke test in the pinned image. The smoke test verifies the image's Python runtime, fixed paths, and output collection with a synthetic executable in place of the authenticated calculation. It requires no user data or token and does not build an image. The GitHub smoke test has passed for both plain mode and S-mode. It is not a complete Terra test or a test of scientific accuracy.
