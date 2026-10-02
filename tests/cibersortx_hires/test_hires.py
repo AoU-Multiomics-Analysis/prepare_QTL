@@ -24,7 +24,7 @@ class HiResTest(unittest.TestCase):
         self.assertTrue(path.is_file(), "The Terra WDL has not been created")
         return WDL.load(str(path))
 
-    def run_task(self, change=None, native_status=0, bad_output=False):
+    def run_task(self, change=None, native_status=0, bad_output=False, inspect=None):
         doc = self.document()
         task = doc.tasks[0]
         with tempfile.TemporaryDirectory(prefix="hires localized ") as tmp:
@@ -101,6 +101,8 @@ class HiResTest(unittest.TestCase):
             args_path = base / "native_args.json"
             args = json.loads(args_path.read_text()) if args_path.exists() else None
             report = base / "output_validation.json"
+            if inspect:
+                inspect(base)
             return proc, args, runtime_cpu, bool(list(base.rglob("INJECTED"))), json.loads(report.read_text()) if report.exists() else None
 
     def test_localized_files_and_literal_flags_reach_native_process(self):
@@ -115,10 +117,13 @@ class HiResTest(unittest.TestCase):
         self.assertEqual((report["sample_count"], report["cell_types"]), (8, ["B", "CD4_T"]))
 
     def test_unresolved_cloud_file_fails_before_native_process(self):
-        proc, args, _, _, _ = self.run_task(lambda inputs, _: inputs.update(mixture="gs://bucket/mixture.txt"))
-        self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("Localization error", proc.stdout)
-        self.assertIsNone(args)
+        for name in ("mixture", "fractions"):
+            with self.subTest(file=name):
+                proc, args, _, _, _ = self.run_task(
+                    lambda inputs, _: inputs.update({name: "gs://bucket/" + name + ".txt"}))
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertIn("Localization error: " + name, proc.stdout)
+                self.assertIsNone(args)
 
     def test_multiline_flag_is_passed_as_one_literal_argument(self):
         # Break caught: a rendered String terminates a shell wrapper here-doc.
@@ -136,15 +141,105 @@ class HiResTest(unittest.TestCase):
         self.assertIn("fraction-only", proc.stdout)
         self.assertIsNone(args)
 
-    def test_fraction_sample_order_fails_before_native_process(self):
-        # Break caught: compatible dimensions hide a different donor order.
+    def test_fraction_samples_are_reordered_to_match_mixture(self):
+        # Break caught: reversed rows are rejected or values stay in donor order.
+        expected = (
+            "Mixture\tB\tCD4_T\n"
+            "s1\t0.2\t0.8\ns2\t0.5\t0.5\ns3\t0.8\t0.2\ns4\t0.3\t0.7\n"
+            "s5\t0.4\t0.6\ns6\t0.6\t0.4\ns7\t0.7\t0.3\ns8\t0.9\t0.1\n"
+        )
+        original = {}
+        observed = {}
         def reorder(inputs, _):
             file = Path(inputs['fractions'])
             rows = file.read_text().splitlines()
             file.write_text('\n'.join([rows[0]] + rows[:0:-1]) + '\n')
-        proc, args, _, _, _ = self.run_task(reorder)
+            original['bytes'] = file.read_bytes()
+        def inspect(base):
+            observed['original'] = (base / "localized input's/fractions.txt").read_bytes()
+            staged = base / 'results/fractions.txt'
+            observed['staged'] = staged.read_text() if staged.exists() else None
+            report = base / 'input_validation.json'
+            observed['report'] = json.loads(report.read_text()) if report.exists() else {}
+        proc, args, _, _, _ = self.run_task(reorder, inspect=inspect)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIsNotNone(args)
+        self.assertEqual(args['--cibresults'], 'fractions.txt')
+        self.assertEqual(observed['staged'], expected)
+        self.assertEqual(observed['original'], original['bytes'])
+        self.assertEqual(observed['report']['fraction_input_sample_count'], 8)
+        self.assertEqual(observed['report']['fraction_retained_sample_count'], 8)
+        self.assertEqual(observed['report']['fraction_dropped_sample_count'], 0)
+
+    def test_fraction_superset_is_selected_without_changing_numeric_text(self):
+        # Break caught: extra donors enter HiRes, or float serialization changes values.
+        source = (
+            "Sample ID\tB\tCD4_T\n"
+            "extra_a\t0.25\t0.75\ns8\t9e-1\t1e-1\ns7\t.700\t.300\n"
+            "s6\t0.6000\t0.4000\nextra_b\t0.75\t0.25\ns5\t4e-1\t6e-1\n"
+            "s4\t.30\t.70\ns3\t0.80000\t0.20000\ns2\t5.0e-1\t5.0e-1\n"
+            "extra_c\t0.1\t0.9\ns1\t0.200000\t0.800000\n"
+        )
+        expected = (
+            "Sample ID\tB\tCD4_T\n"
+            "s1\t0.200000\t0.800000\ns2\t5.0e-1\t5.0e-1\ns3\t0.80000\t0.20000\n"
+            "s4\t.30\t.70\ns5\t4e-1\t6e-1\ns6\t0.6000\t0.4000\n"
+            "s7\t.700\t.300\ns8\t9e-1\t1e-1\n"
+        )
+        observed = {}
+        def superset(inputs, _):
+            Path(inputs['fractions']).write_text(source)
+        def inspect(base):
+            observed['original'] = (base / "localized input's/fractions.txt").read_bytes()
+            staged = base / 'results/fractions.txt'
+            observed['staged'] = staged.read_text() if staged.exists() else None
+            report = base / 'input_validation.json'
+            observed['report'] = json.loads(report.read_text()) if report.exists() else {}
+        proc, args, _, _, _ = self.run_task(superset, inspect=inspect)
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIsNotNone(args)
+        self.assertEqual(args['--cibresults'], 'fractions.txt')
+        self.assertEqual(observed['staged'], expected)
+        self.assertEqual(observed['original'], source.encode('utf-8'))
+        self.assertEqual(observed['report']['fraction_input_sample_count'], 11)
+        self.assertEqual(observed['report']['fraction_retained_sample_count'], 8)
+        self.assertEqual(observed['report']['fraction_dropped_sample_count'], 3)
+        self.assertEqual(observed['report']['samples'], ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
+        self.assertRegex(proc.stdout, r'(?i)(?:selected|retained)\D*8\b')
+        self.assertRegex(proc.stdout, r'(?i)dropped\D*3\b')
+
+    def test_missing_fraction_sample_fails_before_native_process(self):
+        # Break caught: a missing donor is silently removed or replaced by an extra row.
+        def missing(inputs, _):
+            file = Path(inputs['fractions'])
+            rows = file.read_text().splitlines()
+            file.write_text('\n'.join(rows[:-1] + ['extra\t0.5\t0.5']) + '\n')
+        proc, args, _, _, _ = self.run_task(missing)
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn('same order', proc.stdout)
+        self.assertIn('s8', proc.stdout)
+        self.assertIsNone(args)
+
+    def test_duplicate_fraction_samples_fail_before_native_process(self):
+        # Break caught: indexing rows silently overwrites retained or excluded duplicates.
+        for duplicate in ('s1\t0.2\t0.8\n', 'extra\t0.2\t0.8\nextra\t0.8\t0.2\n'):
+            with self.subTest(rows=duplicate):
+                def add_duplicate(inputs, _):
+                    file = Path(inputs['fractions'])
+                    file.write_text(file.read_text() + duplicate)
+                proc, args, _, _, _ = self.run_task(add_duplicate)
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertIn('duplicate labels', proc.stdout)
+                self.assertIsNone(args)
+
+    def test_cell_type_with_zero_retained_fraction_fails_before_native_process(self):
+        # Break caught: an excluded donor supplies the only positive cell-type fraction.
+        def zero_retained(inputs, _):
+            Path(inputs['fractions']).write_text(
+                'Mixture\tB\tCD4_T\nextra\t0\t1\n' +
+                ''.join('s%d\t1\t0\n' % sample for sample in range(1, 9)))
+        proc, args, _, _, _ = self.run_task(zero_retained)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn('positive total fraction', proc.stdout)
         self.assertIsNone(args)
 
     def test_native_failure_is_not_hidden_by_logging(self):

@@ -22,6 +22,8 @@ Username and token are typed String inputs. The command passes them to `--userna
 
 The signature file contains 3,023 shared genes. The 136 absent signature genes were removed for the local test. The fraction file contains only the nine cell fractions. Do not supply the original file with P-value, Correlation, and RMSE columns. Those columns caused the earlier matrix dimension error.
 
+The fractions file can contain more samples than the mixture expression file. The task selects fraction rows by sample ID and puts them in the same order as the mixture sample columns. It preserves the fraction values and leaves the input file unchanged. Every mixture sample must occur once in the fractions file. Missing samples and duplicate labels cause the task to stop before HiRes starts. The selected rows must pass the fraction checks, including a positive total for each cell type.
+
 The inputs already have S-mode adjustment. The wrapper uses `--QN FALSE` and does not repeat batch correction. It preserves negative values in the adjusted matrices and counts them in the input report. It does not add absent genes or change expression values.
 
 ## CPUs and image paths
@@ -34,7 +36,7 @@ The wrapper uses the existing image pinned to this digest:
 cibersortx/hires@sha256:e8da6850311d163e33a343d29a0d2ffc8b18c1ec4604995b8285c7bc2017c83e
 ```
 
-The image has an amd64 binary and an entry point of `./CIBERSORTxHiRes`. The task command calls that binary directly from `/src`. It stages the localized inputs under `/src/data`. It copies the fractions into `/src/outdir`, because HiRes reads `--cibresults` there. Both directories point to the task's working directory. Cromwell can collect the outputs from that directory. No new image or Dockerfile is required. See [Cromwell container commands](https://cromwell.readthedocs.io/en/stable/tutorials/Containers/) and [CPU and resource attributes](https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/).
+The image has an amd64 binary and an entry point of `./CIBERSORTxHiRes`. The task command calls that binary directly from `/src`. It stages the localized inputs under `/src/data`. It writes the selected fraction rows to `/src/outdir/fractions.txt`, because HiRes reads `--cibresults` there. Both directories point to the task's working directory. Cromwell can collect the outputs from that directory. No new image or Dockerfile is required. See [Cromwell container commands](https://cromwell.readthedocs.io/en/stable/tutorials/Containers/) and [CPU and resource attributes](https://cromwell.readthedocs.io/en/stable/RuntimeAttributes/).
 
 ## Logs and outputs
 
@@ -43,7 +45,7 @@ The command prints input checks, the run start, the exit status, and output chec
 Successful task outputs are:
 
 - `expression_matrices`: one sample-level matrix per cell type.
-- `input_validation`: sample IDs, cell types, gene counts, sampling settings, negative-value counts, and file checksums.
+- `input_validation`: sample IDs, cell types, gene counts, sampling settings, negative-value counts, and original input file checksums. The fields `fraction_input_sample_count`, `fraction_retained_sample_count`, and `fraction_dropped_sample_count` record the fraction row selection. These counts also appear in the run log.
 - `output_validation`: sample and gene checks, missing-value counts, and counts of values equal to 1.
 - `run_log`: `hires.log`, with task and native messages.
 - `task_stdout` and `task_stderr`: the task streams.
