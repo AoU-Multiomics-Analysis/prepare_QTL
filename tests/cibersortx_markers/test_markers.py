@@ -5,6 +5,7 @@ or establish the accuracy of the CIBERSORTx marker selection algorithm. Set
 CIBERSORTX_TEST_IMAGE in CI to execute the same command in the existing image.
 """
 import glob
+import gzip
 import hashlib
 import importlib.util
 import json
@@ -60,6 +61,8 @@ class MarkerTest(unittest.TestCase):
             inputs = {"reference": str(reference), "username": USERNAME, "token": TOKEN}
             if change:
                 change(inputs, localized)
+            supplied_path = Path(inputs["reference"])
+            supplied_bytes = supplied_path.read_bytes() if supplied_path.is_file() else None
 
             # The engine sees cloud Files before localization. String inputs
             # must stay untouched when these File values become local paths.
@@ -107,6 +110,10 @@ class MarkerTest(unittest.TestCase):
                 ]
             proc = subprocess.run(invocation, cwd=base, text=True,
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
+            if supplied_bytes is not None:
+                self.assertTrue(supplied_path.is_file(), "The supplied reference was removed")
+                self.assertEqual(supplied_path.read_bytes(), supplied_bytes,
+                                 "The task changed the supplied reference bytes")
             (base / "stdout.txt").write_text(proc.stdout)
             (base / "stderr.txt").write_text(proc.stderr)
             args_path = base / "native_args.json"
@@ -219,6 +226,11 @@ if mode == 'pdf':
         self.assertEqual(result["input_report"]["gene_count"], 2)
         self.assertEqual(result["input_report"]["cell_count"], 10)
         self.assertEqual(result["input_report"]["cell_types"], ["B", "CD4_T"])
+        self.assertEqual(result["input_report"]["reference_compression"], "none")
+        self.assertEqual(result["input_report"]["sha256"], hashlib.sha256(REFERENCE.encode()).hexdigest())
+        self.assertEqual(result["input_report"]["uncompressed_sha256"], hashlib.sha256(REFERENCE.encode()).hexdigest())
+        self.assertEqual(result["input_report"]["reference_bytes"], len(REFERENCE.encode()))
+        self.assertEqual(result["input_report"]["uncompressed_bytes"], len(REFERENCE.encode()))
         self.assertEqual(result["output_report"]["gene_count"], 2)
         self.assertEqual(result["output_report"]["reference_profile_count"], 10)
 
@@ -239,6 +251,79 @@ if mode == 'pdf':
         self.assertEqual(args["--k.max"], "100")
         self.assertEqual(result["cpu"], 2)
         self.assertEqual(result["output_report"]["reference_profile_count"], 6)
+
+    def test_gzip_localized_reference_reaches_native_as_plain_tsv(self):
+        # Catch a failure to decompress or unsafe quoting of a localized gzip.
+        compressed = gzip.compress(REFERENCE.encode(), mtime=0)
+        def compressed_input(inputs, localized):
+            path = localized / "reference ' $(touch INJECTED).tsv.gz"
+            path.write_bytes(compressed)
+            inputs["reference"] = str(path)
+        result = self.run_task(compressed_input)
+        self.assertEqual(result["process"].returncode, 0,
+                         result["process"].stdout + result["process"].stderr)
+        self.assertEqual(result["args"]["--refsample"], "reference.tsv")
+        self.assertEqual(result["args"]["_reference_sha256"], hashlib.sha256(REFERENCE.encode()).hexdigest())
+        self.assertFalse(result["injected"])
+        report = result["input_report"]
+        self.assertEqual(report["reference_compression"], "gzip")
+        self.assertEqual(report["sha256"], hashlib.sha256(compressed).hexdigest())
+        self.assertEqual(report["uncompressed_sha256"], hashlib.sha256(REFERENCE.encode()).hexdigest())
+        self.assertEqual(report["reference_bytes"], len(compressed))
+        self.assertEqual(report["uncompressed_bytes"], len(REFERENCE.encode()))
+        self.assertEqual((report["gene_count"], report["cell_count"], report["cell_types"]),
+                         (2, 10, ["B", "CD4_T"]))
+
+    def test_gzip_magic_is_detected_without_gzip_extension(self):
+        # Catch extension-based detection; WDL localization can rename files.
+        compressed = gzip.compress(REFERENCE.encode(), mtime=0)
+        result = self.run_task(lambda inputs, _: Path(inputs["reference"]).write_bytes(compressed))
+        self.assertEqual(result["process"].returncode, 0,
+                         result["process"].stdout + result["process"].stderr)
+        self.assertEqual(result["args"]["_reference_sha256"], hashlib.sha256(REFERENCE.encode()).hexdigest())
+        self.assertEqual(result["input_report"]["reference_compression"], "gzip")
+
+    def test_plain_reference_with_gzip_extension_is_not_decompressed(self):
+        # Catch treating a filename extension as proof of compression.
+        def misleading_extension(inputs, localized):
+            path = localized / "plain.tsv.gz"
+            path.write_text(REFERENCE)
+            inputs["reference"] = str(path)
+        result = self.run_task(misleading_extension)
+        self.assertEqual(result["process"].returncode, 0,
+                         result["process"].stdout + result["process"].stderr)
+        self.assertEqual(result["args"]["_reference_sha256"], hashlib.sha256(REFERENCE.encode()).hexdigest())
+        self.assertEqual(result["input_report"]["reference_compression"], "none")
+
+    def test_corrupt_and_truncated_gzip_fail_before_native(self):
+        # Catch accepting an incomplete stream or ignoring the gzip checksum.
+        compressed = gzip.compress(REFERENCE.encode(), mtime=0)
+        damaged_crc = bytearray(compressed)
+        damaged_crc[-8] ^= 1
+        for name, contents in {"truncated": compressed[:-6], "corrupt_crc": bytes(damaged_crc)}.items():
+            with self.subTest(case=name):
+                result = self.run_task(lambda inputs, _, data=contents: Path(inputs["reference"]).write_bytes(data))
+                self.assertNotEqual(result["process"].returncode, 0)
+                self.assertIsNone(result["args"])
+                self.assertIn("Input error", result["run_log"])
+                self.assertIn("gzip", result["run_log"].lower())
+
+    def test_malformed_matrix_inside_gzip_fails_before_native(self):
+        # Catch bypassing matrix validation after successful decompression.
+        invalid = {
+            "negative": REFERENCE.replace("geneA\t10", "geneA\t-1"),
+            "nonfinite": REFERENCE.replace("geneA\t10", "geneA\tNaN"),
+            "unequal_width": REFERENCE.replace("geneA\t10\t11", "geneA\t10"),
+            "duplicate_gene": REFERENCE.replace("geneB", "geneA"),
+            "empty": "",
+        }
+        for name, contents in invalid.items():
+            with self.subTest(case=name):
+                compressed = gzip.compress(contents.encode(), mtime=0)
+                result = self.run_task(lambda inputs, _, data=compressed: Path(inputs["reference"]).write_bytes(data))
+                self.assertNotEqual(result["process"].returncode, 0)
+                self.assertIsNone(result["args"])
+                self.assertIn("Input error", result["run_log"])
 
     def test_outputs_stay_files_after_cloud_upload(self):
         # Catch output paths becoming Strings before the workflow consumer.

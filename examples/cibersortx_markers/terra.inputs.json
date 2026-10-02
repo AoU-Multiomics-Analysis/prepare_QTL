@@ -1,5 +1,5 @@
 {
-  "CIBERSORTxMarkers.reference": "gs://YOUR_BUCKET/cibersortx/tabula_sapiens_single_cell_reference_all.tsv",
+  "CIBERSORTxMarkers.reference": "gs://YOUR_BUCKET/cibersortx/single_cell_reference_all_cells_relabelled_no_globins_bulk_detected.tsv.gz",
   "CIBERSORTxMarkers.username": "YOUR_CIBERSORTX_EMAIL",
   "CIBERSORTxMarkers.token": "YOUR_CIBERSORTX_TOKEN",
   "CIBERSORTxMarkers.replicates": 5,

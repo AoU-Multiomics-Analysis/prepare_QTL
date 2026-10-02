@@ -77,8 +77,8 @@ task DeriveMarkers {
       --min-genes ~{min_genes} --max-genes ~{max_genes} --q-value ~{q_value} \
       --max-condition-number ~{max_condition_number} \
       --cpu ~{cpu} --memory-gb ~{memory_gb} --disk-gb ~{disk_gb} <<'PY'
-    import argparse, collections, csv, datetime, hashlib, json, math, os, shutil
-    import subprocess, sys, threading
+    import argparse, collections, csv, datetime, gzip, hashlib, json, math, os, shutil
+    import subprocess, sys, tempfile, threading, zlib
     from pathlib import Path
 
     parser = argparse.ArgumentParser()
@@ -159,6 +159,18 @@ task DeriveMarkers {
         require(0 < args.min_genes <= args.max_genes, 'Input error: require 0 < min_genes <= max_genes.')
         require(all(getattr(args, name) > 0 for name in ('max_condition_number', 'cpu', 'memory_gb', 'disk_gb')),
                 'Input error: condition number, CPU, memory, and disk requests must be positive.')
+        supplied_reference = reference
+        with supplied_reference.open('rb') as stream:
+            is_gzip = stream.read(2) == b'\x1f\x8b'
+        if is_gzip:
+            log('Decompress the localized gzip reference to task disk.')
+            reference = Path(tempfile.mkdtemp(prefix='uncompressed_reference_', dir=str(root))) / 'reference.tsv'
+            try:
+                with gzip.open(str(supplied_reference), 'rb') as src, reference.open('wb') as dst:
+                    shutil.copyfileobj(src, dst, length=1024 * 1024)
+            except (OSError, EOFError, zlib.error) as error:
+                raise ValueError('Input error: reference gzip could not be decompressed: ' + str(error))
+            log('Reference decompression completed; check the uncompressed matrix.')
         columns, input_genes = matrix(reference, 'Input error: reference', repeated_labels=True)
         counts = dict(collections.Counter(columns))
         require(len(counts) >= 2, 'Input error: reference needs at least two cell types.')
@@ -167,7 +179,11 @@ task DeriveMarkers {
             'replicates', 'sampling', 'fraction', 'min_genes', 'max_genes', 'q_value', 'max_condition_number',
             'cpu', 'memory_gb', 'disk_gb')}
         input_report = {'gene_count': len(input_genes), 'cell_count': len(columns), 'cell_types': list(counts),
-                        'cells_per_type': counts, 'parameters': parameters, 'sha256': digest(reference)}
+                        'cells_per_type': counts, 'parameters': parameters, 'sha256': digest(supplied_reference),
+                        'reference_compression': 'gzip' if is_gzip else 'none',
+                        'reference_bytes': supplied_reference.stat().st_size,
+                        'uncompressed_bytes': reference.stat().st_size,
+                        'uncompressed_sha256': digest(reference)}
         (root / 'input_validation.json').write_text(json.dumps(input_report, indent=2) + '\n')
         staging = root / 'inputs'
         results = root / 'results'

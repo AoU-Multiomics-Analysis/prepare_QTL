@@ -7,11 +7,11 @@ The complete workflow has **not run on Terra**. No cloud job or new authenticate
 ## Terra setup
 
 1. Register `workflows/cell_type_specific_expression/cibersortx_markers.wdl` in a workflow method repository that Terra can use.
-2. Upload the single-cell reference to a Google Cloud Storage bucket that the workspace can read.
+2. Upload the single-cell reference as a plain `.tsv` or gzip-compressed `.tsv.gz` file to a Google Cloud Storage bucket that the workspace can read.
 3. Replace the bucket, username, and token placeholders in `examples/cibersortx_markers/terra.inputs.json`. Import this file into the Terra workflow configuration.
 4. Review the resource settings and submit the workflow from Terra. Use an x86 VM for the amd64 image.
 
-The local input used for the all-cell Tabula Sapiens runs is `analysis/cibersortx_tabula_full_100_20260924/inputs/tabula_sapiens_single_cell_reference_all.tsv` in the analysis workspace. The same directory contains `tabula_sapiens_single_cell_reference_50000.tsv` for the 50,000-cell run. These data files are supplied separately; they are not included in this repository. Upload the prepared file for the run you want to repeat. The example uses the all-cell filename and does not apply a new transformation or select a new set of cells.
+The example uses `single_cell_reference_all_cells_relabelled_no_globins_bulk_detected.tsv.gz`. This prepared input contains 22,278 genes and all 70,458 accepted cells from the reviewed Tabula Sapiens pool. It preserves the reviewed CD8/NK labels and the Job5 gene filters. It is stored in `analysis/cibersortx_relabelled_input_20260918/all_cells/` in the analysis workspace. These data files are supplied separately; they are not included in this repository. This input differs from the earlier 50,000-cell export, which used the original atlas labels. The workflow settings above come from that earlier command; the complete Job5 website settings were not recovered.
 
 ## Reference format
 
@@ -27,11 +27,13 @@ Use finite, nonnegative expression values on the linear scale. Supply at least t
 
 The reference remains a WDL `File` until command rendering. Cromwell localizes it before the task checks and opens it. An unresolved cloud URI or unreadable local file causes a localization error. The example JSON supplies workflow inputs; it is not passed to the native program as an argument file.
 
+The task detects gzip from the file contents. It decompresses gzip input on task disk before it checks the matrix and starts CIBERSORTx. The supplied file remains unchanged. Invalid or truncated gzip files cause an input error. Plain TSV input continues to work. No compression flag is needed. The input report records the supplied and uncompressed sizes and SHA-256 checksums. The disk request must allow space for both files and the native outputs; the compressed size alone is not the disk requirement.
+
 ## Settings
 
 | Input | Default | Use |
 |---|---|---|
-| `reference` | Required `File` | Labeled single-cell matrix. |
+| `reference` | Required `File` | Labeled single-cell matrix, plain TSV or gzip-compressed TSV. |
 | `username`, `token` | Required `String` values | CIBERSORTx account credentials. |
 | `replicates` | `5` | Number passed to `--replicates`. |
 | `sampling` | `1.0` | Cell sampling value passed to `--sampling`. |
