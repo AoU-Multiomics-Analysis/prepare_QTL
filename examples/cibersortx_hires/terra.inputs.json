@@ -3,11 +3,14 @@
   "CIBERSORTxHiRes.signature": "gs://YOUR_BUCKET/hires/signature_matrix_Smode_adjusted_shared_genes.txt",
   "CIBERSORTxHiRes.fractions": "gs://YOUR_BUCKET/hires/fractions_100_samples_Smode_fraction_only.txt",
   "CIBERSORTxHiRes.gene_subset": "gs://YOUR_BUCKET/hires/gene_subset_ZNF804A_controls.txt",
+  "CIBERSORTxHiRes.genes_per_chunk": 1000,
   "CIBERSORTxHiRes.username": "YOUR_CIBERSORTX_EMAIL",
   "CIBERSORTxHiRes.token": "YOUR_CIBERSORTX_TOKEN",
   "CIBERSORTxHiRes.threads": 8,
   "CIBERSORTxHiRes.nsampling": 1,
   "CIBERSORTxHiRes.nsampling2": 1,
   "CIBERSORTxHiRes.memory_gb": 16,
-  "CIBERSORTxHiRes.disk_gb": 20
+  "CIBERSORTxHiRes.disk_gb": 20,
+  "CIBERSORTxHiRes.merge_memory_gb": 4,
+  "CIBERSORTxHiRes.merge_disk_gb": 20
 }

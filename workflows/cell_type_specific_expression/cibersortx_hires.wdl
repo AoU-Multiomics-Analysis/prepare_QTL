@@ -13,30 +13,60 @@ workflow CIBERSORTxHiRes {
     Int nsampling2 = 1
     Int memory_gb = 16
     Int disk_gb = 20
+    Int genes_per_chunk = 1000
+    Int merge_memory_gb = 4
+    Int merge_disk_gb = 20
   }
 
-  call RunHiRes {
+  call SplitGeneSubset {
     input:
-      mixture = mixture,
-      signature = signature,
-      fractions = fractions,
       gene_subset = gene_subset,
-      username = username,
-      token = token,
-      threads = threads,
-      nsampling = nsampling,
-      nsampling2 = nsampling2,
-      memory_gb = memory_gb,
-      disk_gb = disk_gb
+      genes_per_chunk = genes_per_chunk
+  }
+
+  scatter (chunk_genes in SplitGeneSubset.chunk_gene_subsets) {
+    call RunHiRes {
+      input:
+        mixture = mixture,
+        signature = signature,
+        fractions = fractions,
+        gene_subset = chunk_genes,
+        username = username,
+        token = token,
+        threads = threads,
+        nsampling = nsampling,
+        nsampling2 = nsampling2,
+        memory_gb = memory_gb,
+        disk_gb = disk_gb
+    }
+  }
+
+  call MergeHiRes {
+    input:
+      gene_subset = gene_subset,
+      chunk_gene_subsets = SplitGeneSubset.chunk_gene_subsets,
+      chunk_expression_matrices = flatten(RunHiRes.expression_matrices),
+      input_validations = RunHiRes.input_validation,
+      run_logs = RunHiRes.run_log,
+      memory_gb = merge_memory_gb,
+      disk_gb = merge_disk_gb
   }
 
   output {
-    Array[File] expression_matrices = RunHiRes.expression_matrices
-    File input_validation = RunHiRes.input_validation
-    File output_validation = RunHiRes.output_validation
-    File run_log = RunHiRes.run_log
-    File task_stdout = RunHiRes.task_stdout
-    File task_stderr = RunHiRes.task_stderr
+    Array[File] expression_matrices = MergeHiRes.expression_matrices
+    File input_validation = MergeHiRes.input_validation
+    File output_validation = MergeHiRes.output_validation
+    File run_log = MergeHiRes.run_log
+    File task_stdout = MergeHiRes.task_stdout
+    File task_stderr = MergeHiRes.task_stderr
+    File chunk_plan = SplitGeneSubset.chunk_plan
+    Array[File] chunk_gene_lists = SplitGeneSubset.chunk_gene_subsets
+    Array[File] chunk_input_validations = RunHiRes.input_validation
+    Array[File] chunk_output_validations = RunHiRes.output_validation
+    Array[File] chunk_logs = RunHiRes.run_log
+    Array[File] chunk_stdout = RunHiRes.task_stdout
+    Array[File] chunk_stderr = RunHiRes.task_stderr
+    File split_log = SplitGeneSubset.run_log
   }
 }
 
@@ -250,6 +280,274 @@ task RunHiRes {
   runtime {
     docker: "cibersortx/hires@sha256:e8da6850311d163e33a343d29a0d2ffc8b18c1ec4604995b8285c7bc2017c83e"
     cpu: threads
+    memory: "~{memory_gb} GiB"
+    disks: "local-disk ~{disk_gb} SSD"
+    bootDiskSizeGb: 20
+    preemptible: 0
+    maxRetries: 0
+  }
+}
+
+task SplitGeneSubset {
+  input {
+    File gene_subset
+    Int genes_per_chunk = 1000
+  }
+
+  command <<<
+    set -euo pipefail
+    {
+    set -euo pipefail
+    printf '[%s] stage=SplitGeneSubset start_time=%s Check gene list.\n' "$(date -u +%FT%TZ)" "$(date -u +%FT%TZ)"
+    python3 - --gene-subset '~{sub(gene_subset, "'", "'\"'\"'")}' --genes-per-chunk ~{genes_per_chunk} <<'PY'
+    import argparse, hashlib, json, os
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gene-subset', required=True)
+    parser.add_argument('--genes-per-chunk', type=int, required=True)
+    args = parser.parse_args()
+    if args.genes_per_chunk <= 0:
+        raise SystemExit('Input error: genes_per_chunk must be positive.')
+    path = Path(args.gene_subset)
+    if '://' in args.gene_subset or not path.is_file() or not os.access(str(path), os.R_OK):
+        raise SystemExit('Localization error: gene_subset must be a readable local File input: ' + args.gene_subset)
+    raw = path.read_bytes()
+    try:
+        genes = raw.decode('utf-8').splitlines()
+    except UnicodeDecodeError:
+        raise SystemExit('Input error: gene_subset must be UTF-8 text.')
+    if (raw.startswith(b'\xef\xbb\xbf') or b'\x00' in raw or not genes or len(set(genes)) != len(genes)
+            or any(not gene or gene != gene.strip() or '\t' in gene for gene in genes)):
+        raise SystemExit('Input error: gene_subset must contain one unique gene per line, with no header or blank lines.')
+    Path('chunks').mkdir()
+    chunks = []
+    for index, start in enumerate(range(0, len(genes), args.genes_per_chunk), 1):
+        chunk = genes[start:start + args.genes_per_chunk]
+        chunk_path = Path('chunks/genes_%08d.txt' % index)
+        chunk_path.write_text('\n'.join(chunk) + '\n', encoding='utf-8')
+        chunks.append({'index': index, 'file': str(chunk_path), 'gene_count': len(chunk),
+                       'sha256': hashlib.sha256(chunk_path.read_bytes()).hexdigest()})
+    report = {'gene_count': len(genes), 'genes_per_chunk': args.genes_per_chunk,
+              'chunk_count': len(chunks), 'gene_subset_sha256': hashlib.sha256(raw).hexdigest(), 'chunks': chunks}
+    Path('chunk_plan.json').write_text(json.dumps(report, indent=2) + '\n')
+    print('stage=SplitGeneSubset dimensions=genes:%d,chunks:%d,genes_per_chunk:%d' %
+          (len(genes), len(chunks), args.genes_per_chunk), flush=True)
+    print('stage=SplitGeneSubset outputs=chunks/genes_*.txt,chunk_plan.json,split.log Gene lists ready.', flush=True)
+    PY
+    printf '[%s] stage=SplitGeneSubset completion_time=%s Task complete.\n' "$(date -u +%FT%TZ)" "$(date -u +%FT%TZ)"
+    } 2>&1 | tee split.log
+  >>>
+
+  output {
+    Array[File] chunk_gene_subsets = glob("chunks/genes_*.txt")
+    File chunk_plan = "chunk_plan.json"
+    File run_log = "split.log"
+  }
+
+  runtime {
+    docker: "cibersortx/hires@sha256:e8da6850311d163e33a343d29a0d2ffc8b18c1ec4604995b8285c7bc2017c83e"
+    cpu: 1
+    memory: "2 GiB"
+    disks: "local-disk 1 SSD"
+    bootDiskSizeGb: 20
+    preemptible: 0
+    maxRetries: 0
+  }
+}
+
+task MergeHiRes {
+  input {
+    File gene_subset
+    Array[File] chunk_gene_subsets
+    Array[File] chunk_expression_matrices
+    Array[File] input_validations
+    Array[File] run_logs
+    Int memory_gb = 4
+    Int disk_gb = 20
+  }
+
+  command <<<
+    set -euo pipefail
+    {
+    set -euo pipefail
+    printf '[%s] stage=MergeHiRes start_time=%s Check localized chunks.\n' "$(date -u +%FT%TZ)" "$(date -u +%FT%TZ)"
+    # Each generated list remains a File until final command-path mapping.
+    # The lists contain already-localized incoming File paths, in array order.
+    cat "~{write_lines(chunk_gene_subsets)}" > chunk_paths.txt
+    cat "~{write_lines(chunk_expression_matrices)}" > matrix_paths.txt
+    cat "~{write_lines(input_validations)}" > validation_paths.txt
+    cat "~{write_lines(run_logs)}" > log_paths.txt
+    python3 - \
+      --gene-subset '~{sub(gene_subset, "'", "'\"'\"'")}' \
+      --chunk-files chunk_paths.txt --matrix-files matrix_paths.txt \
+      --validation-files validation_paths.txt --log-files log_paths.txt \
+      --memory-gb ~{memory_gb} --disk-gb ~{disk_gb} <<'PY'
+    import argparse, hashlib, json, math, os, re, sqlite3
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser()
+    for name in ('gene-subset', 'chunk-files', 'matrix-files', 'validation-files', 'log-files'):
+        parser.add_argument('--' + name, required=True)
+    for name in ('memory-gb', 'disk-gb'):
+        parser.add_argument('--' + name, type=int, required=True)
+    args = parser.parse_args()
+    def require(condition, message):
+        if not condition:
+            raise SystemExit('Merge error: ' + message)
+    require(args.memory_gb > 0 and args.disk_gb > 0, 'memory_gb and disk_gb must be positive.')
+    def local_file(value):
+        path = Path(value)
+        if '://' in value or not path.is_file() or not os.access(str(path), os.R_OK):
+            raise SystemExit('Localization error: expected a readable local File input: ' + value)
+        return path
+    def file_list(value):
+        entries = local_file(value).read_text().splitlines()
+        require(entries and all(entries), 'A required File array is empty or has a blank path.')
+        return [local_file(entry) for entry in entries]
+    def gene_list(path):
+        raw = path.read_bytes()
+        try:
+            genes = raw.decode('utf-8').splitlines()
+        except UnicodeDecodeError:
+            raise SystemExit('Merge error: gene list must be UTF-8: ' + str(path))
+        require(not raw.startswith(b'\xef\xbb\xbf') and b'\x00' not in raw and genes
+                and len(genes) == len(set(genes))
+                and all(gene and gene == gene.strip() and '\t' not in gene for gene in genes),
+                'Invalid or duplicate gene list: ' + str(path))
+        return genes
+    original_path = local_file(args.gene_subset)
+    genes = gene_list(original_path)
+    positions = {gene: index for index, gene in enumerate(genes)}
+    chunks = file_list(args.chunk_files)
+    matrix_files = file_list(args.matrix_files)
+    validation_files = file_list(args.validation_files)
+    logs = file_list(args.log_files)
+    require(len(chunks) == len(validation_files) == len(logs), 'Chunk, validation, and log counts differ.')
+    chunk_genes = [gene_list(path) for path in chunks]
+    all_chunk_genes = [gene for chunk in chunk_genes for gene in chunk]
+    require(len(all_chunk_genes) == len(set(all_chunk_genes)), 'Genes overlap between chunks.')
+    require(set(all_chunk_genes) == set(genes), 'Chunk coverage has missing or unexpected genes.')
+    reports = [json.loads(path.read_text()) for path in validation_files]
+    expected = reports[0]
+    samples, cells = expected['samples'], expected['cell_types']
+    require(samples and len(samples) == len(set(samples)) and expected['sample_count'] == len(samples), 'Invalid sample labels or count.')
+    require(cells and len(cells) == len(set(cells)) and all(
+        cell and not any(char in cell for char in ('/', '\\', '\r', '\n', '\x00')) for cell in cells), 'Invalid cell-type labels.')
+    shared_fields = ('samples', 'sample_count', 'cell_types', 'mixture_gene_count', 'signature_gene_count',
+                     'threads', 'nsampling', 'nsampling2')
+    for index, report in enumerate(reports):
+        require(all(report.get(key) == expected.get(key) for key in shared_fields), 'Sample, cell-type, background or sampling settings differ between chunks.')
+        require(all(report['sha256'].get(key) == expected['sha256'].get(key) and report['sha256'].get(key)
+                    for key in ('mixture', 'signature', 'fractions')), 'Full-input checksums differ between chunks.')
+        require(report['subset_genes'] == chunk_genes[index], 'Validation genes do not match their chunk list.')
+        require(report['sha256']['gene_subset'] == hashlib.sha256(chunks[index].read_bytes()).hexdigest(), 'Chunk checksum does not match validation.')
+    require(len(matrix_files) == len(chunks) * len(cells), 'Expected one matrix per cell type per chunk.')
+    # WDL flatten preserves chunk-major order. Basenames alone are not unique.
+    by_chunk = []
+    window = None
+    for index in range(len(chunks)):
+        group = {}
+        for path in matrix_files[index * len(cells):(index + 1) * len(cells)]:
+            matches = []
+            for cell in cells:
+                match = re.search('_' + re.escape(cell) + r'_Window([0-9]+)\.txt$', path.name)
+                if match:
+                    matches.append((cell, int(match.group(1))))
+            # Use the complete longest label if cell names share a suffix.
+            require(matches, 'Unexpected cell-type matrix: ' + path.name)
+            cell, size = max(matches, key=lambda match: len(match[0]))
+            require(cell not in group, 'Duplicate cell-type matrix in a chunk: ' + cell)
+            require(size > 0 and (window is None or window == size), 'Window sizes differ between chunks or cell types.')
+            window = size
+            group[cell] = path
+        require(set(group) == set(cells), 'Missing cell-type matrix in a chunk.')
+        by_chunk.append(group)
+    print('stage=MergeHiRes dimensions=genes:%d,samples:%d,cell_types:%d,chunks:%d' %
+          (len(genes), len(samples), len(cells), len(chunks)), flush=True)
+    Path('results').mkdir()
+    matrices = []
+    for cell in cells:
+        db_path = Path('merge_rows.sqlite')
+        database = sqlite3.connect(str(db_path))
+        database.execute('PRAGMA cache_size=-8192')
+        database.execute('CREATE TABLE rows (position INTEGER PRIMARY KEY, line TEXT NOT NULL)')
+        header = None
+        missing = ones = 0
+        for index, group in enumerate(by_chunk):
+            seen = set()
+            allowed = set(chunk_genes[index])
+            path = group[cell]
+            with path.open(encoding='utf-8', newline='') as stream:
+                current_header = stream.readline().rstrip('\r\n').split('\t')
+                require(current_header[1:] == samples and (header is None or current_header == header), 'Sample columns or header differ: ' + str(path))
+                header = current_header
+                for line in stream:
+                    text = line.rstrip('\r\n')
+                    row = text.split('\t')
+                    require(len(row) == len(header), 'Nonrectangular matrix: ' + str(path))
+                    gene = row[0]
+                    require(gene in allowed and gene not in seen, 'Unexpected or duplicate gene in matrix: ' + gene)
+                    seen.add(gene)
+                    for value in row[1:]:
+                        if value.strip().upper() in ('', 'NA', 'NAN'):
+                            missing += 1
+                        else:
+                            try:
+                                numeric = float(value)
+                            except ValueError:
+                                raise SystemExit('Merge error: Nonnumeric estimate in ' + str(path))
+                            require(math.isfinite(numeric), 'Nonfinite estimate in ' + str(path))
+                            ones += numeric == 1
+                    database.execute('INSERT INTO rows VALUES (?, ?)', (positions[gene], text))
+            require(seen == allowed, 'Missing genes in matrix: ' + str(path))
+            database.commit()
+        output = Path('results/CIBERSORTxHiRes_merged_' + cell + '_Window%d.txt' % window)
+        with output.open('w', encoding='utf-8', newline='') as stream:
+            stream.write('\t'.join(header) + '\n')
+            for row in database.execute('SELECT line FROM rows ORDER BY position'):
+                stream.write(row[0] + '\n')
+        database.close()
+        db_path.unlink()
+        matrices.append({'cell_type': cell, 'file': str(output), 'gene_count': len(genes),
+                         'missing_values': missing, 'values_equal_to_one': ones})
+        print('stage=MergeHiRes Merged cell type: ' + cell, flush=True)
+    merged_input = dict(expected)
+    merged_input['sha256'] = dict(expected['sha256'])
+    merged_input['sha256']['gene_subset'] = hashlib.sha256(original_path.read_bytes()).hexdigest()
+    merged_input.update(subset_genes=genes, chunk_count=len(chunks), chunk_gene_counts=[len(chunk) for chunk in chunk_genes])
+    Path('input_validation.json').write_text(json.dumps(merged_input, indent=2) + '\n')
+    output_report = {'sample_count': len(samples), 'cell_types': cells, 'matrices': matrices,
+                     'chunk_count': len(chunks), 'window_size': window,
+                     'scale': 'Native HiRes expression scale; units are unverified.',
+                     'value_one_note': 'HiRes documents 1 as an insufficient-estimation marker. Values are preserved.'}
+    Path('output_validation.json').write_text(json.dumps(output_report, indent=2) + '\n')
+    # These File paths are explicit task inputs, not paths read from a manifest.
+    with Path('chunk_native_logs.txt').open('w') as destination:
+        for index, path in enumerate(logs, 1):
+            destination.write('\n--- HiRes chunk %d ---\n' % index)
+            with path.open() as source:
+                for line in source:
+                    destination.write(line)
+    print('stage=MergeHiRes outputs=results/CIBERSORTxHiRes*_Window*.txt,input_validation.json,output_validation.json,hires.log Matrices ready.', flush=True)
+    PY
+    cat chunk_native_logs.txt
+    printf '[%s] stage=MergeHiRes completion_time=%s Task complete.\n' "$(date -u +%FT%TZ)" "$(date -u +%FT%TZ)"
+    } 2>&1 | tee hires.log
+  >>>
+
+  output {
+    Array[File] expression_matrices = glob("results/CIBERSORTxHiRes*_Window*.txt")
+    File input_validation = "input_validation.json"
+    File output_validation = "output_validation.json"
+    File run_log = "hires.log"
+    File task_stdout = stdout()
+    File task_stderr = stderr()
+  }
+
+  runtime {
+    docker: "cibersortx/hires@sha256:e8da6850311d163e33a343d29a0d2ffc8b18c1ec4604995b8285c7bc2017c83e"
+    cpu: 1
     memory: "~{memory_gb} GiB"
     disks: "local-disk ~{disk_gb} SSD"
     bootDiskSizeGb: 20

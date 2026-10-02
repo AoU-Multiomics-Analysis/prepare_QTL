@@ -43,13 +43,13 @@ jobs:
           miniwdl check workflows/cell_type_specific_expression/cibersortx_hires.wdl
           python scripts/check_wdl_file_scope.py workflows/cell_type_specific_expression/cibersortx_hires.wdl
           python scripts/check_wdl_logging.py workflows/cell_type_specific_expression/cibersortx_hires.wdl
-          python tests/cibersortx_hires/test_hires.py
+          python -m unittest discover -s tests/cibersortx_hires -v
       - name: Test commands in the pinned image with synthetic calculations
         run: |
           set -euo pipefail
           CIBERSORTX_TEST_IMAGE=$(python - <<'PY'
           import WDL
-          task = WDL.load('workflows/cell_type_specific_expression/cibersortx_hires.wdl').tasks[0]
+          task = next(task for task in WDL.load('workflows/cell_type_specific_expression/cibersortx_hires.wdl').tasks if task.name == 'RunHiRes')
           print(task.runtime['docker'].eval(WDL.Env.Bindings(), WDL.StdLib.Base('1.0')).value)
           PY
           )
@@ -57,7 +57,7 @@ jobs:
           docker pull "$CIBERSORTX_TEST_IMAGE"
           # The fixture replaces only the authenticated native calculation.
           # No credentials, image build, or CIBERSORTx analysis is required.
-          python tests/cibersortx_hires/test_hires.py -v 2>&1 | tee "$RUNNER_TEMP/cibersortx-hires-smoke.log"
+          python -m unittest discover -s tests/cibersortx_hires -v 2>&1 | tee "$RUNNER_TEMP/cibersortx-hires-smoke.log"
       - name: Save smoke-test log
         if: always()
         uses: actions/upload-artifact@v4
