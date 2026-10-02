@@ -72,7 +72,7 @@ task RunHiRes {
       --gene-subset '~{sub(gene_subset, "'", "'\"'\"'")}' \
       --threads ~{threads} --nsampling ~{nsampling} --nsampling2 ~{nsampling2} \
       --memory-gb ~{memory_gb} --disk-gb ~{disk_gb} <<'PY'
-    import argparse, csv, hashlib, json, math, os, shutil
+    import argparse, csv, hashlib, json, math, os
     from pathlib import Path
 
     parser = argparse.ArgumentParser()
@@ -113,7 +113,13 @@ task RunHiRes {
     fraction_types, fraction_samples, fraction_values = matrix(paths['fractions'])
     require(fraction_types == cell_types,
             'Use fraction-only results. Their columns must match the signature cell types in the same order. Remove P-value, Correlation and RMSE.')
-    require(fraction_samples == samples, 'Fraction rows must match mixture samples in the same order.')
+    fraction_input_sample_count = len(fraction_samples)
+    fraction_index = {sample: index for index, sample in enumerate(fraction_samples)}
+    missing_samples = [sample for sample in samples if sample not in fraction_index]
+    require(not missing_samples, 'Mixture samples missing from fractions: ' + ', '.join(missing_samples))
+    # Select by sample ID, then put fraction rows in mixture column order.
+    fraction_indices = [fraction_index[sample] for sample in samples]
+    fraction_values = [fraction_values[index] for index in fraction_indices]
     require(len(samples) >= 4 * len(cell_types), 'HiRes needs at least four samples per cell type for the default window.')
     require(all(0 <= value <= 1 for row in fraction_values for value in row), 'Fractions must be between zero and one.')
     require(all(abs(sum(row) - 1) <= 1e-6 for row in fraction_values), 'Each fraction row must sum to one.')
@@ -126,6 +132,9 @@ task RunHiRes {
     require(all(sum(row[column] for row in mixture_values) > 0 for column in range(len(samples))), 'Each mixture sample must have a positive expression total.')
     report = {
         'sample_count': len(samples), 'samples': samples, 'cell_types': cell_types,
+        'fraction_input_sample_count': fraction_input_sample_count,
+        'fraction_retained_sample_count': len(samples),
+        'fraction_dropped_sample_count': fraction_input_sample_count - len(samples),
         'mixture_gene_count': len(genes), 'signature_gene_count': len(signature_genes), 'subset_genes': panel,
         'threads': args.threads, 'nsampling': args.nsampling, 'nsampling2': args.nsampling2,
         'negative_mixture_values': sum(value < 0 for row in mixture_values for value in row),
@@ -140,7 +149,12 @@ task RunHiRes {
     for name in ('mixture', 'signature', 'gene_subset'):
         (staging / (name + '.txt')).symlink_to(paths[name].resolve())
     # HiRes reads --cibresults from its output directory.
-    shutil.copyfile(str(paths['fractions']), str(results / 'fractions.txt'))
+    # Preserve the header and numeric text from the original fraction rows.
+    fraction_lines = paths['fractions'].read_text().splitlines()
+    selected_lines = [fraction_lines[0]] + [fraction_lines[index + 1] for index in fraction_indices]
+    (results / 'fractions.txt').write_text('\n'.join(selected_lines) + '\n')
+    print('stage=CIBERSORTxHiRes fraction_samples=input:%d,retained:%d,dropped:%d Fractions matched to mixture samples.' %
+          (fraction_input_sample_count, len(samples), fraction_input_sample_count - len(samples)), flush=True)
     for destination, source in ((Path('/src/data'), staging), (Path('/src/outdir'), results)):
         require(not destination.exists() and not destination.is_symlink(), str(destination) + ' already exists in the image.')
         destination.symlink_to(source, target_is_directory=True)
