@@ -4,6 +4,7 @@ Only the authenticated native calculation is replaced with a small fixture.
 No image is built and no credentials or scientific data are required.
 """
 import argparse
+import gzip
 import importlib.util
 import json
 import os
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 IMAGE = 'cibersortx/fractions@sha256:9dc06b0a3f58d12a81cc962c9d2147b2b5edb6743f44dc2ac6d3f59fe7418edc'
 
 
-def prepare(base, smode):
+def prepare(base, smode, gzip_mixture=False):
     document = WDL.load(str(ROOT / 'workflows/cell_type_specific_expression/cibersortx_fractions.wdl'))
     task = document.tasks[0]
     localized = base / 'localized'
@@ -30,9 +31,13 @@ def prepare(base, smode):
     }
     values = dict(username='fixture@example.org', token='fixture-token', smode=smode)
     for name, text in contents.items():
-        (localized / (name + '.txt')).write_text(text)
+        filename = name + '.txt' + ('.gz' if name == 'mixture' and gzip_mixture else '')
+        if name == 'mixture' and gzip_mixture:
+            (localized / filename).write_bytes(gzip.compress(text.encode()))
+        else:
+            (localized / filename).write_text(text)
         if name in ('mixture', 'signature') or smode:
-            values[name] = '/work/localized/' + name + '.txt'
+            values[name] = '/work/localized/' + filename
     env = WDL.values_from_json(values, task.available_inputs)
     stdlib = WDL.StdLib.Base('1.0')
     for decl in task.inputs:
@@ -60,10 +65,10 @@ def main():
         prepare(args.prepare_only, True)
         print('Prepared S-mode command and native fixture; image not run.')
         return
-    for smode in (False, True):
+    for smode, gzip_mixture in ((False, False), (True, False), (False, True), (True, True)):
         with tempfile.TemporaryDirectory(prefix='fractions-image-') as temp:
             base = Path(temp)
-            prepare(base, smode)
+            prepare(base, smode, gzip_mixture)
             # Check the real executable and Python runtime before replacing the
             # native calculation. This is an image compatibility check only.
             subprocess.run(['docker', 'run', '--rm', '--platform', 'linux/amd64',
@@ -83,8 +88,12 @@ def main():
             report = json.loads((base / 'output_validation.json').read_text())
             assert report['sample_count'] == 3 and report['cell_types'] == ['B', 'CD4_T']
             assert report['smode'] == smode
+            inputs = json.loads((base / 'input_validation.json').read_text())
+            assert inputs['mixture_compression'] == ('gzip' if gzip_mixture else 'none')
+            mixture = (base / 'results/mixture_for_hires.txt').read_text()
+            assert mixture == 'GeneSymbol\ts1\ts2\ts3\nsig\t1\t2\t3\nZNF804A\t2\t3\t4\n'
             assert 'fixture-token' not in (base / 'fractions.log').read_text()
-            print('PASS: image wrapper smoke test; S-mode=%s.' % smode)
+            print('PASS: image wrapper smoke test; S-mode=%s; gzip mixture=%s.' % (smode, gzip_mixture))
 
 
 if __name__ == '__main__':

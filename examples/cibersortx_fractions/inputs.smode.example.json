@@ -1,5 +1,5 @@
 {
-  "CIBERSORTxFractions.mixture": "gs://YOUR_BUCKET/cibersort_test_data/mixture_100_samples_linear_CPM.txt",
+  "CIBERSORTxFractions.mixture": "gs://YOUR_BUCKET/cibersort_test_data/mixture_100_samples_linear_CPM.txt.gz",
   "CIBERSORTxFractions.signature": "gs://YOUR_BUCKET/cibersort_test_data/signature_matrix_tabula_sapiens_50000.txt",
   "CIBERSORTxFractions.refsample": "gs://YOUR_BUCKET/cibersort_test_data/refsample_tabula_sapiens_50000.txt",
   "CIBERSORTxFractions.source_geps": "gs://YOUR_BUCKET/cibersort_test_data/sourceGEP_tabula_sapiens_50000.txt",
