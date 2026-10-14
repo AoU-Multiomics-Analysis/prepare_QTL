@@ -1,4 +1,5 @@
 version 1.0
+import "../common/ExportRegenie.wdl" as Regenie
 import "../common/calculate_phenotypePCs.wdl" as ComputePCs
 import "../common/MergeCovariates.wdl" as CovariateMerge
 
@@ -350,6 +351,7 @@ command <<<
 
 workflow AggregateMethylationCohort {
     input {
+        Int RegeniePhenotypesPerFile = 100
         String aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String aggregatemethylationcohortarrays__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
@@ -569,7 +571,40 @@ workflow AggregateMethylationCohort {
   }
     }
 
+    call Regenie.ExportRegenie as ExportIntRegenie {
+        input:
+            Bed = FinalizeMethylationConnectivity.IntMethylationBed,
+            Covariates = select_first([MergeIntAdditionalCovariates.QtlCovariates, IntPhenotypePCs.OutPhenotypePCs]),
+            CovariateFormat = if defined(AdditionalCovariates) then "tensor" else "sample",
+            OutputPrefix = OutputPrefix + ".methylation.INT",
+            PhenotypesPerFile = RegeniePhenotypesPerFile,
+            DiskGB = AggregateDiskGB
+    }
+
+    call Regenie.ExportRegenie as ExportRawRegenie {
+        input:
+            Bed = FinalizeMethylationConnectivity.RawMethylationBed,
+            Covariates = AdditionalCovariates,
+            CovariateFormat = "sample",
+            OutputPrefix = OutputPrefix + ".methylation.raw",
+            PhenotypesPerFile = RegeniePhenotypesPerFile,
+            DiskGB = AggregateDiskGB
+    }
+
     output {
+        Array[File] IntRegeniePhenotypes = ExportIntRegenie.Phenotypes
+        File? IntRegenieCovariates = ExportIntRegenie.CovariatesOut
+        File IntRegenieTraitMap = ExportIntRegenie.TraitMap
+        File IntRegenieBatches = ExportIntRegenie.Batches
+        File IntRegenieExcludedSamples = ExportIntRegenie.ExcludedSamples
+        File IntRegenieLog = ExportIntRegenie.Log
+        Array[File] RawRegeniePhenotypes = ExportRawRegenie.Phenotypes
+        File? RawRegenieCovariates = ExportRawRegenie.CovariatesOut
+        File RawRegenieTraitMap = ExportRawRegenie.TraitMap
+        File RawRegenieBatches = ExportRawRegenie.Batches
+        File RawRegenieExcludedSamples = ExportRawRegenie.ExcludedSamples
+        File RawRegenieLog = ExportRawRegenie.Log
+
         File FilteredCalls = FinalizeMethylationConnectivity.FilteredCalls
         File SiteQC = AggregateMethylationChromosomes.SiteQC
         File SiteMetadata = AggregateMethylationChromosomes.SiteMetadata

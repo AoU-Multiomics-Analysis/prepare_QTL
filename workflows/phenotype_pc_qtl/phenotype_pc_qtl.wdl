@@ -1,9 +1,11 @@
 version 1.0
+import "../common/ExportRegenie.wdl" as Regenie
 
 import "tasks/tensorqtl_trans_compat.wdl" as trans
 
 workflow PhenotypePCQTL {
     input {
+        Int RegeniePhenotypesPerFile = 100
         File covariates
         File plink_pgen
         File plink_pvar
@@ -41,7 +43,24 @@ workflow PhenotypePCQTL {
             docker_image = tensorqtl_docker
     }
 
+    call Regenie.ExportRegenie as ExportPcRegenie {
+        input:
+            Bed = PreparePCPhenotypes.phenotype_bed,
+            Covariates = PreparePCPhenotypes.remaining_covariates,
+            CovariateFormat = "tensor",
+            OutputPrefix = "phenotype_pc",
+            PhenotypesPerFile = RegeniePhenotypesPerFile,
+            DiskGB = disk_gb
+    }
+
     output {
+        Array[File] PcRegeniePhenotypes = ExportPcRegenie.Phenotypes
+        File? PcRegenieCovariates = ExportPcRegenie.CovariatesOut
+        File PcRegenieTraitMap = ExportPcRegenie.TraitMap
+        File PcRegenieBatches = ExportPcRegenie.Batches
+        File PcRegenieExcludedSamples = ExportPcRegenie.ExcludedSamples
+        File PcRegenieLog = ExportPcRegenie.Log
+
         File phenotype_pc_bed = PreparePCPhenotypes.phenotype_bed
         File remaining_covariates = PreparePCPhenotypes.remaining_covariates
         File pc_selection = PreparePCPhenotypes.pc_selection

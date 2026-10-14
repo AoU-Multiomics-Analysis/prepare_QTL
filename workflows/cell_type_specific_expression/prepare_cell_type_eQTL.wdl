@@ -6,6 +6,7 @@ import "../expression/prepare_eQTL.wdl" as eqtl
 
 workflow PrepareCellTypeEqtlWorkflow {
   input {
+    Int RegeniePhenotypesPerFile = 100
     String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String expression__filter_expression_genes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:6d9f290ddca518391e7b4647c742fa57ecec5f3740969821da00eb831abec87a"
         String filter_scatter__filter_cell_type_bed_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl-cell-type-specific-expression@sha256:a49ac1684f9e2cb2cc2f5f222ad0195062a518c3f385c4b58abafa42d2793f01"
@@ -168,6 +169,7 @@ workflow PrepareCellTypeEqtlWorkflow {
     }
     call eqtl.eQTLPrepareData as PrepareCellTypeEqtl {
       input:
+        RegeniePhenotypesPerFile = RegeniePhenotypesPerFile,
       calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
       mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
       prepare_eqtl__eqtl_prepare_expression_image = prepare_eqtl__eqtl_prepare_expression_image,
@@ -223,6 +225,25 @@ workflow PrepareCellTypeEqtlWorkflow {
   }
 
   output {
+    Array[Array[File]] IntRegeniePhenotypes = PrepareCellTypeEqtl.IntRegeniePhenotypes
+    Array[File?] IntRegenieCovariates = PrepareCellTypeEqtl.IntRegenieCovariates
+    Array[File] IntRegenieTraitMap = PrepareCellTypeEqtl.IntRegenieTraitMap
+    Array[File] IntRegenieBatches = PrepareCellTypeEqtl.IntRegenieBatches
+    Array[File] IntRegenieExcludedSamples = PrepareCellTypeEqtl.IntRegenieExcludedSamples
+    Array[File] IntRegenieLog = PrepareCellTypeEqtl.IntRegenieLog
+    Array[Array[File]] ScaledRegeniePhenotypes = PrepareCellTypeEqtl.ScaledRegeniePhenotypes
+    Array[File?] ScaledRegenieCovariates = PrepareCellTypeEqtl.ScaledRegenieCovariates
+    Array[File] ScaledRegenieTraitMap = PrepareCellTypeEqtl.ScaledRegenieTraitMap
+    Array[File] ScaledRegenieBatches = PrepareCellTypeEqtl.ScaledRegenieBatches
+    Array[File] ScaledRegenieExcludedSamples = PrepareCellTypeEqtl.ScaledRegenieExcludedSamples
+    Array[File] ScaledRegenieLog = PrepareCellTypeEqtl.ScaledRegenieLog
+    Array[Array[File]] RawRegeniePhenotypes = PrepareCellTypeEqtl.RawRegeniePhenotypes
+    Array[File?] RawRegenieCovariates = PrepareCellTypeEqtl.RawRegenieCovariates
+    Array[File] RawRegenieTraitMap = PrepareCellTypeEqtl.RawRegenieTraitMap
+    Array[File] RawRegenieBatches = PrepareCellTypeEqtl.RawRegenieBatches
+    Array[File] RawRegenieExcludedSamples = PrepareCellTypeEqtl.RawRegenieExcludedSamples
+    Array[File] RawRegenieLog = PrepareCellTypeEqtl.RawRegenieLog
+
     Map[String, String] task_images = {
       "calculate_phenotypepcs__computep_cs": calculate_phenotypepcs__computep_cs_image,
       "expression__filter_expression_genes": expression__filter_expression_genes_image,

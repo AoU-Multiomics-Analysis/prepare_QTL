@@ -34,7 +34,7 @@ class WDLTests(unittest.TestCase):
             command=render(doc.tasks[0],{'covariates':'gs://bucket/cov.tsv','placeholder_chromosome':'chrY','docker_image':'unused'},prep,{'gs://bucket/cov.tsv':str(cov)})
             r=subprocess.run(['bash','-c',command],cwd=prep,text=True,capture_output=True)
             self.assertEqual(r.returncode,0,r.stdout+r.stderr)
-            task=doc.imports[0].doc.tasks[0]
+            task=next(i for i in doc.imports if i.namespace=='trans').doc.tasks[0]
             trans=p/'trans';trans.mkdir()
             paths={}
             values={'phenotype_bed':'gs://outputs/pc.bed','covariates':'gs://outputs/cov.tsv','maf_threshold':.05,'pval_threshold':1e-5,'num_threads':1,'memory_gb':2,'disk_gb':10,'preemptible_attempts':0,'docker_image':'unused'}
@@ -63,9 +63,12 @@ class WDLTests(unittest.TestCase):
             self.assertIn('localization error',r.stdout+r.stderr)
             self.assertFalse((bad/'pc_scan.trans_qtl_pairs.parquet').exists())
 
-    def test_workflow_has_two_calls_and_no_file_writes(self):
+    def test_workflow_has_preparation_scan_export_and_no_file_writes(self):
         doc=WDL.load(str(ROOT/'workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl'))
-        self.assertEqual(sum(isinstance(n,WDL.Tree.Call) for n in doc.workflow.body),2)
+        calls={n.name:n for n in doc.workflow.body if isinstance(n,WDL.Tree.Call)}
+        self.assertEqual(set(calls),{'PreparePCPhenotypes','TensorQTLTrans','ExportPcRegenie'})
+        self.assertEqual(str(calls['ExportPcRegenie'].inputs['Bed']),'PreparePCPhenotypes.phenotype_bed')
+        self.assertEqual(str(calls['ExportPcRegenie'].inputs['Covariates']),'PreparePCPhenotypes.remaining_covariates')
         self.assertEqual(doc.wdl_version,'1.0')
         self.assertNotIn('phenotype_pc_ids', [d.name for d in doc.workflow.inputs])
         def walk(node):
@@ -73,7 +76,7 @@ class WDLTests(unittest.TestCase):
                 self.assertNotIn(node.function_name,{'write_lines','write_tsv','write_map','write_json','write_objects','write_object'})
             for child in node.children: walk(child)
         walk(doc.workflow)
-        for task in [doc.tasks[0],doc.imports[0].doc.tasks[0]]:
+        for task in [doc.tasks[0],next(i for i in doc.imports if i.namespace=='trans').doc.tasks[0]]:
             file_names={'covariates'} if task.name=='PreparePCPhenotypes' else {'plink_pgen','plink_pvar','plink_psam','phenotype_bed','covariates'}
             for decl in task.inputs:
                 if decl.name in file_names:self.assertIsInstance(decl.type,WDL.Type.File)

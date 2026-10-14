@@ -72,3 +72,7 @@ workflows:
   - subclass: WDL
     primaryDescriptorPath: /workflows/genotype/trans_ld_regions.wdl
     name: trans_ld_regions
+
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/common/ExportRegenie.wdl
+    name: ExportRegenie

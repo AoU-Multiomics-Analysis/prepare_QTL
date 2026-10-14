@@ -19,6 +19,9 @@ implementation modules.
 
 ## Public entry points
 
+The QTL preparation entry points also emit [REGENIE exports](../docs/regenie-exports.md).
+The independent `common/ExportRegenie.wdl` helper can export an existing BED.
+
 | Area | WDL | Use |
 | --- | --- | --- |
 | Expression | `expression/rnaseqc2_aggregate_batched.wdl` | Aggregate RNA-SeQC outputs from one sample manifest in batches, then stream the cohort merge. |
