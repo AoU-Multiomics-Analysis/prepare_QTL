@@ -80,6 +80,8 @@ def covariates(path, orientation):
 
 
 def covariate_value(value):
+    # R's t(data.frame) can add numeric padding in MergeCovariates.R.
+    value = value.strip()
     if value.lower() in MISSING or re.search(r'\s', value):
         raise ValueError('covariates contain missing values or whitespace')
     try:

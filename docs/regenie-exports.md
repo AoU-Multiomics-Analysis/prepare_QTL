@@ -45,7 +45,7 @@ FID IID pheno_04b... pheno_709...
 
 The actual files use tabs. `FID` is `0`; `IID` is the exact BED sample ID.
 For a PSAM that has only `#IID`, the REGENIE pipeline adds `FID=0` in its task.
-Numeric text is retained. Missing phenotypes (`NA`, `NaN`, `.`, or an empty cell)
+Numeric text is retained; outer padding in covariate cells is removed. Missing phenotypes (`NA`, `NaN`, `.`, or an empty cell)
 become `NA`. The converter does not transform, impute, or residualize values.
 Each original trait ID gets a stable name of the form `pheno_<24 hex digits>`.
 Use the trait map to join association results to genes, proteins, splice events,

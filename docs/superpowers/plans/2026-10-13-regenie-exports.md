@@ -39,11 +39,11 @@ output prefix. Outputs: Array[File] phenotype batches; optional File covariates;
 File trait map, batch table, exclusions, log. The batch table is metadata; WDL
 discovers phenotype Files with glob, not paths parsed from the metadata.
 
-- [ ] Write CLI and localization regression tests. Assert exact transpose and
+- [x] Write CLI and localization regression tests. Assert exact transpose and
   numeric text, stable safe IDs, missing NA, reordered overlap, categorical
   covariates, duplicates, nonfinite values, empty input, and cloud URI failures.
-- [ ] Run the tests and confirm failure because the exporter does not exist.
-- [ ] Implement the exporter, literal WDL program, typed task, workflow calls,
+- [x] Run the tests and confirm failure because the exporter does not exist.
+- [x] Implement the exporter, literal WDL program, typed task, workflow calls,
   and pass-through outputs. Add common helper registration and routing policy.
 - [ ] Run the exporter and localization tests, all descriptor checks, file-scope
   regression check, existing Python/R tests available locally, and the CI smoke.
@@ -54,3 +54,22 @@ discovers phenotype Files with glob, not paths parsed from the metadata.
 
 Native execution. The user requested the code change; no further design or
 worktree approval is needed for this reversible branch.
+
+- Baseline: the complete R testthat suite has 147 passed assertions and 14 failed
+  assertions in documentation/runtime-contract tests, with no errors. An archive
+  of fd100b0 and the feature branch produce identical failure tables.
+- Initial exporter tests failed because the exporter was absent, then passed.
+- Initial WDL integration tests failed because outputs were absent, then passed.
+- Broad Python tests: 225 passed after installing temporary test dependencies and
+  allowing loopback for the simulated App callback server. No real App was created.
+- GitHub Actions on 4b743dd: all nine public WDLs passed Womtool87 validation;
+  two-step REGENIE smoke scans passed for expression, protein, splicing, methylation.
+- Final review: one Important issue, no Critical or Minor issues. Fixed padded
+  numeric covariates from the existing R merge: regression test failed before the
+  fix and passed after it. The CI fixture now also uses padded covariate values.
+- Updated phenotype-PC tests to select an import by namespace and check the new
+  preparation/scan/export call contract; both previous failures were reproduced.
+- Review scope: Terra execution and cloud output transfer remain untested; no job
+  was authorized or submitted. Upstream sample-ID conversion and existing R
+  contract failures remain unchanged. CI provides a synthetic scan, not cohort
+  performance evidence.

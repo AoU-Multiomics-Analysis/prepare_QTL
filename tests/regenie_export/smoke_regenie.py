@@ -35,7 +35,8 @@ def main():
         (root/'geno.psam').write_text('#IID\n' + '\n'.join(samples) + '\n')
         (root/'common_variants.txt').write_text(''.join(f'v{i}\n' for i in range(200)))
         ages = [str(rng.uniform(20, 80)) for _ in samples]
-        (root/'cov.tsv').write_text('ID\t' + '\t'.join(reversed(samples)) + '\nage\t' + '\t'.join(reversed(ages)) + '\n')
+        # Match the padded numeric text emitted by the existing R merge step.
+        (root/'cov.tsv').write_text('ID\t' + '\t'.join(reversed(samples)) + '\nage\t' + '\t'.join(v.rjust(24) for v in reversed(ages)) + '\n')
         trait_values = [[str(.2*dosage[t*100][i]+rng.gauss(0,1)) for i in range(len(samples))] for t in range(2)]
         trait_values[0][1] = 'NA'
         for kind, ids in {'eqtl': ['ENSG001.1', 'ENSG002.2'], 'pqtl': ['protein:one', 'protein,two'],

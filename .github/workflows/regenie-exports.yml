@@ -35,6 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests/regenie_export -v
+          python -m unittest discover -s tests/phenotype_pc_qtl -v
           python scripts/check_wdl_file_scope.py workflows
           miniwdl check workflows/common/ExportRegenie.wdl
       - name: Validate public preparation workflows with Cromwell

@@ -71,6 +71,13 @@ class ExportTests(unittest.TestCase):
         self.assertIn('0\t001\tNA\t3', files['qtl.phenotypes.000001.tsv'])
         self.assertIn('0\tS3\tNA\t5', files['qtl.phenotypes.000001.tsv'])
 
+    def test_accepts_numeric_padding_from_existing_r_covariate_merge(self):
+        # t(data.frame) formats numeric columns before mixing them with sample IDs.
+        cov = 'ID\t001\tS2\tS3\nage\t20\t60\t 9\nPC1\t-1.21000\t 0.00013\t 3.91000\n'
+        result, files = self.run_case(cov=cov, orientation='tensor')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(files['qtl.covariates.tsv'], 'FID\tIID\tage\tPC1\n0\t001\t20\t-1.21000\n0\tS2\t60\t0.00013\n0\tS3\t9\t3.91000\n')
+
     def test_rejects_invalid_beds(self):
         for bed in [BED.replace('001\tS2', '001\t001'), BED.replace('protein,1', 'ENSG1.2'),
                     BED.replace('1.23000', 'Inf'), BED.replace('1.23000', 'oops'),
