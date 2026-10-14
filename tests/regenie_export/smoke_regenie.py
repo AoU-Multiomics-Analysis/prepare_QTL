@@ -33,6 +33,7 @@ def main():
         run(['plink2', '--vcf', root/'input.vcf', '--make-pgen', '--out', root/'geno', '--threads', '2'], root)
         # This matches the user's IID-only genotype inputs. The runner adds FID=0.
         (root/'geno.psam').write_text('#IID\n' + '\n'.join(samples) + '\n')
+        (root/'common_variants.txt').write_text(''.join(f'v{i}\n' for i in range(200)))
         ages = [str(rng.uniform(20, 80)) for _ in samples]
         (root/'cov.tsv').write_text('ID\t' + '\t'.join(reversed(samples)) + '\nage\t' + '\t'.join(reversed(ages)) + '\n')
         trait_values = [[str(.2*dosage[t*100][i]+rng.gauss(0,1)) for i in range(len(samples))] for t in range(2)]
@@ -53,7 +54,8 @@ def main():
                       '--threads', '2', '--block-size', '50']
             fit, test = work/'fit', work/'test'
             fit.mkdir(); test.mkdir()
-            run([sys.executable, RUNNER, 'step1', *common, '--lowmem', '--cv-folds', '3'], fit)
+            run([sys.executable, RUNNER, 'step1', *common, '--extract', root/'common_variants.txt',
+                 '--lowmem', '--cv-folds', '3'], fit)
             predictions = sorted((fit/'results').glob('fit_*.loco'))
             (work/'prediction_files.list').write_text(''.join(str(p)+'\n' for p in predictions))
             run([sys.executable, RUNNER, 'step2', *common, '--prediction-list', fit/'results/fit_pred.list',
