@@ -657,6 +657,10 @@ legacy_runtime_roots:
 - scripts/splicing
 workflow_groups:
 - paths:
+  - workflows/common/ExportRegenie.wdl
+  stages: []
+  policy: external_images_manual
+- paths:
   - workflows/cell_type_specific_expression/**
   stages:
   - prepare_eqtl__eqtl_prepare_expression
@@ -769,3 +773,5 @@ workflow_groups:
   - trans_ld_prepare
   - trans_ld_ancestry
   - trans_ld_combine
+
+# Export program is embedded in WDL and uses the existing REGENIE image.

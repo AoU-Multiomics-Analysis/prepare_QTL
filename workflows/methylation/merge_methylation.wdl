@@ -158,6 +158,7 @@ command <<<
 
 workflow MergeMethylation {
     input {
+        Int RegeniePhenotypesPerFile = 100
         String aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String aggregatemethylationcohortarrays__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
@@ -237,6 +238,7 @@ workflow MergeMethylation {
 
     call CohortAggregation.AggregateMethylationCohort as CohortMerge {
         input:
+            RegeniePhenotypesPerFile = RegeniePhenotypesPerFile,
       aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image = aggregatemethylationcohortarrays__aggregate_methylation_chromosomes_image,
       aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image = aggregatemethylationcohortarrays__analyze_methylation_cpg_correlation_image,
       aggregatemethylationcohortarrays__annotate_methylation_sites_image = aggregatemethylationcohortarrays__annotate_methylation_sites_image,
@@ -299,6 +301,19 @@ workflow MergeMethylation {
   }
 
     output {
+        Array[File] IntRegeniePhenotypes = CohortMerge.IntRegeniePhenotypes
+        File? IntRegenieCovariates = CohortMerge.IntRegenieCovariates
+        File IntRegenieTraitMap = CohortMerge.IntRegenieTraitMap
+        File IntRegenieBatches = CohortMerge.IntRegenieBatches
+        File IntRegenieExcludedSamples = CohortMerge.IntRegenieExcludedSamples
+        File IntRegenieLog = CohortMerge.IntRegenieLog
+        Array[File] RawRegeniePhenotypes = CohortMerge.RawRegeniePhenotypes
+        File? RawRegenieCovariates = CohortMerge.RawRegenieCovariates
+        File RawRegenieTraitMap = CohortMerge.RawRegenieTraitMap
+        File RawRegenieBatches = CohortMerge.RawRegenieBatches
+        File RawRegenieExcludedSamples = CohortMerge.RawRegenieExcludedSamples
+        File RawRegenieLog = CohortMerge.RawRegenieLog
+
         File FilteredCalls = CohortMerge.FilteredCalls
         File SiteQC = CohortMerge.SiteQC
         File SiteMetadata = CohortMerge.SiteMetadata

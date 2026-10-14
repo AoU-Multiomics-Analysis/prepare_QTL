@@ -1,0 +1,61 @@
+name: REGENIE exports
+on:
+  pull_request:
+    paths:
+      - 'workflows/**'
+      - 'tools/regenie_export/**'
+      - 'tests/regenie_export/**'
+      - '.github/workflows/regenie-exports.yml'
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - 'workflows/**'
+      - 'tools/regenie_export/**'
+      - 'tests/regenie_export/**'
+      - '.github/workflows/regenie-exports.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install WDL validation dependencies
+        run: python -m pip install miniwdl==1.15.0 PyYAML==6.0.2
+      - name: Check export formats and cloud file localization
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests/regenie_export -v
+          python scripts/check_wdl_file_scope.py workflows
+          miniwdl check workflows/common/ExportRegenie.wdl
+      - name: Validate public preparation workflows with Cromwell
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://github.com/broadinstitute/cromwell/releases/download/87/womtool-87.jar \
+            --output "$RUNNER_TEMP/womtool.jar"
+          echo "73b63098ac0a87d586b7c5b8729b6e8b440de3df0f5c8b0daafd796dc4ff734c  $RUNNER_TEMP/womtool.jar" | sha256sum --check
+          for descriptor in workflows/common/ExportRegenie.wdl workflows/expression/prepare_eQTL.wdl workflows/proteomics/prepare_pQTL.wdl workflows/splicing/prepare_sQTL.wdl workflows/methylation/prepare_mQTL.wdl workflows/methylation/AggregateMethylationCohort.wdl workflows/methylation/merge_methylation.wdl workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl workflows/phenotype_pc_qtl/phenotype_pc_qtl.wdl; do
+            java -jar "$RUNNER_TEMP/womtool.jar" validate "$descriptor"
+          done
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test exported files with both REGENIE steps
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint python3 \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" -w /workspace \
+            ghcr.io/aou-multiomics-analysis/regenie@sha256:4232a95edf04477deab443032cf8cff01a8fc3cd200e6a9505721230a2795c43 \
+            tests/regenie_export/smoke_regenie.py

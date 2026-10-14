@@ -9,6 +9,7 @@ import "qtl_covariates.wdl" as QtlCovariates
 
 workflow AggregateMethylationCohort {
     input {
+        Int RegeniePhenotypesPerFile = 100
         String annotation__annotate_methylation_sites_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String cohort_aggregation__aggregate_methylation_chromosomes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
@@ -110,10 +111,12 @@ workflow AggregateMethylationCohort {
 
     call QtlCovariates.PrepareMethylationQtlCovariates as PrepareQtlCovariates {
         input:
+            RegeniePhenotypesPerFile = RegeniePhenotypesPerFile,
       calculate_phenotypepcs__computep_cs_image = calculate_phenotypepcs__computep_cs_image,
       mergecovariates__merge_covariatesr_image = mergecovariates__merge_covariatesr_image,
 
             IntMethylationBed = RefineConnectivity.IntMethylationBed,
+            RawMethylationBed = RefineConnectivity.RawMethylationBed,
             AdditionalCovariates = AdditionalCovariates,
             OutputPrefix = OutputPrefix,
             PcMemoryGB = MergeMemoryGB,
@@ -122,6 +125,19 @@ workflow AggregateMethylationCohort {
   }
 
     output {
+        Array[File] IntRegeniePhenotypes = PrepareQtlCovariates.IntRegeniePhenotypes
+        File? IntRegenieCovariates = PrepareQtlCovariates.IntRegenieCovariates
+        File IntRegenieTraitMap = PrepareQtlCovariates.IntRegenieTraitMap
+        File IntRegenieBatches = PrepareQtlCovariates.IntRegenieBatches
+        File IntRegenieExcludedSamples = PrepareQtlCovariates.IntRegenieExcludedSamples
+        File IntRegenieLog = PrepareQtlCovariates.IntRegenieLog
+        Array[File] RawRegeniePhenotypes = PrepareQtlCovariates.RawRegeniePhenotypes
+        File? RawRegenieCovariates = PrepareQtlCovariates.RawRegenieCovariates
+        File RawRegenieTraitMap = PrepareQtlCovariates.RawRegenieTraitMap
+        File RawRegenieBatches = PrepareQtlCovariates.RawRegenieBatches
+        File RawRegenieExcludedSamples = PrepareQtlCovariates.RawRegenieExcludedSamples
+        File RawRegenieLog = PrepareQtlCovariates.RawRegenieLog
+
         File FilteredCalls = RefineConnectivity.FilteredCalls
         File SiteQC = AggregateCohort.SiteQC
         File SiteMetadata = AggregateCohort.SiteMetadata

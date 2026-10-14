@@ -1,4 +1,5 @@
 version 1.0
+import "../common/ExportRegenie.wdl" as Regenie
 import "../common/calculate_phenotypePCs.wdl" as ComputePCs
 import "../common/MergeCovariates.wdl" as CovariateMerge
 import "../common/ResidualizePhenotypes.wdl" as Residualize
@@ -40,6 +41,7 @@ command {
 
 workflow sQTLPrepareData  {
     input {
+        Int RegeniePhenotypesPerFile = 100
         String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String prepare_sqtl__prepare_splice_data_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
@@ -135,7 +137,56 @@ workflow sQTLPrepareData  {
         }
     }
 
+    call Regenie.ExportRegenie as ExportIntRegenie {
+        input:
+            Bed = PrepareSpliceData.IntSplicingBed,
+            Covariates = select_first([MergeIntAdditionalCovariates.QtlCovariates, IntPhenotypePCs.OutPhenotypePCs]),
+            CovariateFormat = if defined(AdditionalCovariates) then "tensor" else "sample",
+            OutputPrefix = OutputPrefix + ".splicing.INT",
+            PhenotypesPerFile = RegeniePhenotypesPerFile,
+            DiskGB = disk_space
+    }
+
+    call Regenie.ExportRegenie as ExportScaledRegenie {
+        input:
+            Bed = PrepareSpliceData.ScaledSplicingBed,
+            Covariates = select_first([MergeScaledAdditionalCovariates.QtlCovariates, ScaledPhenotypePCs.OutPhenotypePCs]),
+            CovariateFormat = if defined(AdditionalCovariates) then "tensor" else "sample",
+            OutputPrefix = OutputPrefix + ".splicing.scaled",
+            PhenotypesPerFile = RegeniePhenotypesPerFile,
+            DiskGB = disk_space
+    }
+
+    call Regenie.ExportRegenie as ExportRawRegenie {
+        input:
+            Bed = PrepareSpliceData.RawSplicingBed,
+            Covariates = AdditionalCovariates,
+            CovariateFormat = "sample",
+            OutputPrefix = OutputPrefix + ".splicing.raw",
+            PhenotypesPerFile = RegeniePhenotypesPerFile,
+            DiskGB = disk_space
+    }
+
     output {
+        Array[File] IntRegeniePhenotypes = ExportIntRegenie.Phenotypes
+        File? IntRegenieCovariates = ExportIntRegenie.CovariatesOut
+        File IntRegenieTraitMap = ExportIntRegenie.TraitMap
+        File IntRegenieBatches = ExportIntRegenie.Batches
+        File IntRegenieExcludedSamples = ExportIntRegenie.ExcludedSamples
+        File IntRegenieLog = ExportIntRegenie.Log
+        Array[File] ScaledRegeniePhenotypes = ExportScaledRegenie.Phenotypes
+        File? ScaledRegenieCovariates = ExportScaledRegenie.CovariatesOut
+        File ScaledRegenieTraitMap = ExportScaledRegenie.TraitMap
+        File ScaledRegenieBatches = ExportScaledRegenie.Batches
+        File ScaledRegenieExcludedSamples = ExportScaledRegenie.ExcludedSamples
+        File ScaledRegenieLog = ExportScaledRegenie.Log
+        Array[File] RawRegeniePhenotypes = ExportRawRegenie.Phenotypes
+        File? RawRegenieCovariates = ExportRawRegenie.CovariatesOut
+        File RawRegenieTraitMap = ExportRawRegenie.TraitMap
+        File RawRegenieBatches = ExportRawRegenie.Batches
+        File RawRegenieExcludedSamples = ExportRawRegenie.ExcludedSamples
+        File RawRegenieLog = ExportRawRegenie.Log
+
         File IntBedFile = PrepareSpliceData.IntSplicingBed
         File ScaledBedFile = PrepareSpliceData.ScaledSplicingBed
         File RawBedFile = PrepareSpliceData.RawSplicingBed
