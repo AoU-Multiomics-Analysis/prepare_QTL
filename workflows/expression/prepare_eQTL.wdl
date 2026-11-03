@@ -18,7 +18,7 @@ task eqtl_prepare_expression {
         Int memory
         Int disk_space
         Int num_threads
-        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f79e1308eb885198ad855714a1a0a6d2d9a18a1da32adc954bca1099e5f74c4f"
+        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f9329733aedfb159cf3d38e837ed195bd2db1de9bb56b6f46673814b33019765"
         Int preemptible_attempts = 2
         Int max_retries = 2
 
@@ -65,7 +65,7 @@ workflow eQTLPrepareData {
         Int RegeniePhenotypesPerFile = 100
         String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
-        String prepare_eqtl__eqtl_prepare_expression_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f79e1308eb885198ad855714a1a0a6d2d9a18a1da32adc954bca1099e5f74c4f"
+        String prepare_eqtl__eqtl_prepare_expression_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f9329733aedfb159cf3d38e837ed195bd2db1de9bb56b6f46673814b33019765"
         String residualizephenotypes__residualize_phenotypes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String OutputPrefix
         File? CountGCT
