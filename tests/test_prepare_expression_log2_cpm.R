@@ -80,9 +80,12 @@ read_bed <- function(suffix) {
 raw <- read_bed(".expression.raw.bed.gz")
 int <- read_bed(".expression.INT.bed.gz")
 scaled <- read_bed(".expression.scaled.bed.gz")
+assert_true(file.exists(paste0(output_prefix, ".expression.log2CPM.bed.gz")),
+            "The unscaled log2 CPM BED was not written")
+log2_cpm <- read_bed(".expression.log2CPM.bed.gz")
 
 expected_columns <- c("#chr", "start", "end", "gene_id", "1002", "S-1", "X100")
-for (bed_output in list(raw = raw, int = int, scaled = scaled)) {
+for (bed_output in list(raw = raw, int = int, scaled = scaled, log2CPM = log2_cpm)) {
     assert_equal(
         names(bed_output),
         expected_columns,
@@ -95,6 +98,8 @@ for (bed_output in list(raw = raw, int = int, scaled = scaled)) {
     )
 }
 assert_equal(as.numeric(raw[1, 5:7]), c(1, 3, 0), "The raw BED changed supplied log2 CPM values")
+assert_equal(as.numeric(log2_cpm[1, 5:7]), c(1, 3, 0),
+             "The log2 CPM BED changed or scaled supplied log2 values")
 assert_equal(
     as.numeric(int[1, 5:7]),
     c(0, 0.8694238, -0.8694238),
@@ -130,7 +135,7 @@ cpm_output <- suppressWarnings(system2(
 cpm_status <- attr(cpm_output, "status")
 if (is.null(cpm_status)) cpm_status <- 0L
 assert_equal(cpm_status, 0L, paste(c("CPM BED preparation failed:", cpm_output), collapse = "\n"))
-for (suffix in c("raw", "INT", "scaled")) {
+for (suffix in c("raw", "INT", "scaled", "log2CPM")) {
     cpm_bed <- read.delim(paste0(cpm_prefix, ".expression.", suffix, ".bed.gz"),
                          check.names = FALSE, colClasses = c(gene_id = "character"))
     assert_equal(names(cpm_bed), expected_columns, "CPM BED changed the sample order")
@@ -138,7 +143,8 @@ for (suffix in c("raw", "INT", "scaled")) {
     expected_values <- switch(suffix,
         raw = c(1, 7, 0),
         INT = c(0, 0.8694238, -0.8694238),
-        scaled = c(-0.2182179, 1.0910895, -0.8728716))
+        scaled = c(-0.2182179, 1.0910895, -0.8728716),
+        log2CPM = c(1, 3, 0))
     assert_equal(as.numeric(cpm_bed[1, 5:7]), expected_values,
                  paste("CPM BED has the wrong transformation for", suffix))
 }
@@ -251,6 +257,48 @@ assert_true(
     all(is.finite(as.matrix(raw_count_bed[, 5:7]))),
     "Raw-count mode wrote non-finite CPM values"
 )
+raw_count_log2 <- read.delim(paste0(raw_count_prefix, ".expression.log2CPM.bed.gz"),
+                            check.names = FALSE)
+raw_count_scaled <- read.delim(paste0(raw_count_prefix, ".expression.scaled.bed.gz"),
+                              check.names = FALSE)
+assert_equal(names(raw_count_log2), names(raw_count_scaled),
+             "Count-input log2 and scaled BEDs have different sample IDs")
+assert_equal(raw_count_log2[, 1:4], raw_count_scaled[, 1:4],
+             "Count-input log2 and scaled BEDs have different genes or coordinates")
+assert_equal(as.numeric(as.matrix(raw_count_log2[, -(1:4)])),
+             as.numeric(log2(as.matrix(raw_count_bed[, names(raw_count_log2)[-(1:4)]]) + 1)),
+             "Count-input log2 BED did not preserve unscaled log2(CPM + 1)")
+
+# All normal samples correlate positively after scaling; one sample is reversed.
+# The real WGCNA check must remove it once and share that sample list with log2.
+outlier_samples <- c(paste0("keep", seq_len(15)), "outlier")
+outlier_values <- outer(seq(-1, 1, length.out = 20), c(seq(1, 1.1, length.out = 15), -2)) + 10
+outlier_bed <- data.frame("#chr" = "chr1", start = seq_len(20), end = seq_len(20) + 1,
+                         gene_id = paste0("gene", seq_len(20)), check.names = FALSE)
+outlier_bed[outlier_samples] <- as.data.frame(outlier_values)
+outlier_path <- file.path(work_dir, "connectivity.bed.gz")
+outlier_list <- file.path(work_dir, "connectivity.samples.tsv")
+outlier_prefix <- file.path(work_dir, "connectivity")
+data.table::fwrite(outlier_bed, outlier_path, sep = "\t")
+writeLines(outlier_samples, outlier_list)
+outlier_output <- suppressWarnings(system2("Rscript", c(shQuote(script_path),
+    "--Log2CpmBed", shQuote(outlier_path), "--SampleList", shQuote(outlier_list),
+    "--OutputPrefix", shQuote(outlier_prefix)), stdout = TRUE, stderr = TRUE))
+outlier_status <- attr(outlier_output, "status")
+assert_true(is.null(outlier_status) || outlier_status == 0L,
+            paste(c("Connectivity fixture failed:", outlier_output), collapse = "\n"))
+outlier_scaled <- read.delim(paste0(outlier_prefix, ".expression.scaled.bed.gz"), check.names = FALSE)
+outlier_log2 <- read.delim(paste0(outlier_prefix, ".expression.log2CPM.bed.gz"), check.names = FALSE)
+assert_equal(names(outlier_scaled)[-(1:4)], outlier_samples[-16],
+             "The connectivity fixture did not remove its known outlier")
+assert_equal(names(outlier_log2), names(outlier_scaled),
+             "Log2 and scaled BEDs have different retained sample IDs or order")
+assert_equal(outlier_log2[, 1:4], outlier_scaled[, 1:4],
+             "Log2 and scaled BEDs have different gene metadata or order")
+assert_equal(as.numeric(as.matrix(outlier_log2[, -(1:4)])),
+             as.numeric(outlier_values[, -16]), "Outlier filtering changed the retained log2 values")
+assert_equal(sum(grepl("Computing connectivity outliers", outlier_output, fixed = TRUE)), 2L,
+             "The log2 output must reuse scaled exclusions without a third connectivity check")
 
 run_invalid <- function(input_args, prefix_name) {
     invalid_args <- c(

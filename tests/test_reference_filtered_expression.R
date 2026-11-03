@@ -86,4 +86,10 @@ check(identical(as.numeric(raw[1, -(1:4)]), as.numeric(signed_values[1, ])), "Si
 expected <- as.numeric(scale(sign(signed_values[1, ]) * log2(1 + abs(signed_values[1, ]))))
 check(isTRUE(all.equal(as.numeric(scaled[1, -(1:4)]), expected, tolerance = 1e-7)),
   "Signed scaling differs from expected values")
+log2_cpm <- readr::read_tsv(paste0(signed_prefix, ".expression.log2CPM.bed.gz"), show_col_types = FALSE)
+check(identical(names(log2_cpm), names(scaled)) && identical(log2_cpm$gene_id, scaled$gene_id),
+  "Signed log2 output has different genes or samples from scaled output")
+expected_log2 <- sign(signed_values[1, ]) * log2(1 + abs(signed_values[1, ]))
+check(isTRUE(all.equal(as.numeric(log2_cpm[1, -(1:4)]), as.numeric(expected_log2), tolerance = 1e-7)),
+  "Signed log2 output changed the signed-log convention or standardized its values")
 message("Signed CPM boundary -> QTL integration passed")

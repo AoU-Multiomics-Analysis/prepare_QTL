@@ -164,9 +164,11 @@ if (!has_count_gct && !is.null(opt$AnnotationGTF) && nzchar(opt$AnnotationGTF)) 
 
 IntOutputFile <- paste0(opt$OutputPrefix,'.expression.INT.bed.gz')
 ScaledOutputFile <- paste0(opt$OutputPrefix,'.expression.scaled.bed.gz')
+Log2CpmOutputFile <- paste0(opt$OutputPrefix,'.expression.log2CPM.bed.gz')
 RawOutputFile <- paste0(opt$OutputPrefix,'.expression.raw.bed.gz')
 message(paste0('Writing INT bed file to: ', IntOutputFile ))
 message(paste0('Writing scaled bed file to: ', ScaledOutputFile ))
+message(paste0('Writing log2 CPM bed file to: ', Log2CpmOutputFile ))
 message(paste0('Writing raw bed file to: ', RawOutputFile ))
 ############# PROCESS DATA ###########
 if (has_count_gct) {
@@ -313,8 +315,17 @@ write_expression_bed <- function(cpm_data, tss_positions, output_file, transform
     BedNormalizedCPMs %>%
         dplyr::rename('#chr' = 'seqnames') %>%
         fwrite(output_file,sep='\t')
+    invisible(colnames(NormalizedCPMsMatrix))
 }
 
 write_expression_bed(DataCPM, PositionTSS, IntOutputFile, 'rank-normalized', TRUE)
-write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = !has_log2_cpm_bed, signed_cpm = opt$SignedCpm)
+ScaledSampleIDs <- write_expression_bed(DataCPM, PositionTSS, ScaledOutputFile, 'scaled', FALSE, log2_transform = !has_log2_cpm_bed, signed_cpm = opt$SignedCpm)
+
+message('Reusing scaled connectivity-filtered samples for unscaled log2 CPM output')
+Log2CpmData <- DataCPM %>% dplyr::select(all_of(ScaledSampleIDs))
+if (!has_log2_cpm_bed) {
+    Log2CpmData <- Log2CpmData %>%
+        mutate(across(everything(), ~ if (opt$SignedCpm) sign(.x) * log2(1 + abs(.x)) else log2(.x + 1)))
+}
+write_expression_bed(Log2CpmData, PositionTSS, Log2CpmOutputFile, 'unscaled log2', remove_outliers = FALSE)
 write_expression_bed(DataCPM, PositionTSS, RawOutputFile, 'raw', remove_outliers = FALSE)

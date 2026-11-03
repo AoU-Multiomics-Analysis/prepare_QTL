@@ -27,7 +27,7 @@ command {
         set -euo pipefail
         stage="eqtl_prepare_expression"
         printf 'stage=%s start_time=%s dimensions=pending outputs=%s\n' \
-            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
+            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.log2CPM.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
         Rscript /tmp/PrepareExpression.R \
             ~{if defined(CountGCT) then "--CountGCT \"" + select_first([CountGCT]) + "\"" else ""} \
             ~{if defined(AnnotationGTF) then "--AnnotationGTF \"" + select_first([AnnotationGTF]) + "\"" else ""} \
@@ -37,7 +37,7 @@ command {
             --SampleList "~{SampleList}" \
             --OutputPrefix "~{OutputPrefix}"
         printf 'stage=%s completion_time=%s dimensions=complete outputs=%s\n' \
-            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
+            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.log2CPM.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
 
         }
 
@@ -53,6 +53,7 @@ command {
     output {
         File IntExpressionBed="${OutputPrefix}.expression.INT.bed.gz"
         File ScaledExpressionBed="${OutputPrefix}.expression.scaled.bed.gz"
+        File Log2CpmExpressionBed="${OutputPrefix}.expression.log2CPM.bed.gz"
         File RawExpressionBed="${OutputPrefix}.expression.raw.bed.gz"
         File IntConnectivityOutliers="${OutputPrefix}.expression.INT.connectivity_outliers.tsv"
         File ScaledConnectivityOutliers="${OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
@@ -239,6 +240,7 @@ workflow eQTLPrepareData {
 
         File IntBedFile = eqtl_prepare_expression.IntExpressionBed
         File ScaledBedFile = eqtl_prepare_expression.ScaledExpressionBed
+        File Log2CpmBedFile = eqtl_prepare_expression.Log2CpmExpressionBed
         File RawBedFile = eqtl_prepare_expression.RawExpressionBed
         File IntConnectivityOutliers = eqtl_prepare_expression.IntConnectivityOutliers
         File ScaledConnectivityOutliers = eqtl_prepare_expression.ScaledConnectivityOutliers
