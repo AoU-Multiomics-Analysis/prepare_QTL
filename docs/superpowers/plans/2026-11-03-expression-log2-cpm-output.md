@@ -78,3 +78,13 @@ Read-only review confirmed the implementation and downstream mappings. Review
 notes were addressed in the guides: fixed covariates are numeric, signed CPM is
 an explicit exception, and existing PC ID rewriting is documented. Image pins
 must be updated in all registered expression-stage targets before release.
+
+The user then requested a GitHub push, Actions image build, and image-pin update.
+The feature branch was rebased onto current main `c297869`. PR #90 contains
+source commit `ffc70bf` and release-App pin commit `d664b65`. Stage Image Release
+run `41726806674` passed. Its verified standard image is
+`ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f9329733aedfb159cf3d38e837ed195bd2db1de9bb56b6f46673814b33019765`.
+The source fingerprint matches the pushed branch. All three registered expression
+pins were updated: task, expression workflow, and cell-type wrapper. No other
+stage pin changed. GitHub Actions source checks were requested for the pinned
+revision. No Terra jobs were submitted.

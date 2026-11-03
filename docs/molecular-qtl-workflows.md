@@ -70,7 +70,7 @@ those values do not have the CPM fold-change interpretation required here.
 This output needs an image containing the updated expression script. Use the
 existing GitHub Actions expression-stage release and update its verified image
 digest in the expression task, expression workflow, and cell-type wrapper before
-a Terra submission. Existing pinned images do not write this file.
+a Terra submission. Images published before this change do not write this file.
 Local task and WDL checks do not establish Terra compatibility. The complete
 workflow with this output has not been tested on Terra.
 
