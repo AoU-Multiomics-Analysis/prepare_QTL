@@ -88,3 +88,9 @@ The source fingerprint matches the pushed branch. All three registered expressio
 pins were updated: task, expression workflow, and cell-type wrapper. No other
 stage pin changed. GitHub Actions source checks were requested for the pinned
 revision. No Terra jobs were submitted.
+
+The first source-check run stopped in three existing cell-type output-contract
+assertions after main added REGENIE exports. The wrapper differs from main only
+in its expression image pin. Updated the test to include the published REGENIE
+file arrays and allow raw REGENIE exports while still rejecting raw BED and
+residualized BED outputs. This test-only correction needs no image rebuild.

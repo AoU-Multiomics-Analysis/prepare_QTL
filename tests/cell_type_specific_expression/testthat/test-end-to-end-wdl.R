@@ -187,11 +187,19 @@ testthat::test_that("end-to-end WDL exposes aligned QTL-ready file arrays", {
     "scaled_merged_covariates", "int_connectivity_outliers",
     "scaled_connectivity_outliers"
   )
-  testthat::expect_identical(qtl_array_names, expected_qtl_array_names)
+  expected_regenie_array_names <- unlist(purrr::map(
+    c("Int", "Scaled", "Raw"),
+    ~ paste0(.x, "Regenie", c("TraitMap", "Batches", "ExcludedSamples", "Log"))
+  ), use.names = FALSE)
+  testthat::expect_identical(
+    qtl_array_names,
+    c(expected_regenie_array_names, expected_qtl_array_names)
+  )
   all_array_names <- array_matches[!is.na(array_matches[, 1L]), 2L]
   testthat::expect_identical(
     all_array_names,
-    c("cell_type_beds", "filtered_cell_type_beds", "reference_filter_plots",
+    c(expected_regenie_array_names,
+      "cell_type_beds", "filtered_cell_type_beds", "reference_filter_plots",
       expected_qtl_array_names)
   )
 
@@ -202,7 +210,7 @@ testthat::test_that("end-to-end WDL exposes aligned QTL-ready file arrays", {
   public_output_names <- public_output_names[!is.na(public_output_names)]
   testthat::expect_false(any(grepl(
     "raw|residualized",
-    public_output_names,
+    public_output_names[!startsWith(public_output_names, "RawRegenie")],
     ignore.case = TRUE
   )))
 })
