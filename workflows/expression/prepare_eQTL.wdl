@@ -18,7 +18,7 @@ task eqtl_prepare_expression {
         Int memory
         Int disk_space
         Int num_threads
-        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f79e1308eb885198ad855714a1a0a6d2d9a18a1da32adc954bca1099e5f74c4f"
+        String DockerImage = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f9329733aedfb159cf3d38e837ed195bd2db1de9bb56b6f46673814b33019765"
         Int preemptible_attempts = 2
         Int max_retries = 2
 
@@ -27,7 +27,7 @@ command {
         set -euo pipefail
         stage="eqtl_prepare_expression"
         printf 'stage=%s start_time=%s dimensions=pending outputs=%s\n' \
-            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
+            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.log2CPM.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
         Rscript /tmp/PrepareExpression.R \
             ~{if defined(CountGCT) then "--CountGCT \"" + select_first([CountGCT]) + "\"" else ""} \
             ~{if defined(AnnotationGTF) then "--AnnotationGTF \"" + select_first([AnnotationGTF]) + "\"" else ""} \
@@ -37,7 +37,7 @@ command {
             --SampleList "~{SampleList}" \
             --OutputPrefix "~{OutputPrefix}"
         printf 'stage=%s completion_time=%s dimensions=complete outputs=%s\n' \
-            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
+            "$stage" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "~{OutputPrefix}.expression.INT.bed.gz,~{OutputPrefix}.expression.scaled.bed.gz,~{OutputPrefix}.expression.log2CPM.bed.gz,~{OutputPrefix}.expression.raw.bed.gz,~{OutputPrefix}.expression.INT.connectivity_outliers.tsv,~{OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
 
         }
 
@@ -53,6 +53,7 @@ command {
     output {
         File IntExpressionBed="${OutputPrefix}.expression.INT.bed.gz"
         File ScaledExpressionBed="${OutputPrefix}.expression.scaled.bed.gz"
+        File Log2CpmExpressionBed="${OutputPrefix}.expression.log2CPM.bed.gz"
         File RawExpressionBed="${OutputPrefix}.expression.raw.bed.gz"
         File IntConnectivityOutliers="${OutputPrefix}.expression.INT.connectivity_outliers.tsv"
         File ScaledConnectivityOutliers="${OutputPrefix}.expression.scaled.connectivity_outliers.tsv"
@@ -64,7 +65,7 @@ workflow eQTLPrepareData {
         Int RegeniePhenotypesPerFile = 100
         String calculate_phenotypepcs__computep_cs_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String mergecovariates__merge_covariatesr_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
-        String prepare_eqtl__eqtl_prepare_expression_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f79e1308eb885198ad855714a1a0a6d2d9a18a1da32adc954bca1099e5f74c4f"
+        String prepare_eqtl__eqtl_prepare_expression_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:f9329733aedfb159cf3d38e837ed195bd2db1de9bb56b6f46673814b33019765"
         String residualizephenotypes__residualize_phenotypes_image = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:237c02268a4797c7ec72544a8584b16fc82cb5678958d59eb5cf1647e02b0993"
         String OutputPrefix
         File? CountGCT
@@ -239,6 +240,7 @@ workflow eQTLPrepareData {
 
         File IntBedFile = eqtl_prepare_expression.IntExpressionBed
         File ScaledBedFile = eqtl_prepare_expression.ScaledExpressionBed
+        File Log2CpmBedFile = eqtl_prepare_expression.Log2CpmExpressionBed
         File RawBedFile = eqtl_prepare_expression.RawExpressionBed
         File IntConnectivityOutliers = eqtl_prepare_expression.IntConnectivityOutliers
         File ScaledConnectivityOutliers = eqtl_prepare_expression.ScaledConnectivityOutliers

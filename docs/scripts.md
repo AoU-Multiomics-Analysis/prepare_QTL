@@ -17,6 +17,10 @@ All scripts are written in R and are invoked from the command line with `Rscript
 
 For each `.INT` and `.scaled` matrix, the scripts compute WGCNA sample connectivity outliers from the feature-by-sample matrix before writing the BED. Raw BEDs keep all samples after the initial sample-list filter.
 
+Expression also writes `.log2CPM`. This BED contains unscaled log2 values and
+uses exactly the genes and samples retained in `.scaled`. It reuses the scaled
+connectivity exclusions without another connectivity calculation.
+
 WGCNA outlier detection uses the same implementation in all three prepare scripts:
 
 1. Compute sample-sample biweight midcorrelations with `WGCNA::bicor(phenotype_matrix, use = "pairwise.complete.obs")`.
@@ -41,13 +45,13 @@ Prepares RNA-seq gene expression data for eQTL analysis.
 1. Loads either raw count data from a GCT-formatted file or a coordinate-preserving BED of pre-normalized CPM or log2 CPM values.
 2. In raw-count mode, extracts TSS positions from a GENCODE GTF, filters genes, and applies edgeR TMM and CPM normalization.
 3. Filters and orders samples using the supplied sample list.
-4. Creates rank-based inverse normal transformed, centered/scaled, and untransformed matrices. Raw-count and CPM BED modes apply `log2(CPM + 1)` before scaling. Log2-CPM BED mode scales the supplied values directly.
+4. Creates rank-based inverse normal transformed, centered/scaled, untransformed, and unscaled log2 matrices. Raw-count and CPM BED modes apply `log2(CPM + 1)` for `.log2CPM` and before scaling. Log2-CPM BED mode preserves the supplied values for `.log2CPM` and scales them directly for `.scaled`.
 5. Removes connectivity outliers from the transformed matrices and writes compressed BED files.
 
 **Inputs:**
 - Exactly one expression mode:
   - `--CountGCT`: GCT or TSV file of raw RNA-seq count data. This mode also requires `--AnnotationGTF` to extract TSS locations.
-  - `--CpmBed`: BED with the same coordinate and sample columns as `--Log2CpmBed`, but containing finite, nonnegative linear CPM values. It skips count filtering, TMM, CPM calculation, and GTF mapping. Only the scaled output applies `log2(CPM + 1)`. Negative values stop preparation with example gene IDs; they are not clipped.
+  - `--CpmBed`: BED with the same coordinate and sample columns as `--Log2CpmBed`, but containing finite, nonnegative linear CPM values. It skips count filtering, TMM, CPM calculation, and GTF mapping. The log2 and scaled outputs apply `log2(CPM + 1)`. Negative values stop preparation with example gene IDs; they are not clipped.
   - `--Log2CpmBed`: BED with `#chr`, `start`, `end`, `gene_id`, and sample columns containing pre-normalized log2 CPM values. This mode preserves the supplied coordinates and does not apply count filtering, TMM, CPM calculation, GTF mapping, or another log transform.
 - `--SampleList`: File containing the list of sample IDs to include.
 - `--OutputPrefix`: Prefix for the output file.
@@ -60,9 +64,15 @@ values and zero-variance genes before writing expression outputs.
 **Outputs:**
 - `<OutputPrefix>.expression.INT.bed.gz`
 - `<OutputPrefix>.expression.scaled.bed.gz`
+- `<OutputPrefix>.expression.log2CPM.bed.gz`: Unscaled log2 values with the same genes and samples as `.scaled`. Pair with the existing scaled phenotype PCs. No separate log2 PC calculation or covariate adjustment is performed.
 - `<OutputPrefix>.expression.raw.bed.gz`
 - `<OutputPrefix>.expression.INT.connectivity_outliers.tsv`
 - `<OutputPrefix>.expression.scaled.connectivity_outliers.tsv`
+
+When `--SignedCpm` is used, `.log2CPM` contains
+`sign(CPM) * log2(1 + abs(CPM))`, as used before scaling. These signed estimates
+do not have the ordinary CPM fold-change interpretation required for haplo
+analysis.
 
 ## `scripts/proteomics/PrepareProteomics.R`
 

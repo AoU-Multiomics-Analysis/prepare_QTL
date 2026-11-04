@@ -10,6 +10,9 @@ This page summarizes the modality-specific normalization and filtering used by t
 
 Only `.INT` and `.scaled` outputs are used for phenotype PCs, optional covariate merging, optional residualization, and WGCNA connectivity outlier removal. Raw BEDs skip WGCNA outlier removal and keep all samples that remain after the initial sample-list filter.
 
+Expression also exports an unscaled `.log2CPM` BED. It shares the genes and
+retained samples of `.scaled` and uses the existing scaled PCs.
+
 ## Shared WGCNA Connectivity Filtering
 
 For `.INT` and `.scaled` matrices from expression, proteomics, and splicing, the prepare scripts remove sample connectivity outliers before writing the BED file:
@@ -35,7 +38,7 @@ Expression preparation is implemented in [`scripts/expression/prepare/PrepareExp
 - Filters genes before normalization, retaining genes with raw counts greater than 6 in at least 20% of retained samples.
 - Extracts gene TSS positions from the GENCODE GTF using `type == "gene"` and strand-aware TSS coordinates.
 - Inner-joins the expression matrix to the GTF-derived TSS table by `gene_id`; genes without matching TSS annotation are dropped from the BED.
-- Removes WGCNA connectivity outlier samples from `.INT` and `.scaled` matrices only.
+- Calculates WGCNA connectivity exclusions separately for `.INT` and `.scaled`. The `.log2CPM` BED reuses the `.scaled` exclusions; no third connectivity check is run.
 
 **Normalization and transforms:**
 
@@ -44,18 +47,25 @@ Expression preparation is implemented in [`scripts/expression/prepare/PrepareExp
 - `.raw`: TMM-normalized CPM values, without rank-normalization, log2 transform, centering, scaling, or WGCNA outlier removal.
 - `.INT`: applies `RNOmni::RankNorm()` to each gene across samples using unlogged CPM values.
 - `.scaled`: applies `log2(CPM + 1)` to each gene across samples, then centers and scales with `scale(..., center = TRUE, scale = TRUE)`.
+- `.log2CPM`: retains `log2(CPM + 1)` without centering, scaling, or covariate adjustment. Genes, coordinates, sample IDs, and their order match `.scaled` exactly. Use `ScaledPhenotypePCsAllOut` for an outlier workflow that selects its own PC count.
 
 As an alternative, `Log2CpmBed` accepts a BED with leading columns `#chr`, `start`, `end`, and `gene_id`, followed by sample columns in log2-CPM space. This mode preserves the supplied coordinates and gene order. It skips count filtering, TMM normalization, CPM calculation, GTF mapping, and the `log2(CPM + 1)` transform. The workflow rank-normalizes these values for `.INT`, centers and scales them directly for `.scaled`, and writes the supplied log2-CPM values to `.raw`.
 
 `CpmBed` accepts the same BED layout with linear CPM values. It skips count
 filtering, TMM normalization, CPM calculation, and GTF mapping. It applies
-`log2(CPM + 1)` only before centering and scaling for `.scaled`. The `.INT`
+`log2(CPM + 1)` for `.log2CPM` and before centering and scaling for `.scaled`. The `.INT`
 branch rank-normalizes the supplied CPM values, and `.raw` preserves them.
 Both transformed branches keep their existing connectivity-outlier checks.
 
+For `Log2CpmBed`, `.log2CPM` preserves the supplied log2 values without another
+log transform, after selecting the scaled sample set. For `SignedCpm`, it uses
+the same signed-log values as the scaled branch before standardization:
+`sign(CPM) * log2(1 + abs(CPM))`. Signed estimates do not support the ordinary
+CPM fold-change interpretation of a haplo drop threshold.
+
 Supply exactly one of `CountGCT`, `CpmBed`, or `Log2CpmBed`. A GTF is required
-only for counts and is rejected for either BED input. `CpmBed` requires finite,
-nonnegative values; negative estimates stop preparation with example gene IDs.
+only for counts and is rejected for either BED input. `CpmBed` requires finite
+values; negative estimates stop preparation unless `SignedCpm` is enabled.
 No values are silently clipped. Finite negative log2-CPM values remain valid
 in `Log2CpmBed`. Neither BED mode accepts zero-variance genes.
 

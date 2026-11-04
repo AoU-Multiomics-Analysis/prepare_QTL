@@ -20,6 +20,26 @@ def calls_in(nodes):
 
 
 class ExpressionInputTest(unittest.TestCase):
+    def test_log2_output_is_a_file_and_preserves_collected_cloud_path(self):
+        doc = WDL.load(str(ROOT / "workflows/expression/prepare_eQTL.wdl"))
+        task = next(t for t in doc.tasks if t.name == "eqtl_prepare_expression")
+        outputs = {d.name: d for d in task.outputs}
+        self.assertIn("Log2CpmExpressionBed", outputs)
+        output = outputs["Log2CpmExpressionBed"]
+        self.assertIsInstance(output.type, WDL.Type.File)
+        env = WDL.Env.Bindings().bind("OutputPrefix", WDL.Value.String("cohort"))
+        self.assertEqual(output.expr.eval(env, STDLIB).coerce(output.type).value,
+                         "cohort.expression.log2CPM.bed.gz")
+        public = next(d for d in doc.workflow.outputs if d.name == "Log2CpmBedFile")
+        self.assertIsInstance(public.type, WDL.Type.File)
+        cloud_path = "gs://bucket/submission/call-eqtl_prepare_expression/cohort.expression.log2CPM.bed.gz"
+        env = WDL.Env.Bindings().bind("eqtl_prepare_expression.Log2CpmExpressionBed",
+                                     WDL.Value.File(cloud_path))
+        value = public.expr.eval(env, STDLIB).coerce(public.type)
+        self.assertEqual(value.value, cloud_path)
+        localized = WDL.Value.rewrite_paths(value, lambda _: "/localized/cohort.expression.log2CPM.bed.gz")
+        self.assertEqual(localized.value, "/localized/cohort.expression.log2CPM.bed.gz")
+
     def test_tca_beds_reach_the_linear_cpm_input(self):
         doc = WDL.load(str(ROOT / "workflows/cell_type_specific_expression/prepare_cell_type_eQTL.wdl"))
         call = next(c for c in calls_in(doc.workflow.body) if c.name == "PrepareCellTypeEqtl")

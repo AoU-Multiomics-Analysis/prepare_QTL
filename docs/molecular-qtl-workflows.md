@@ -25,14 +25,54 @@ Set `ResidualizeNormalizedInputs` to `true` to run [`ResidualizePhenotypes.wdl`]
 End-to-end workflow for preparing gene expression data for eQTL analysis.
 
 **Steps:**
-1. Runs `PrepareExpression.R` to produce `.INT`, `.scaled`, and `.raw` expression BED files. Raw-count mode applies TMM and CPM; its `.scaled` branch applies `log2(CPM + 1)` before centering/scaling. `CpmBed` accepts linear CPM and applies the same log transform before scaling, without repeating TMM or CPM calculation. `Log2CpmBed` accepts pre-normalized log2 CPM and scales those values directly. Both BED modes preserve coordinates and use the supplied values for rank normalization and raw output.
+1. Runs `PrepareExpression.R` to produce `.INT`, `.scaled`, `.raw`, and `.log2CPM` expression BED files. Raw-count mode applies TMM and CPM; its `.scaled` branch applies `log2(CPM + 1)` before centering/scaling. `CpmBed` accepts linear CPM and applies the same log transform before scaling, without repeating TMM or CPM calculation. `Log2CpmBed` accepts pre-normalized log2 CPM and scales those values directly. Both BED modes preserve coordinates and use the supplied values for rank normalization and raw output. The `.log2CPM` file retains the log2 values before centering/scaling and uses exactly the genes and samples retained in `.scaled`.
 2. Runs `calculate_PCs.R` through [`calculate_phenotypePCs.wdl`](../workflows/common/calculate_phenotypePCs.wdl) separately for the `.INT` and `.scaled` expression BED files.
 3. Optionally runs [`MergeCovariates.wdl`](../workflows/common/MergeCovariates.wdl) separately for the `.INT` and `.scaled` phenotype PCs when `AdditionalCovariates` is provided.
 4. Optionally runs [`ResidualizePhenotypes.wdl`](../workflows/common/ResidualizePhenotypes.wdl) for the `.INT` and `.scaled` BED files when `ResidualizeNormalizedInputs` is `true`.
 
-**Inputs:** Exactly one of `CountGCT` (with GENCODE GTF), `CpmBed`, or `Log2CpmBed`; sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters. BED modes do not accept a GTF. `CpmBed` requires finite, nonnegative values; negative estimates are rejected, not clipped.
+**Inputs:** Exactly one of `CountGCT` (with GENCODE GTF), `CpmBed`, or `Log2CpmBed`; sample list, output prefix, optional additional covariates TSV, residualization toggle, resource parameters. BED modes do not accept a GTF. `CpmBed` requires finite values and rejects negative estimates unless `SignedCpm` is enabled.
 
-**Outputs:** `.expression.INT.bed.gz`, `.expression.scaled.bed.gz`, `.expression.raw.bed.gz`, connectivity outlier TSVs for `.INT` and `.scaled`, selected phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, full phenotype-PC matrices ending in `.INT.all.tsv` and `.scaled.all.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv` that continue to use the selected PC files, and optionally residualized BEDs ending in `.residualized.bed.gz`.
+**Outputs:** `.expression.INT.bed.gz`, `.expression.scaled.bed.gz`, `.expression.raw.bed.gz`, `.expression.log2CPM.bed.gz` (`Log2CpmBedFile`), connectivity outlier TSVs for `.INT` and `.scaled`, selected phenotype PCs ending in `.INT.tsv` and `.scaled.tsv`, full phenotype-PC matrices ending in `.INT.all.tsv` and `.scaled.all.tsv`, optionally merged QTL covariates ending in `.INT.tsv` and `.scaled.tsv` that continue to use the selected PC files, and optionally residualized BEDs ending in `.residualized.bed.gz`.
+
+### Inputs to the multi-omics outlier workflow
+
+For [MultiOmicsOutliers](https://github.com/AoU-Multiomics-Analysis/RareVariantEnrichment/blob/main/workflows/multiomics_outliers.wdl),
+set these fields in the expression row of `ome_manifest`:
+
+| Manifest field | Value |
+| --- | --- |
+| `ome_name` | `expression`, with this exact spelling to enable haplo calls. |
+| `phenotype_bed` | `eQTLPrepareData.Log2CpmBedFile`: `<OutputPrefix>.expression.log2CPM.bed.gz`. |
+| `principal_components_tsv` | `eQTLPrepareData.ScaledPhenotypePCsAllOut`: `<OutputPrefix>.expression_phenotype_PCs.scaled.all.tsv`. |
+| `lof_carrier_table` | The prepared LoF carrier table for the expression cohort. |
+| `additional_covariates_tsv` | Optional sample-by-covariate TSV with `sample_id` or `ID` and finite numeric covariates. Encode categorical sex or batch variables numerically. Use a blank cell or `.` when absent. |
+
+Use `gs://` paths in the manifest for Terra. Supply `gene_annotation_gtf` as a
+separate workflow input. The default `haplo_logcpm_drop` is `1.0`; the expression
+haplo call requires residual `Z <= -3` and a drop strictly greater than this
+threshold in the supplied log2 units. With `log2(CPM + 1)`, a one-unit drop
+corresponds to a factor of two in `CPM + 1`, approximately in CPM at high expression.
+
+Use the complete `.scaled.all.tsv` PC file because the outlier workflow selects
+how many phenotype PCs to remove. Supply fixed covariates separately. Do not use
+`ScaledQtlCovariates`, which already contains selected phenotype PCs, as the fixed
+covariate input. Do not use an INT, scaled, or residualized expression BED for
+the haplo calculation. The outlier workflow performs covariate adjustment itself.
+Check that BED and PC sample IDs match exactly. The existing PC writer removes
+the first `X` in an ID; this behavior is unchanged by the log2 output.
+For protein and splicing rows, use their respective `ScaledBedFile` and
+`ScaledPhenotypePCsAllOut`; only the expression row has the haplo drop test.
+
+For a supplied `Log2CpmBed`, the log2 output retains that input's convention.
+For `SignedCpm`, it contains signed-log estimates rather than ordinary log2 CPM;
+those values do not have the CPM fold-change interpretation required here.
+
+This output needs an image containing the updated expression script. Use the
+existing GitHub Actions expression-stage release and update its verified image
+digest in the expression task, expression workflow, and cell-type wrapper before
+a Terra submission. Images published before this change do not write this file.
+Local task and WDL checks do not establish Terra compatibility. The complete
+workflow with this output has not been tested on Terra.
 
 ## `workflows/proteomics/prepare_pQTL.wdl`
 
