@@ -233,9 +233,14 @@ task StageMethBatChromosomes {
         set -euo pipefail
 
         manifest='~{sub("~{subset_manifest}", "'", "'\"'\"'")}'
-        chromosome_list='~{sub("~{write_lines(chromosomes)}", "'", "'\"'\"'")}'
-        if [[ "$manifest" == *://* || ! -r "$manifest" || ! -r "$chromosome_list" ]]; then
-            echo "Staging localization error. Cannot read the subset manifest or chromosome list." >&2
+        # Keep the generated path as a File until Cromwell renders the command.
+        chromosome_list="~{write_lines(chromosomes)}"
+        if [[ "$manifest" == *://* || ! -r "$manifest" ]]; then
+            echo "Staging localization error. Cannot read the local subset manifest." >&2
+            exit 1
+        fi
+        if [[ "$chromosome_list" == *://* || ! -r "$chromosome_list" ]]; then
+            echo "Staging localization error. Cannot read the generated chromosome list." >&2
             exit 1
         fi
 
@@ -471,8 +476,13 @@ task CompareMethBatBoundaries {
     command <<<
         set -euo pipefail
 
-        bed_list='~{sub("~{write_lines(prefix("", region_beds))}", "'", "'\"'\"'")}'
-        run_list='~{sub("~{write_lines(run_keys)}", "'", "'\"'\"'")}'
+        # Keep each generated list as a File for Cromwell localization.
+        bed_list="~{write_lines(prefix("", region_beds))}"
+        run_list="~{write_lines(run_keys)}"
+        if [[ "$bed_list" == *://* || ! -r "$bed_list" || "$run_list" == *://* || ! -r "$run_list" ]]; then
+            echo "Boundary comparison localization error. Cannot read the generated input lists." >&2
+            exit 1
+        fi
         python3 - --beds "$bed_list" --runs "$run_list" --min-overlap ~{min_reciprocal_overlap} <<'PY'
         import argparse
         from collections import defaultdict
