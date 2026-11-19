@@ -2,7 +2,7 @@ version 1.0
 
 workflow MethBat_jointseg_chromosome_subsets {
     meta {
-        description: "Run MethBat v0.17 joint segmentation on disjoint cohorts and measure boundary shifts by sample size and chromosome."
+        description: "Compare MethBat v1.2.0 joint segmentation with segmentation of an upstream cohort average. Measure boundary shifts across disjoint groups."
     }
 
     input {
@@ -22,16 +22,17 @@ workflow MethBat_jointseg_chromosome_subsets {
         Boolean condense_bed_labels = false
         Boolean enable_nodata_segments = false
         String staging_docker = "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        String methbat_docker = "us.gcr.io/broad-dsp-lrma/hangsuunc/methylationanalysis:v2"
+        String methbat_docker
     }
 
     parameter_meta {
-        manifest_file: "TSV with identifier, gs:// pb-CpG-tools prefix, and optional labels. Each prefix needs combined, hap1, and hap2 BEDs and their .tbi indexes. Use immutable source paths for Terra call caching."
+        manifest_file: "TSV with identifier, gs:// pb-CpG-tools prefix, and optional labels. Each prefix needs combined, hap1, and hap2 pb-CpG-tools BEDs and their .tbi indexes. The workflow converts the staged slices to the unified MethBat v1.2.0 BED format. Use immutable source paths for Terra call caching."
         chromosomes: "Exact contig names from the input BED indexes."
         subset_count: "Number of disjoint label-balanced groups. Use 1 for the full cohort."
         subset_sizes: "Number of samples to take from each group. Sizes are nested within a group. Use an empty array to run each entire group."
         split_seed: "Random seed for reproducible subset membership."
         min_reciprocal_overlap: "Minimum fraction of each region covered by a same-label match in the other subset."
+        methbat_docker: "Digest of the MethBat v1.2.0 image from the MethBat image workflow. The image includes the conversion, aggregation, and comparison scripts."
     }
 
     call SplitMethBatCohort {
@@ -92,6 +93,13 @@ workflow MethBat_jointseg_chromosome_subsets {
         Array[Array[File]] meth_regions_bed = SegmentMethBatChromosome.meth_regions_bed
         Array[Array[File]] combined_methyl_bedgraph = SegmentMethBatChromosome.combined_methyl_bedgraph
         Array[Array[File]] asm_bedgraph = SegmentMethBatChromosome.asm_bedgraph
+        Array[Array[File]] aggregate_pileup_bed = SegmentMethBatChromosome.aggregate_pileup_bed
+        Array[Array[File]] aggregate_meth_regions_bed = SegmentMethBatChromosome.aggregate_meth_regions_bed
+        Array[Array[File]] aggregate_combined_methyl_bedgraph = SegmentMethBatChromosome.aggregate_combined_methyl_bedgraph
+        Array[Array[File]] aggregate_asm_bedgraph = SegmentMethBatChromosome.aggregate_asm_bedgraph
+        Array[Array[File]] aggregation_qc_tsv = SegmentMethBatChromosome.aggregation_qc_tsv
+        Array[Array[File]] method_comparison_tsv = SegmentMethBatChromosome.method_comparison_tsv
+        Array[Array[File]] method_differences_tsv = SegmentMethBatChromosome.method_differences_tsv
         File boundary_summary_tsv = CompareMethBatBoundaries.boundary_summary
         File boundary_shifts_tsv = CompareMethBatBoundaries.boundary_shifts
     }
@@ -378,7 +386,7 @@ task SegmentMethBatChromosome {
         Int disk_gb = 50
         Boolean condense_bed_labels
         Boolean enable_nodata_segments
-        String docker_image = "us.gcr.io/broad-dsp-lrma/hangsuunc/methylationanalysis:v2"
+        String docker_image
     }
 
     String size_suffix = if sample_limit > 0 then ".n~{sample_limit}" else ""
@@ -414,21 +422,17 @@ task SegmentMethBatChromosome {
             echo "Chromosome bundle is missing its collection TSV or CpG tracks." >&2
             exit 1
         fi
-        awk -v limit="$sample_limit" 'NR == 1 || !limit || NR <= limit + 1' collection.tsv > selected.tsv
-        awk -F '\t' 'NR > 1 { print $2 }' selected.tsv > track_prefixes.txt
-        sample_count=$(awk 'END {print NR}' track_prefixes.txt)
-        if [[ "$sample_count" -lt 1 || ( "$sample_limit" -gt 0 && "$sample_count" -ne "$sample_limit" ) ]]; then
-            echo "The bundle does not contain enough samples for $subset on $chrom." >&2
+        version=$(methbat --version)
+        if [[ "$version" != "methbat 1.2.0-7a582da" ]]; then
+            echo "Expected MethBat 1.2.0. Found $version." >&2
             exit 1
         fi
-        while IFS= read -r prefix; do
-            for track in combined hap1 hap2; do
-                if [[ ! -s "$prefix.$track.bed.gz" || ! -r "$prefix.$track.bed.gz" ]]; then
-                    echo "Missing readable CpG track $prefix.$track.bed.gz." >&2
-                    exit 1
-                fi
-            done
-        done < track_prefixes.txt
+
+        mkdir -p output
+        echo "Converting donor tracks and preparing the cohort average for $subset on $chrom."
+        methbat_prepare_pileups.py --collection collection.tsv --chromosome "$chrom" \
+            --sample-limit "$sample_limit" --output-prefix "$output_prefix"
+        read -r sample_count < sample_count.txt
 
         extra_args=()
         if [[ "~{condense_bed_labels}" == "true" ]]; then
@@ -438,13 +442,19 @@ task SegmentMethBatChromosome {
             extra_args+=(--enable-nodata-segments)
         fi
 
-        mkdir -p output
         echo "Running MethBat joint segmentation for $subset on $chrom with $sample_count samples."
         methbat joint-segment -t ~{threads} --input-collection selected.tsv \
+            --min-sample-frac 0.9 --min-asm-frac 0.6 \
             --output-prefix "$output_prefix" "${extra_args[@]}"
-        printf '%s\n' "$sample_count" > sample_count.txt
+
+        echo "Running MethBat on the cohort average for $subset on $chrom."
+        methbat joint-segment -t ~{threads} --input-collection aggregate.tsv \
+            --min-sample-frac 0.9 --min-asm-frac 0.6 \
+            --output-prefix "$output_prefix.aggregate" "${extra_args[@]}"
+
+        methbat_compare_methods.py --prefix "$output_prefix" --subset "$subset" \
+            --chromosome "$chrom" --sample-count "$sample_count"
         printf '%s\t%s\t%s\t%s\n' "$subset" "$chrom" "$sample_limit" "$sample_count" > run_key.tsv
-        echo "Finished MethBat joint segmentation for $subset on $chrom."
     >>>
 
     runtime {
@@ -462,6 +472,13 @@ task SegmentMethBatChromosome {
         File meth_regions_bed = result_prefix + ".meth_regions.bed"
         File combined_methyl_bedgraph = result_prefix + ".combined_methyl.bedgraph"
         File asm_bedgraph = result_prefix + ".asm.bedgraph"
+        File aggregate_pileup_bed = result_prefix + ".aggregate.5mC.bed.gz"
+        File aggregate_meth_regions_bed = result_prefix + ".aggregate.meth_regions.bed"
+        File aggregate_combined_methyl_bedgraph = result_prefix + ".aggregate.combined_methyl.bedgraph"
+        File aggregate_asm_bedgraph = result_prefix + ".aggregate.asm.bedgraph"
+        File aggregation_qc_tsv = result_prefix + ".aggregation_qc.tsv"
+        File method_comparison_tsv = result_prefix + ".method_comparison.tsv"
+        File method_differences_tsv = result_prefix + ".method_differences.tsv"
     }
 }
 

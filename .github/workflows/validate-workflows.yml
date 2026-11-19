@@ -79,5 +79,11 @@ jobs:
             workflows/common/MergeCovariates.wdl \
             workflows/common/ResidualizePhenotypes.wdl
 
+      - name: Check MethBat task localization and comparison
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tabix
+          python tests/methylation/test_methbat_chromosome_subsets.py
+
       - name: Check CI path selection
         run: python tests/test_ci_path_filters.py

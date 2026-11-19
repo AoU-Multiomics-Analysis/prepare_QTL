@@ -64,6 +64,16 @@ class CiPathTests(unittest.TestCase):
             for path in ('workflows/genotype/trans_ld_regions.wdl', 'tests/trans_ld_regions/test_ld.py', 'tools/trans_ld_regions/Dockerfile', 'tools/trans_ld_regions/environment.yml'):
                 self.assertEqual(self.heavy_jobs(path, event), set())
 
+    def test_methbat_image_builds_only_for_its_runtime_files(self):
+        for event in ('push', 'pull_request'):
+            for name in ('Dockerfile', 'methbat_prepare_pileups.py', 'methbat_compare_methods.py'):
+                with self.subTest(event=event, name=name):
+                    self.assertEqual(self.heavy_jobs('tools/methbat/' + name, event),
+                                     {'smoke_methbat_image'})
+            for path in ('workflows/methylation/MethBat_jointseg_chromosome_subsets.wdl',
+                         'tests/methylation/test_methbat_chromosome_subsets.py'):
+                self.assertEqual(self.heavy_jobs(path, event), set())
+
     def test_manual_dispatch_runs_all_builds(self):
         self.assertEqual(self.heavy_jobs('', 'workflow_dispatch'),
                          {'build_and_push', 'build_cell_type_specific_expression',

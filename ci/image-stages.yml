@@ -656,6 +656,12 @@ legacy_runtime_roots:
 - scripts/proteomics
 - scripts/splicing
 workflow_groups:
+# MethBat uses its own protected image workflow and a digest supplied by the caller.
+- paths:
+  - workflows/methylation/MethBat_jointseg.wdl
+  - workflows/methylation/MethBat_jointseg_chromosome_subsets.wdl
+  stages: []
+  policy: external_images_manual
 - paths:
   - workflows/common/ExportRegenie.wdl
   stages: []

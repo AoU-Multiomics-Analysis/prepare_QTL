@@ -21,3 +21,33 @@ The sample list can be a headerless one-column file or use `sample_id`, `SampleI
 The root workflow owns the stable user-facing inputs and outputs. Add a task to
 the module that owns its data, and expose only the files needed by another
 stage.
+
+## MethBat chr21 pilot
+
+Use [MethBat_jointseg_chromosome_subsets.wdl](MethBat_jointseg_chromosome_subsets.wdl)
+with the existing legacy pb-CpG-tools manifest and indexes. The default settings
+use chr21 and two disjoint donor groups, with nested subsets of 25, 50, and 100
+donors per group. Use the published `ghcr.io/...@sha256:...` reference from the
+**MethBat Image** Actions run as `methbat_docker`. The image contains the pinned
+PacBio v1.2.0 binary and the pilot scripts.
+
+For each subset, the workflow converts the staged tracks to one unified 5mC
+pileup per donor. The direct run uses the donor pileups. The upstream run uses
+one cohort pileup and the same MethBat segmentation options.
+
+- Keep a CpG if at least 90% of all selected donors have a combined call.
+- Keep its haplotype signal if at least 60% of all selected donors have both
+  haplotype calls. Order the two fractions from low to high within each donor
+  before averaging the low and high values separately.
+- Give each eligible donor equal weight at a site. Use the modified and
+  unmodified counts from the input files. For a model-mode file, these are
+  estimated counts. The upstream pileup stores averages on the 1/10,000
+  fraction scale used by the v1.2.0 loader. This extra rounding can affect
+  segmentation or output scores.
+
+The workflow returns both region BEDs and both sets of score tracks, the cohort
+pileup, CpG filter counts, and a paired method comparison for each run. The
+comparison ignores file headers. It counts exact row matches, reports which
+rows differ, and measures the maximum score difference on shared bedGraph
+coordinates in percentage points. The existing boundary summaries still compare
+the two disjoint groups at each size with the direct MethBat method.
