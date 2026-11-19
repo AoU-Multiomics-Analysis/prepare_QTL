@@ -43,6 +43,12 @@ workflows:
   - subclass: WDL
     primaryDescriptorPath: /workflows/methylation/AggregateMethylationCohort.wdl
     name: aggregate_methylation_cohort
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/methylation/MethBat_jointseg.wdl
+    name: MethBat_jointseg
+  - subclass: WDL
+    primaryDescriptorPath: /workflows/methylation/MethBat_jointseg_chromosome_subsets.wdl
+    name: MethBat_jointseg_chromosome_subsets
   - subclass: WDL 
     primaryDescriptorPath: /workflows/common/calculate_phenotypePCs.wdl
     name: calculate_phenotypePCs
