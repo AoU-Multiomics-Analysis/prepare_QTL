@@ -22,7 +22,7 @@ workflow MethBat_jointseg_chromosome_subsets {
         Boolean condense_bed_labels = false
         Boolean enable_nodata_segments = false
         String staging_docker = "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        String methbat_docker
+        String methbat_docker = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:58a8a3d31fc50c57e28f7c5c039667f61f42d1e49986d3ba9317891da64d2166"
     }
 
     parameter_meta {
@@ -32,7 +32,7 @@ workflow MethBat_jointseg_chromosome_subsets {
         subset_sizes: "Number of samples to take from each group. Sizes are nested within a group. Use an empty array to run each entire group."
         split_seed: "Random seed for reproducible subset membership."
         min_reciprocal_overlap: "Minimum fraction of each region covered by a same-label match in the other subset."
-        methbat_docker: "Digest of the MethBat v1.2.0 image from the MethBat image workflow. The image includes the conversion, aggregation, and comparison scripts."
+        methbat_docker: "Optional override for the default MethBat v1.2.0 image digest. The image includes the conversion, aggregation, and comparison scripts."
     }
 
     call SplitMethBatCohort {

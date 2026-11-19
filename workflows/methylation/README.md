@@ -27,9 +27,9 @@ stage.
 Use [MethBat_jointseg_chromosome_subsets.wdl](MethBat_jointseg_chromosome_subsets.wdl)
 with the existing legacy pb-CpG-tools manifest and indexes. The default settings
 use chr21 and two disjoint donor groups, with nested subsets of 25, 50, and 100
-donors per group. Use the published `ghcr.io/...@sha256:...` reference from the
-**MethBat Image** Actions run as `methbat_docker`. The image contains the pinned
-PacBio v1.2.0 binary and the pilot scripts.
+donors per group. The default image uses a published digest from the
+**MethBat Image** Actions run. It contains the PacBio v1.2.0 binary and the pilot
+scripts. Use `methbat_docker` to override the default digest.
 
 For each subset, the workflow converts the staged tracks to one unified 5mC
 pileup per donor. The direct run uses the donor pileups. The upstream run uses
