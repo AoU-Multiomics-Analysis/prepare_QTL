@@ -160,18 +160,26 @@ args = sys.argv[1:]
 if args == ['--version']:
     print('methbat 1.2.0-7a582da')
     sys.exit(0)
-assert args[:3] == ['joint-segment', '-t', '2']
 assert '--enable-nodata-segments' in args and '--condense-bed-labels' not in args
-assert args[args.index('--min-sample-frac') + 1] == '0.9'
-assert args[args.index('--min-asm-frac') + 1] == '0.6'
-manifest = pathlib.Path(args[args.index('--input-collection') + 1]).read_text().splitlines()
-assert len(manifest) == 2
-_, pileup, label = manifest[1].split('\\t')
-assert label in ('F;study', '')
+if args[0] == 'joint-segment':
+    assert args[:3] == ['joint-segment', '-t', '2']
+    assert args[args.index('--min-sample-frac') + 1] == '0.9'
+    assert args[args.index('--min-asm-frac') + 1] == '0.6'
+    manifest = pathlib.Path(args[args.index('--input-collection') + 1]).read_text().splitlines()
+    assert len(manifest) == 2
+    _, pileup, label = manifest[1].split('\\t')
+    assert label == 'F;study'
+    expected_tracks = {'Total', 'hap1'}
+else:
+    assert args[0] == 'segment'
+    assert '--input-collection' not in args
+    pileup = args[args.index('--input-pileup') + 1]
+    assert pileup.endswith('.aggregate.5mC.bed.gz')
+    expected_tracks = {'Total'}
 rows = gzip.open(pileup, 'rt').read().splitlines()
 assert rows[0] == '##base_modification=5mC'
 assert rows[1].split('\\t')[7] == 'type'
-assert {row.split('\\t')[7] for row in rows[2:]} == ({'Total', 'hap1'} if label else {'Total'})
+assert {row.split('\\t')[7] for row in rows[2:]} == expected_tracks
 assert all(row.startswith('chr21\\t') for row in rows[2:])
 out = args[args.index('--output-prefix') + 1]
 for suffix in ('meth_regions.bed', 'combined_methyl.bedgraph', 'asm.bedgraph'):
@@ -229,7 +237,7 @@ for suffix in ('meth_regions.bed', 'combined_methyl.bedgraph', 'asm.bedgraph'):
         self.assertTrue(all(row["exact_rows_match"] == "true" for row in rows), rows)
         self.run_task("SegmentMethBatChromosome", self.root / "bad_segment", segment_inputs, {}, "localization error")
 
-    def test_aggregation_applies_both_cutoffs_and_uses_equal_donor_weights(self):
+    def test_exact_aggregation_keeps_eligible_donor_ratios(self):
         work = self.root / "aggregation"
         tracks = work / "tracks"
         tracks.mkdir(parents=True)
@@ -241,10 +249,13 @@ for suffix in ('meth_regions.bed', 'combined_methyl.bedgraph', 'asm.bedgraph'):
             samples.append(f"donor{donor}\t{prefix}\tX\n")
             for i, track in enumerate(("combined", "hap1", "hap2")):
                 with gzip.open(work / f"{prefix}.{track}.bed.gz", "wt") as handle:
-                    for start, n_combined, n_paired in ((10, 22, 15), (20, 23, 15), (30, 25, 14)):
+                    for start, n_combined, n_paired in ((10, 22, 15), (20, 23, 15), (30, 25, 14), (40, 25, 0)):
                         if i == 0 and donor < n_combined:
                             # The higher-depth call must still have equal weight.
                             counts = (0, 100) if donor == 0 else (1, 2)
+                            if start == 40:
+                                # MethBat's floating-point product is just below 1.5 units.
+                                counts = (3, 20000)
                         elif i in (1, 2) and donor < n_paired:
                             counts = (1, 1) if (donor + i) % 2 else (0, 1)
                         elif i == 1 and donor == n_paired:
@@ -258,21 +269,22 @@ for suffix in ('meth_regions.bed', 'combined_methyl.bedgraph', 'asm.bedgraph'):
         (work / "collection.tsv").write_text("identifier\tfilename\tlabels\n" + "".join(samples))
         subprocess.run(
             ["methbat_prepare_pileups.py", "--collection", "collection.tsv", "--chromosome", "chr21",
-             "--sample-limit", "25", "--output-prefix", "pilot"], cwd=work, env=self.env, check=True,
+             "--sample-limit", "25", "--output-prefix", "pilot", "--exact-ratio"], cwd=work, env=self.env, check=True,
         )
         with gzip.open(work / "pilot.aggregate.5mC.bed.gz", "rt") as handle:
             rows = {(fields[1], fields[7]): fields[8:11]
                     for fields in (line.split("\t") for line in handle) if fields[0] == "chr21"}
         self.assertEqual(rows, {
-            ("20", "Total"): ["10000", "4783", "5217"],
-            ("20", "hap1"): ["10000", "0", "10000"],
-            ("20", "hap2"): ["10000", "10000", "0"],
-            ("30", "Total"): ["10000", "4800", "5200"],
+            ("20", "Total"): ["230000", "110000", "120000"],
+            ("20", "hap1"): ["150000", "0", "150000"],
+            ("20", "hap2"): ["150000", "150000", "0"],
+            ("30", "Total"): ["250000", "120000", "130000"],
+            ("40", "Total"): ["250000", "25", "249975"],
         })
         with (work / "pilot.aggregation_qc.tsv").open() as handle:
             qc = next(csv.DictReader(handle, delimiter="\t"))
         self.assertEqual([qc[field] for field in ("sample_count", "candidate_sites", "combined_pass_sites",
-                                                  "paired_haplotype_pass_sites")], ["25", "3", "2", "1"])
+                                                  "paired_haplotype_pass_sites")], ["25", "4", "3", "1"])
 
     @unittest.skipUnless(os.environ.get("METHBAT_REAL"), "requires the pinned MethBat binary")
     def test_real_methbat_on_25_donors(self):

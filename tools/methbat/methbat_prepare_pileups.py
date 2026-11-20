@@ -5,6 +5,7 @@ import argparse
 from contextlib import contextmanager
 import csv
 import gzip
+from math import modf
 from heapq import merge
 from itertools import groupby, islice
 from pathlib import Path
@@ -81,14 +82,20 @@ def convert_sample(prefix, chromosome):
     return output
 
 
-def converted_sites(path):
+def converted_sites(path, *, exact_ratio=False):
     def rows(handle):
         for line in handle:
             if line.startswith("#"):
                 continue
             columns = line.split("\t", 11)
-            yield (int(columns[1]), TRACKS.index(columns[7]),
-                   round_ratio(FRACTION_SCALE * int(columns[9]), int(columns[8])))
+            modified, coverage = int(columns[9]), int(columns[8])
+            if exact_ratio:
+                # Match joint-segment's floating-point conversion of each donor.
+                remainder, whole = modf((modified / coverage) * FRACTION_SCALE)
+                fraction = int(whole) + int(remainder >= 0.5)
+            else:
+                fraction = round_ratio(FRACTION_SCALE * modified, coverage)
+            yield int(columns[1]), TRACKS.index(columns[7]), fraction
 
     with gzip.open(path, "rt", encoding="utf-8") as handle:
         for start, calls in groupby(rows(handle), key=lambda row: row[0]):
@@ -98,10 +105,17 @@ def converted_sites(path):
             yield start, fractions
 
 
-def write_aggregate(pileups, chromosome, output):
+def write_aggregate(pileups, chromosome, output, *, exact_ratio=False):
+    def aggregate_row(start, track, total, count):
+        if exact_ratio:
+            # The count columns hold the sum of donor fractions and its scale.
+            return bed_row(chromosome, start, track, FRACTION_SCALE * count, total)
+        return bed_row(chromosome, start, track, FRACTION_SCALE, round_ratio(total, count))
+
     candidate_sites = combined_sites = asm_sites = 0
     n_donors = len(pileups)
-    merged = merge(*(converted_sites(path) for path in pileups), key=lambda site: site[0])
+    merged = merge(*(converted_sites(path, exact_ratio=exact_ratio) for path in pileups),
+                   key=lambda site: site[0])
     with bgzip_writer(output) as handle:
         for start, observations in groupby(merged, key=lambda site: site[0]):
             candidate_sites += 1
@@ -119,13 +133,11 @@ def write_aggregate(pileups, chromosome, output):
             if 10 * combined_count < 9 * n_donors:
                 continue
             combined_sites += 1
-            handle.write(bed_row(chromosome, start, 0, FRACTION_SCALE,
-                                 round_ratio(combined_sum, combined_count)))
+            handle.write(aggregate_row(start, 0, combined_sum, combined_count))
             if 10 * paired_count >= 6 * n_donors:
                 asm_sites += 1
                 for track, total in ((1, low_sum), (2, high_sum)):
-                    handle.write(bed_row(chromosome, start, track, FRACTION_SCALE,
-                                         round_ratio(total, paired_count)))
+                    handle.write(aggregate_row(start, track, total, paired_count))
     return candidate_sites, combined_sites, asm_sites
 
 
@@ -150,10 +162,12 @@ def prepare(args):
             handle.write(f"{identifier}\t{pileup}\t{label}\n")
 
     aggregate = Path(f"{args.output_prefix}.aggregate.5mC.bed.gz")
-    candidates, combined, asm = write_aggregate(pileups, args.chromosome, aggregate)
-    Path("aggregate.tsv").write_text(
-        "\t".join(MANIFEST_FIELDS) + f"\ncohort\t{aggregate}\t\n", encoding="utf-8"
-    )
+    candidates, combined, asm = write_aggregate(pileups, args.chromosome, aggregate,
+                                                 exact_ratio=args.exact_ratio)
+    if not args.exact_ratio:
+        Path("aggregate.tsv").write_text(
+            "\t".join(MANIFEST_FIELDS) + f"\ncohort\t{aggregate}\t\n", encoding="utf-8"
+        )
     Path("sample_count.txt").write_text(f"{len(samples)}\n", encoding="utf-8")
     with Path(f"{args.output_prefix}.aggregation_qc.tsv").open("w", encoding="utf-8") as handle:
         handle.write("chromosome\tsample_count\tcandidate_sites\tcombined_pass_sites\tpaired_haplotype_pass_sites\n")
@@ -167,6 +181,8 @@ def main():
     parser.add_argument("--chromosome", required=True)
     parser.add_argument("--sample-limit", type=int, required=True)
     parser.add_argument("--output-prefix", required=True)
+    parser.add_argument("--exact-ratio", action="store_true",
+                        help="Preserve cohort ratios for methbat segment.")
     args = parser.parse_args()
     try:
         prepare(args)
