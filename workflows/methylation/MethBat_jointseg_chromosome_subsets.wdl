@@ -2,7 +2,7 @@ version 1.0
 
 workflow MethBat_jointseg_chromosome_subsets {
     meta {
-        description: "Compare MethBat v1.2.0 joint segmentation with segmentation of an upstream cohort average. Measure boundary shifts across disjoint groups."
+        description: "Compare MethBat v1.2.0 joint segmentation with segmentation of exact upstream cohort averages. Measure boundary shifts across disjoint groups."
     }
 
     input {
@@ -22,7 +22,7 @@ workflow MethBat_jointseg_chromosome_subsets {
         Boolean condense_bed_labels = false
         Boolean enable_nodata_segments = false
         String staging_docker = "ghcr.io/aou-multiomics-analysis/prepare_qtl:main"
-        String methbat_docker = "ghcr.io/aou-multiomics-analysis/prepare_qtl@sha256:58a8a3d31fc50c57e28f7c5c039667f61f42d1e49986d3ba9317891da64d2166"
+        String methbat_docker = "ghcr.io/aou-multiomics-analysis/prepare_qtl:methbat-1.2.0-rt-e2481cf3ec8364fe1f284fd85f98afb73f5fe132"
     }
 
     parameter_meta {
@@ -32,7 +32,7 @@ workflow MethBat_jointseg_chromosome_subsets {
         subset_sizes: "Number of samples to take from each group. Sizes are nested within a group. Use an empty array to run each entire group."
         split_seed: "Random seed for reproducible subset membership."
         min_reciprocal_overlap: "Minimum fraction of each region covered by a same-label match in the other subset."
-        methbat_docker: "Optional override for the default MethBat v1.2.0 image digest. The image includes the conversion, aggregation, and comparison scripts."
+        methbat_docker: "Override for the versioned MethBat v1.2.0 runtime. The image must include exact-ratio pileup preparation and method comparison."
     }
 
     call SplitMethBatCohort {
@@ -429,9 +429,9 @@ task SegmentMethBatChromosome {
         fi
 
         mkdir -p output
-        echo "Converting donor tracks and preparing the cohort average for $subset on $chrom."
+        echo "Converting donor tracks and preparing exact cohort ratios for $subset on $chrom."
         methbat_prepare_pileups.py --collection collection.tsv --chromosome "$chrom" \
-            --sample-limit "$sample_limit" --output-prefix "$output_prefix"
+            --sample-limit "$sample_limit" --output-prefix "$output_prefix" --exact-ratio
         read -r sample_count < sample_count.txt
 
         extra_args=()
@@ -447,9 +447,8 @@ task SegmentMethBatChromosome {
             --min-sample-frac 0.9 --min-asm-frac 0.6 \
             --output-prefix "$output_prefix" "${extra_args[@]}"
 
-        echo "Running MethBat on the cohort average for $subset on $chrom."
-        methbat joint-segment -t ~{threads} --input-collection aggregate.tsv \
-            --min-sample-frac 0.9 --min-asm-frac 0.6 \
+        echo "Running MethBat segment on the exact-ratio cohort pileup for $subset on $chrom."
+        methbat segment --input-pileup "$output_prefix.aggregate.5mC.bed.gz" \
             --output-prefix "$output_prefix.aggregate" "${extra_args[@]}"
 
         methbat_compare_methods.py --prefix "$output_prefix" --subset "$subset" \
